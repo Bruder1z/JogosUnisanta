@@ -20,7 +20,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
             }}
         >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <span>{match.sport.toUpperCase()}</span>
+                <span>{match.sport.toUpperCase()} - {match.category.toUpperCase()}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     {match.status === 'live' && (
                         <span style={{

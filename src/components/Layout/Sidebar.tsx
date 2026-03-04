@@ -1,21 +1,23 @@
 import { type FC } from 'react';
 import {
     Trophy,
-    Dribbble,
-    Target,
-    Users,
     ChevronRight,
-    TrendingUp,
-    History
+    History,
+    LayoutGrid
 } from 'lucide-react';
 
-const Sidebar: FC = () => {
-    const sports = [
-        { name: 'Futsal', icon: <Target size={18} /> },
-        { name: 'Basquete', icon: <Dribbble size={18} /> },
-        { name: 'Vôlei', icon: <Users size={18} /> },
-        { name: 'Natação', icon: <TrendingUp size={18} /> },
-        { name: 'Handebol', icon: <Target size={18} /> },
+interface SidebarProps {
+    onShowModalities?: () => void;
+    onSelectSport?: (sport: string) => void;
+}
+
+const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport }) => {
+    const principalSports = [
+        { name: 'Futsal', icon: '⚽' },
+        { name: 'Futebol Society', icon: '⚽' },
+        { name: 'Basquete 3x3', icon: '🏀' },
+        { name: 'Vôlei', icon: '🏐' },
+        { name: 'Handebol', icon: '🤾' },
     ];
 
     return (
@@ -38,10 +40,10 @@ const Sidebar: FC = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {sports.map((sport) => (
-                    <a
+                {principalSports.map((sport) => (
+                    <div
                         key={sport.name}
-                        href="#"
+                        onClick={() => onSelectSport?.(sport.name)}
                         className="sidebar-link"
                         style={{
                             display: 'flex',
@@ -51,16 +53,43 @@ const Sidebar: FC = () => {
                             fontSize: '14px',
                             fontWeight: 500,
                             color: 'var(--text-secondary)',
-                            transition: 'background 0.2s'
+                            transition: 'all 0.2s',
+                            cursor: 'pointer'
                         }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {sport.icon}
+                            <span style={{ fontSize: '18px' }}>{sport.icon}</span>
                             {sport.name}
                         </div>
                         <ChevronRight size={14} opacity={0.5} />
-                    </a>
+                    </div>
                 ))}
+
+                <button
+                    onClick={onShowModalities}
+                    className="sidebar-link"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 20px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: 'var(--accent-color)',
+                        background: 'none',
+                        border: 'none',
+                        width: '100%',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <LayoutGrid size={18} />
+                        MODALIDADES
+                    </div>
+                    <ChevronRight size={14} opacity={0.5} />
+                </button>
             </div>
 
             <div style={{ marginTop: '30px', padding: '0 20px 15px', borderBottom: '1px solid var(--border-color)', marginBottom: '15px' }}>

@@ -28,6 +28,7 @@ export interface MatchEvent {
 export interface Match {
   id: string;
   sport: string;
+  category: 'Masculino' | 'Feminino';
   teamA: Team;
   teamB: Team;
   scoreA: number;
@@ -62,56 +63,43 @@ export const mockTeams: Team[] = [
 ];
 
 export const mockMatches: Match[] = [
+  // Futsal
   {
-    id: 'm1',
-    sport: 'Futsal Masculino',
-    teamA: mockTeams[0],
-    teamB: mockTeams[1],
-    scoreA: 3,
-    scoreB: 1,
-    status: 'live',
-    date: '2026-03-04',
-    time: '19:00',
-    location: 'Ginásio Laerte Gonçalves',
-    events: [
-      { id: 'e1', type: 'start', minute: 0 },
-      { id: 'e2', type: 'goal', minute: 12, teamId: '1', player: 'Juninho' },
-      { id: 'e3', type: 'yellow_card', minute: 18, teamId: '2', player: 'Ricardo' },
-      { id: 'e4', type: 'goal', minute: 25, teamId: '1', player: 'Dudu' },
-      { id: 'e5', type: 'goal', minute: 32, teamId: '2', player: 'Felipe' },
-      { id: 'e6', type: 'red_card', minute: 38, teamId: '2', player: 'Ricardo' },
-      { id: 'e7', type: 'goal', minute: 40, teamId: '1', player: 'Juninho' },
-    ]
+    id: 'm1', sport: 'Futsal', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 3, scoreB: 1, status: 'live', date: '2026-03-04', time: '19:00', location: 'Ginásio Laerte Gonçalves',
+    events: [{ id: 'e1', type: 'start', minute: 0 }, { id: 'e2', type: 'goal', minute: 12, teamId: '1', player: 'Juninho' }]
   },
+  { id: 'm1f', sport: 'Futsal', category: 'Feminino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '18:00', location: 'Ginásio Laerte Gonçalves' },
+
+  // Vôlei
   {
-    id: 'm2',
-    sport: 'Vôlei Feminino',
-    teamA: mockTeams[2],
-    teamB: mockTeams[3],
-    scoreA: 2,
-    scoreB: 0,
-    status: 'live',
-    date: '2026-03-04',
-    time: '19:30',
-    location: 'Poliesportivo Unisanta',
-    events: [
-      { id: 'v1', type: 'start', minute: 0 },
-      { id: 'v2', type: 'set_win', minute: 25, teamId: '3', score: '25-18' },
-      { id: 'v3', type: 'set_win', minute: 52, teamId: '3', score: '25-22' },
-    ]
+    id: 'm2', sport: 'Vôlei', category: 'Feminino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 2, scoreB: 0, status: 'live', date: '2026-03-04', time: '19:30', location: 'Poliesportivo Unisanta',
+    events: [{ id: 'v1', type: 'start', minute: 0 }, { id: 'v2', type: 'set_win', minute: 25, teamId: '3', score: '25-18' }]
   },
-  {
-    id: 'm3',
-    sport: 'Basquete Masculino',
-    teamA: mockTeams[1],
-    teamB: mockTeams[3],
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    date: '2026-03-04',
-    time: '21:00',
-    location: 'Ginásio Laerte Gonçalves',
-  },
+  { id: 'm2m', sport: 'Vôlei', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '20:30', location: 'Poliesportivo Unisanta' },
+
+  // Basquete 3x3
+  { id: 'm3', sport: 'Basquete 3x3', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[3], scoreA: 15, scoreB: 12, status: 'finished', date: '2026-03-04', time: '14:00', location: 'Pátio Bloco M' },
+  { id: 'm3f', sport: 'Basquete 3x3', category: 'Feminino', teamA: mockTeams[0], teamB: mockTeams[2], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '16:00', location: 'Pátio Bloco M' },
+
+  // Handball
+  { id: 'm4', sport: 'Handebol', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[2], scoreA: 10, scoreB: 10, status: 'live', date: '2026-03-04', time: '20:00', location: 'Ginásio Laerte' },
+
+  // Natação
+  { id: 'm5', sport: 'Natação', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[0], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '09:00', location: 'Piscina Olímpica' },
+  { id: 'm5f', sport: 'Natação', category: 'Feminino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'finished', date: '2026-03-04', time: '08:00', location: 'Piscina Olímpica' },
+
+  // Soccer Society
+  { id: 'm6', sport: 'Futebol Society', category: 'Masculino', teamA: mockTeams[3], teamB: mockTeams[0], scoreA: 2, scoreB: 4, status: 'finished', date: '2026-03-04', time: '17:00', location: 'Campo Society' },
+
+  // Others
+  { id: 'm7', sport: 'Karatê', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[2], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '15:00', location: 'Sala de Lutas' },
+  { id: 'm8', sport: 'Judô', category: 'Feminino', teamA: mockTeams[0], teamB: mockTeams[3], scoreA: 1, scoreB: 0, status: 'live', date: '2026-03-04', time: '15:30', location: 'Sala de Lutas' },
+  { id: 'm9', sport: 'Xadrez', category: 'Masculino', teamA: mockTeams[2], teamB: mockTeams[1], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '13:00', location: 'Biblioteca' },
+  { id: 'm10', sport: 'Tênis de Mesa', category: 'Feminino', teamA: mockTeams[3], teamB: mockTeams[0], scoreA: 3, scoreB: 1, status: 'finished', date: '2026-03-04', time: '10:00', location: 'Ginásio de Mesa' },
+  { id: 'm11', sport: 'Futevôlei', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 2, scoreB: 0, status: 'finished', date: '2026-03-04', time: '16:00', location: 'Quadra de Areia' },
+  { id: 'm12', sport: 'Beach Tennis', category: 'Feminino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '17:00', location: 'Quadra de Areia' },
+  { id: 'm13', sport: 'Vôlei de Praia', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[2], scoreA: 1, scoreB: 1, status: 'live', date: '2026-03-04', time: '18:30', location: 'Quadra de Areia' },
+  { id: 'm14', sport: 'Tamboréu', category: 'Masculino', teamA: mockTeams[3], teamB: mockTeams[0], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '11:00', location: 'Quadra de Tamboréu' },
 ];
 
 export const AVAILABLE_COURSES = [
@@ -152,18 +140,38 @@ export const AVAILABLE_COURSES = [
 ];
 
 export const AVAILABLE_SPORTS = [
-  'Futsal Masculino',
-  'Futsal Feminino',
-  'Vôlei Masculino',
-  'Vôlei Feminino',
-  'Basquete Masculino',
-  'Basquete Feminino',
-  'Handebol Masculino',
-  'Handebol Feminino',
+  'Futsal',
+  'Futebol Society',
+  'Handebol',
+  'Vôlei',
   'Natação',
+  'Karatê',
   'Judô',
-  'Tênis de Mesa'
+  'Tamboréu',
+  'Xadrez',
+  'Tênis de Mesa',
+  'Futevôlei',
+  'Beach Tennis',
+  'Vôlei de Praia',
+  'Basquete 3x3'
 ];
+
+export const SPORT_ICONS: Record<string, string> = {
+  'Futsal': '⚽',
+  'Futebol Society': '⚽',
+  'Handebol': '🤾',
+  'Vôlei': '🏐',
+  'Natação': '🏊',
+  'Karatê': '🥋',
+  'Judô': '🥋',
+  'Tamboréu': '🎾',
+  'Xadrez': '♟️',
+  'Tênis de Mesa': '🏓',
+  'Futevôlei': '⚽',
+  'Beach Tennis': '🎾',
+  'Vôlei de Praia': '🏐',
+  'Basquete 3x3': '🏀',
+};
 
 export const COURSE_ICONS: Record<string, string> = {
   'Administração': '💼',

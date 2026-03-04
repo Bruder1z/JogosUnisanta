@@ -3,21 +3,36 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import MatchCard from '../components/Match/MatchCard';
 import MatchModal from '../components/Match/MatchModal';
+import ModalitiesModal from '../components/Modals/ModalitiesModal';
 import Login from './Login';
 import AdminDashboard from '../components/Admin/AdminDashboard';
 import { mockMatches, type Match } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, Calendar, Filter } from 'lucide-react';
+import {
+    Calendar,
+    ChevronDown,
+    Award,
+} from 'lucide-react';
 
 const Home: React.FC = () => {
     const { user } = useAuth();
     const [showLogin, setShowLogin] = useState(false);
+    const [showModalities, setShowModalities] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+    const [selectedSport, setSelectedSport] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<'Todos' | 'Masculino' | 'Feminino'>('Todos');
 
     const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
 
-    const liveMatches = mockMatches.filter(m => m.status === 'live');
-    const upcomingMatches = mockMatches.filter(m => m.status === 'scheduled');
+    const filteredMatches = mockMatches.filter(m => {
+        const sportMatch = !selectedSport || m.sport === selectedSport;
+        const categoryMatch = selectedCategory === 'Todos' || m.category === selectedCategory;
+        return sportMatch && categoryMatch;
+    });
+
+    const liveMatches = filteredMatches.filter(m => m.status === 'live');
+    const upcomingMatches = filteredMatches.filter(m => m.status === 'scheduled');
+    const finishedMatches = filteredMatches.filter(m => m.status === 'finished');
 
     return (
         <div style={{ minHeight: '100vh' }}>
@@ -40,7 +55,13 @@ const Home: React.FC = () => {
                 </div>
             )}
 
-            <Sidebar />
+            <Sidebar
+                onShowModalities={() => setShowModalities(true)}
+                onSelectSport={(sport) => {
+                    setSelectedSport(sport);
+                    setSelectedCategory('Todos');
+                }}
+            />
 
             <main style={{
                 marginLeft: 'var(--sidebar-width)',
@@ -88,7 +109,17 @@ const Home: React.FC = () => {
                         <section>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                    <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Jogos de Hoje</h1>
+                                    <h1 style={{ fontSize: '24px', fontWeight: 800 }}>
+                                        {selectedSport ? selectedSport : 'Jogos de Hoje'}
+                                    </h1>
+                                    {selectedSport && (
+                                        <button
+                                            onClick={() => setSelectedSport(null)}
+                                            style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            Ver todos os jogos
+                                        </button>
+                                    )}
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -106,16 +137,27 @@ const Home: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <button style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '13px'
-                                }}>
-                                    <Filter size={16} />
-                                    Filtrar
-                                </button>
+                                <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    {(['Todos', 'Masculino', 'Feminino'] as const).map((cat) => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setSelectedCategory(cat)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                fontWeight: 700,
+                                                background: selectedCategory === cat ? 'var(--accent-color)' : 'transparent',
+                                                color: selectedCategory === cat ? 'white' : 'var(--text-secondary)',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {cat.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {liveMatches.length > 0 && (
@@ -165,6 +207,25 @@ const Home: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
+                            {finishedMatches.length > 0 && (
+                                <div style={{ marginTop: '40px' }}>
+                                    <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Award size={16} /> JOGOS ENCERRADOS
+                                    </h2>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {finishedMatches.map(match => (
+                                            <MatchCard key={match.id} match={match} onClick={() => setSelectedMatch(match)} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {liveMatches.length === 0 && upcomingMatches.length === 0 && finishedMatches.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-secondary)' }}>
+                                    <Calendar size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
+                                    <p>Nenhum jogo encontrado para este filtro.</p>
+                                </div>
+                            )}
                         </section>
 
                         {/* Right Column: Mini Tables / Stats */}
@@ -217,6 +278,15 @@ const Home: React.FC = () => {
             </main>
 
             {showLogin && <Login onClose={() => setShowLogin(false)} />}
+            {showModalities && (
+                <ModalitiesModal
+                    onClose={() => setShowModalities(false)}
+                    onSelectSport={(sport) => {
+                        setSelectedSport(sport);
+                        setSelectedCategory('Todos');
+                    }}
+                />
+            )}
             {selectedMatch && (
                 <MatchModal
                     match={selectedMatch}
