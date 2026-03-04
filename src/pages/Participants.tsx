@@ -163,175 +163,66 @@ const Participants: FC = () => {
                         </div>
                     ) : (
                         <div>
-                            {/* Filters row */}
-                            <div style={{
-                                display: 'flex',
-                                gap: '15px',
-                                marginBottom: '30px',
-                                flexWrap: 'wrap'
-                            }}>
-                                <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
-                                    <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar atleta por nome..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        style={{
-                                            width: '100%',
-                                            background: 'var(--bg-card)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '12px 15px 12px 45px',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            outline: 'none'
-                                        }}
-                                    />
+                            <div style={{ marginBottom: '40px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                    <Trophy size={20} color="var(--accent-color)" />
+                                    <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Destaques dos Jogos</h2>
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <select
-                                        value={selectedSport}
-                                        onChange={(e) => setSelectedSport(e.target.value)}
-                                        style={{
-                                            background: 'var(--bg-card)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '0 15px',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            outline: 'none',
-                                            minWidth: '150px'
-                                        }}
-                                    >
-                                        <option value="Todos">Todas as Modalidades</option>
-                                        {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <select
-                                        value={selectedCourse}
-                                        onChange={(e) => setSelectedCourse(e.target.value)}
-                                        style={{
-                                            background: 'var(--bg-card)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '0 15px',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            outline: 'none',
-                                            minWidth: '150px'
-                                        }}
-                                    >
-                                        <option value="Todos">Todos os Cursos</option>
-                                        {Array.from(new Set(mockAthletes.map(a => a.course))).map(c => (
-                                            <option key={c} value={c}>{c}</option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={selectedInstitution}
-                                        onChange={(e) => setSelectedInstitution(e.target.value)}
-                                        style={{
-                                            background: 'var(--bg-card)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '0 15px',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            outline: 'none',
-                                            minWidth: '150px'
-                                        }}
-                                    >
-                                        <option value="Todas">Todas as Inst.</option>
-                                        {uniqueInstitutions.map(inst => (
-                                            <option key={inst} value={inst}>{inst}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                                gap: '25px'
-                            }}>
-                                {filteredAthletes.map((athlete) => (
-                                    <div key={athlete.id} className="premium-card hover-glow" style={{
-                                        padding: '24px',
-                                        transition: 'all 0.2s',
-                                        position: 'relative',
-                                        overflow: 'hidden'
-                                    }}>
-                                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-                                            <div style={{ position: 'relative' }}>
-                                                <div style={{
-                                                    width: '64px',
-                                                    height: '64px',
-                                                    borderRadius: '16px',
-                                                    background: 'var(--bg-hover)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: 'var(--accent-color)',
-                                                    fontSize: '24px',
-                                                    fontWeight: 800,
-                                                    border: '2px solid var(--bg-hover)'
-                                                }}>
-                                                    {athlete.firstName[0]}{athlete.lastName[0]}
-                                                </div>
-                                                <div style={{
-                                                    position: 'absolute',
-                                                    bottom: '-5px',
-                                                    right: '-5px',
-                                                    background: 'var(--accent-color)',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    border: '3px solid var(--bg-card)'
-                                                }}>
-                                                    <Trophy size={10} color="white" />
-                                                </div>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                                    gap: '20px'
+                                }}>
+                                    {[...mockAthletes].sort(() => 0.5 - Math.random()).slice(0, 5).map(athlete => (
+                                        <div key={athlete.id} className="premium-card hover-glow" style={{ padding: '20px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '-20px',
+                                                right: '-20px',
+                                                background: 'var(--accent-color)',
+                                                width: '50px',
+                                                height: '50px',
+                                                borderRadius: '50%',
+                                                opacity: 0.1
+                                            }} />
+                                            <div style={{
+                                                width: '64px',
+                                                height: '64px',
+                                                borderRadius: '50%',
+                                                background: 'var(--bg-hover)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: 'var(--accent-color)',
+                                                fontSize: '24px',
+                                                fontWeight: 800,
+                                                margin: '0 auto 15px',
+                                                border: '2px solid var(--accent-color)'
+                                            }}>
+                                                {athlete.firstName[0]}{athlete.lastName[0]}
                                             </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>
-                                                    {athlete.firstName} {athlete.lastName}
-                                                </div>
-                                                <div style={{ fontSize: '13px', color: 'var(--accent-color)', fontWeight: 600, marginBottom: '2px' }}>
-                                                    {athlete.course}
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <School size={12} />
-                                                    {athlete.institution}
-                                                </div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '4px' }}>
+                                                {athlete.firstName} {athlete.lastName}
+                                            </div>
+                                            <div style={{ marginTop: '15px', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                                                {athlete.sports.map(sport => (
+                                                    <span key={sport} style={{
+                                                        background: 'var(--bg-hover)',
+                                                        color: 'white',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '20px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        border: '1px solid var(--border-color)'
+                                                    }}>
+                                                        {sport}
+                                                    </span>
+                                                ))}
                                             </div>
                                         </div>
-
-                                        <div style={{ marginTop: '20px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                            {athlete.sports.map(sport => (
-                                                <span key={sport} style={{
-                                                    background: 'var(--bg-hover)',
-                                                    color: 'white',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    border: '1px solid var(--border-color)'
-                                                }}>
-                                                    {sport}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {filteredAthletes.length === 0 && (
-                                <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-secondary)' }}>
-                                    <User size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
-                                    <p>Nenhum atleta encontrado com esses filtros.</p>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </main>
@@ -345,7 +236,7 @@ const Participants: FC = () => {
                     box-shadow: 0 10px 30px rgba(227, 6, 19, 0.1);
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 
