@@ -1,0 +1,374 @@
+import { type FC, useState, useMemo, useEffect } from 'react';
+import Header from '../components/Navigation/Header';
+import Sidebar from '../components/Layout/Sidebar';
+import RankingModal from '../components/Modals/RankingModal';
+import { mockMatches, COURSE_EMBLEMS, type Match } from '../data/mockData';
+import { Zap, Save, CheckCircle, RotateCcw, Calendar, Trophy } from 'lucide-react';
+
+interface Prediction {
+    matchId: string;
+    scoreA: number | '';
+    scoreB: number | '';
+}
+
+const LS_KEY = 'jogos-unisanta-predictions';
+
+const Simulator: FC = () => {
+    const [showRanking, setShowRanking] = useState(false);
+    const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
+    const [saved, setSaved] = useState(false);
+
+    const getTeamEmblem = (teamName: string) => {
+        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
+            courseKey.toLowerCase().includes(teamName.toLowerCase())
+        );
+        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+    };
+
+    // Filter today's matches
+    const todayMatches = useMemo(() => {
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const local = new Date(now.getTime() - (offset * 60 * 1000));
+        const todayStr = local.toISOString().split('T')[0];
+        return mockMatches.filter(m => m.date === todayStr);
+    }, []);
+
+    // Also show all matches if none today
+    const displayMatches = useMemo(() => {
+        return todayMatches.length > 0 ? todayMatches : mockMatches;
+    }, [todayMatches]);
+
+    const showingAll = todayMatches.length === 0;
+
+    // Load from localStorage
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(LS_KEY);
+            if (stored) {
+                setPredictions(JSON.parse(stored));
+            }
+        } catch { /* ignore */ }
+    }, []);
+
+    const updatePrediction = (matchId: string, field: 'scoreA' | 'scoreB', value: string) => {
+        const numVal = value === '' ? '' : Math.max(0, parseInt(value) || 0);
+        setPredictions(prev => ({
+            ...prev,
+            [matchId]: {
+                matchId,
+                scoreA: field === 'scoreA' ? numVal : (prev[matchId]?.scoreA ?? ''),
+                scoreB: field === 'scoreB' ? numVal : (prev[matchId]?.scoreB ?? ''),
+            }
+        }));
+        setSaved(false);
+    };
+
+    const savePredictions = () => {
+        localStorage.setItem(LS_KEY, JSON.stringify(predictions));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+    };
+
+    const resetPredictions = () => {
+        setPredictions({});
+        localStorage.removeItem(LS_KEY);
+    };
+
+    const filledCount = Object.values(predictions).filter(p => p.scoreA !== '' && p.scoreB !== '').length;
+
+    const TeamEmblem = ({ teamName, size = 48 }: { teamName: string; size?: number }) => {
+        const emblemUrl = getTeamEmblem(teamName);
+        return emblemUrl ? (
+            <img
+                src={emblemUrl}
+                alt={teamName}
+                style={{ width: size, height: size, objectFit: 'contain' }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+        ) : (
+            <div style={{
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                background: 'var(--bg-hover)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: size * 0.5,
+            }}>
+                ⚽
+            </div>
+        );
+    };
+
+    const ScoreInput = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => (
+        <input
+            type="number"
+            min="0"
+            value={value}
+            onChange={(e) => updatePrediction(matchId, field, e.target.value)}
+            placeholder="-"
+            style={{
+                width: '56px',
+                height: '56px',
+                textAlign: 'center',
+                fontSize: '22px',
+                fontWeight: 800,
+                background: 'rgba(255,255,255,0.05)',
+                border: '2px solid var(--border-color)',
+                borderRadius: '12px',
+                color: 'white',
+                outline: 'none',
+                transition: 'all 0.2s',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-color)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,46,46,0.2)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.boxShadow = 'none'; }}
+        />
+    );
+
+    const MatchSimCard = ({ match }: { match: Match }) => {
+        const pred = predictions[match.id];
+        const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
+        const isFinished = match.status === 'finished';
+
+        return (
+            <div className="premium-card" style={{
+                padding: '24px',
+                transition: 'all 0.3s',
+                border: hasPrediction ? '1px solid rgba(255,46,46,0.3)' : '1px solid var(--border-color)',
+                position: 'relative',
+                overflow: 'hidden',
+            }}>
+                {/* Status badge */}
+                <div style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: match.status === 'live' ? 'rgba(255,46,46,0.15)' : match.status === 'finished' ? 'rgba(0,200,83,0.1)' : 'rgba(255,255,255,0.05)',
+                    color: match.status === 'live' ? '#ff4444' : match.status === 'finished' ? '#00c853' : 'var(--text-secondary)',
+                }}>
+                    <div style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: match.status === 'live' ? '#ff4444' : match.status === 'finished' ? '#00c853' : 'var(--text-secondary)',
+                        animation: match.status === 'live' ? 'pulse 1.5s infinite' : 'none',
+                    }} />
+                    {match.status === 'live' ? 'AO VIVO' : match.status === 'finished' ? 'ENCERRADO' : match.time}
+                </div>
+
+                {/* Sport & category */}
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span>{match.sport}</span>
+                    <span style={{ opacity: 0.3 }}>•</span>
+                    <span>{match.category}</span>
+                </div>
+
+                {/* Teams and scores */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                    {/* Team A */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <TeamEmblem teamName={match.teamA.name} size={48} />
+                        <span style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>
+                            {match.teamA.name.split(' - ')[0]}
+                        </span>
+                    </div>
+
+                    {/* Score inputs */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <ScoreInput matchId={match.id} field="scoreA" value={pred?.scoreA ?? ''} />
+                        <span style={{ fontSize: '20px', fontWeight: 300, color: 'var(--text-secondary)' }}>×</span>
+                        <ScoreInput matchId={match.id} field="scoreB" value={pred?.scoreB ?? ''} />
+                    </div>
+
+                    {/* Team B */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <TeamEmblem teamName={match.teamB.name} size={48} />
+                        <span style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>
+                            {match.teamB.name.split(' - ')[0]}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Real score if finished */}
+                {isFinished && (
+                    <div style={{
+                        marginTop: '16px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'rgba(0,200,83,0.05)',
+                        border: '1px solid rgba(0,200,83,0.15)',
+                        textAlign: 'center',
+                        fontSize: '13px',
+                        color: 'var(--text-secondary)',
+                    }}>
+                        Resultado real: <strong style={{ color: 'white' }}>{match.scoreA} × {match.scoreB}</strong>
+                    </div>
+                )}
+
+                {/* Match info */}
+                <div style={{
+                    marginTop: '14px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '16px',
+                    fontSize: '11px',
+                    color: 'var(--text-secondary)',
+                }}>
+                    <span>📍 {match.location}</span>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+            <Header />
+            <div style={{ display: 'flex', flex: 1, paddingLeft: 'var(--sidebar-width)', paddingTop: 'var(--header-height)' }}>
+                <Sidebar onShowRanking={() => setShowRanking(true)} />
+                <main style={{ flex: 1, padding: '40px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+
+                    {/* Page header */}
+                    <div style={{ marginBottom: '30px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
+                            <div style={{
+                                width: '50px',
+                                height: '50px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, var(--accent-color), #ff6b35)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 20px rgba(255, 46, 46, 0.3)',
+                            }}>
+                                <Zap size={26} color="white" />
+                            </div>
+                            <div>
+                                <h1 style={{ fontSize: '32px', fontWeight: 800, margin: 0 }}>Simulador</h1>
+                                <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: '14px' }}>
+                                    Dê seus palpites nos jogos {showingAll ? 'disponíveis' : 'de hoje'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats bar */}
+                    <div className="premium-card" style={{
+                        padding: '16px 24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '24px',
+                    }}>
+                        <div style={{ display: 'flex', gap: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Calendar size={16} color="var(--text-secondary)" />
+                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    <strong style={{ color: 'white' }}>{displayMatches.length}</strong> jogos
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Trophy size={16} color="var(--text-secondary)" />
+                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    <strong style={{ color: 'white' }}>{filledCount}</strong> palpites
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                                onClick={resetPredictions}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                <RotateCcw size={14} />
+                                Limpar
+                            </button>
+                            <button
+                                onClick={savePredictions}
+                                className="hover-glow"
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: saved ? '#00c853' : 'var(--accent-color)',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.3s',
+                                    boxShadow: '0 2px 12px rgba(255,46,46,0.3)',
+                                }}
+                            >
+                                {saved ? <><CheckCircle size={14} /> Salvo!</> : <><Save size={14} /> Salvar Palpites</>}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Info banner when showing all */}
+                    {showingAll && (
+                        <div style={{
+                            padding: '12px 20px',
+                            borderRadius: '10px',
+                            background: 'rgba(255,165,0,0.08)',
+                            border: '1px solid rgba(255,165,0,0.2)',
+                            marginBottom: '24px',
+                            fontSize: '13px',
+                            color: '#ffaa00',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                        }}>
+                            <Calendar size={16} />
+                            Não há jogos programados para hoje. Mostrando todos os jogos disponíveis.
+                        </div>
+                    )}
+
+                    {/* Match cards grid */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
+                        gap: '20px',
+                    }}>
+                        {displayMatches.map(match => (
+                            <MatchSimCard key={match.id} match={match} />
+                        ))}
+                    </div>
+
+                    {displayMatches.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-secondary)' }}>
+                            <Calendar size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
+                            <p>Nenhum jogo disponível para simulação.</p>
+                        </div>
+                    )}
+                </main>
+            </div>
+
+            {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
+        </div>
+    );
+};
+
+export default Simulator;

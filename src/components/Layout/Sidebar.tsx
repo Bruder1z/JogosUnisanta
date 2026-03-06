@@ -122,6 +122,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 <Link to="/melhores-atletas" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>Melhores Atletas</Link>
                 <Link to="/historia" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>História dos Jogos</Link>
                 <Link to="/transmissao" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>Transmissão</Link>
+                <Link to="/simulador" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--accent-color)', textDecoration: 'none', fontWeight: 600 }}>⚡ Simulador</Link>
             </div>
 
             <style>{`
