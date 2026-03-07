@@ -86,12 +86,11 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 <TeamDisplay team={match.teamA} side="left" />
 
                 <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ fontSize: '32px', fontWeight: 800, display: 'flex', gap: '15px' }}>
+                    <div style={{ fontSize: '32px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <span>{match.scoreA}</span>
-                        <span style={{ color: 'var(--border-color)' }}>-</span>
+                        <span style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600 }}>X</span>
                         <span>{match.scoreB}</span>
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '5px' }}>VS</div>
                 </div>
 
                 <TeamDisplay team={match.teamB} side="right" />

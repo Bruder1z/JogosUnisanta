@@ -4,7 +4,7 @@ export interface User {
   name: string;
   surname?: string;
   preferredCourse?: string;
-  preferredSport?: string;
+  favoriteTeam?: string;
   role: 'superadmin' | 'cliente';
   avatar?: string;
 }

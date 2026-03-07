@@ -1,11 +1,14 @@
 import { type FC } from 'react';
-import { Search, User as UserIcon, LogOut, LayoutDashboard } from 'lucide-react';
+import { Search, User as UserIcon, LogOut, LayoutDashboard, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ProfileModal from '../Modals/ProfileModal';
+import { useState } from 'react';
 
 const Header: FC = () => {
     const { user, logout } = useAuth();
     const location = useLocation();
+    const [showProfile, setShowProfile] = useState(false);
 
     const isActive = (path: string) => location.pathname === path;
 
@@ -44,11 +47,6 @@ const Header: FC = () => {
                         textDecoration: 'none',
                         transition: 'color 0.2s'
                     }}>Notícias</Link>
-                    <Link to="/simulador" style={{
-                        color: isActive('/simulador') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s'
-                    }}>Simulador</Link>
                 </nav>
             </div>
 
@@ -79,49 +77,67 @@ const Header: FC = () => {
 
                 {user ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: 'var(--accent-color)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 'bold',
-                            fontSize: '14px',
-                            cursor: 'pointer'
-                        }}>
+                        <div
+                            onClick={() => setShowProfile(true)}
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: 'var(--accent-color)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '14px',
+                                cursor: 'pointer'
+                            }}
+                        >
                             {user.name[0]}
                         </div>
                         <div style={{ textAlign: 'left' }}>
                             <div style={{ fontSize: '12px', fontWeight: 600 }}>{user.name}</div>
                             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{user.role}</div>
                         </div>
-                        {user.role === 'superadmin' && (
-                            <button title="Dashboard Admin" style={{ color: 'var(--text-secondary)' }}>
-                                <LayoutDashboard size={20} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <button
+                                onClick={() => setShowProfile(true)}
+                                title="Configurações"
+                                style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                            >
+                                <Settings size={18} />
                             </button>
-                        )}
-                        <button onClick={logout} title="Sair" style={{ color: 'var(--text-secondary)' }}>
-                            <LogOut size={20} />
-                        </button>
+                            {user.role === 'superadmin' && (
+                                <button title="Dashboard Admin" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                                    <LayoutDashboard size={20} />
+                                </button>
+                            )}
+                            <button onClick={logout} title="Sair" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                                <LogOut size={20} />
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <UserIcon size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} />
-                        <button style={{
-                            padding: '8px 16px',
-                            borderRadius: 'var(--border-radius)',
-                            background: 'var(--accent-color)',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            color: 'white'
-                        }}>
-                            Login / Cadastro
-                        </button>
+                        <Link to="/login" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                padding: '8px 16px',
+                                borderRadius: 'var(--border-radius)',
+                                background: 'var(--accent-color)',
+                                fontWeight: 700,
+                                fontSize: '13px',
+                                color: 'white',
+                                border: 'none',
+                                cursor: 'pointer'
+                            }}>
+                                Login / Cadastro
+                            </button>
+                        </Link>
                     </div>
                 )}
             </div>
+
+            {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
         </header>
     );
 };

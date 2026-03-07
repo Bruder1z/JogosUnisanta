@@ -6,6 +6,7 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<boolean>;
     register: (userData: Omit<User, 'id' | 'role'>) => Promise<boolean>;
     logout: () => void;
+    updateUser: (updates: Partial<User>) => Promise<boolean>;
     isLoading: boolean;
 }
 
@@ -71,8 +72,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('jogos_unisanta_user');
     };
 
+    const updateUser = async (updates: Partial<User>): Promise<boolean> => {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                if (!user) return resolve(false);
+
+                const updatedUser = { ...user, ...updates };
+                setUser(updatedUser);
+                localStorage.setItem('jogos_unisanta_user', JSON.stringify(updatedUser));
+
+                // Also update in registered users list if exists
+                const registeredUsersRaw = localStorage.getItem('jogos_unisanta_registered_users');
+                if (registeredUsersRaw) {
+                    const registeredUsers: User[] = JSON.parse(registeredUsersRaw);
+                    const updatedList = registeredUsers.map(u => u.id === user.id ? updatedUser : u);
+                    localStorage.setItem('jogos_unisanta_registered_users', JSON.stringify(updatedList));
+                }
+
+                resolve(true);
+            }, 300);
+        });
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+        <AuthContext.Provider value={{ user, login, register, logout, updateUser, isLoading }}>
             {children}
         </AuthContext.Provider>
     );

@@ -165,8 +165,10 @@ const MatchModal: FC<MatchModalProps> = ({ match, onClose }) => {
                         <TeamHeaderDisplay team={match.teamA} />
 
                         <div style={{ padding: '0 30px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '48px', fontWeight: 900, letterSpacing: '4px', color: 'var(--text-primary)' }}>
-                                {match.scoreA} - {match.scoreB}
+                            <div style={{ fontSize: '48px', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '15px', color: 'var(--text-primary)' }}>
+                                <span>{match.scoreA}</span>
+                                <span style={{ fontSize: '24px', color: 'var(--text-secondary)', fontWeight: 700 }}>X</span>
+                                <span>{match.scoreB}</span>
                             </div>
                             {match.status === 'live' && (
                                 <div style={{

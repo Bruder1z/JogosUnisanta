@@ -3,7 +3,7 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { mockMatches, COURSE_EMBLEMS, type Match } from '../data/mockData';
-import { Zap, Save, CheckCircle, RotateCcw, Calendar, Trophy } from 'lucide-react';
+import { Zap, Save, CheckCircle, RotateCcw, Calendar, Trophy, Info } from 'lucide-react';
 
 interface Prediction {
     matchId: string;
@@ -12,6 +12,9 @@ interface Prediction {
 }
 
 const LS_KEY = 'jogos-unisanta-predictions';
+
+const SET_SPORTS = ['Vôlei', 'Vôlei de Praia', 'Beach Tennis', 'Tênis de Mesa', 'Futevôlei'];
+const EXCLUDED_SPORTS = ['Xadrez', 'Natação'];
 
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
@@ -25,18 +28,19 @@ const Simulator: FC = () => {
         return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
     };
 
-    // Filter today's matches
+    // Filter today's matches (exclude finished)
     const todayMatches = useMemo(() => {
         const now = new Date();
         const offset = now.getTimezoneOffset();
         const local = new Date(now.getTime() - (offset * 60 * 1000));
         const todayStr = local.toISOString().split('T')[0];
-        return mockMatches.filter(m => m.date === todayStr);
+        return mockMatches.filter(m => m.date === todayStr && m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
     }, []);
 
-    // Also show all matches if none today
+    // Also show all scheduled matches if none today
     const displayMatches = useMemo(() => {
-        return todayMatches.length > 0 ? todayMatches : mockMatches;
+        if (todayMatches.length > 0) return todayMatches;
+        return mockMatches.filter(m => m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
     }, [todayMatches]);
 
     const showingAll = todayMatches.length === 0;
@@ -104,23 +108,31 @@ const Simulator: FC = () => {
 
     const ScoreInput = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => (
         <input
-            type="number"
-            min="0"
+            type="text"
+            inputMode="numeric"
             value={value}
-            onChange={(e) => updatePrediction(matchId, field, e.target.value)}
+            onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                updatePrediction(matchId, field, val);
+            }}
             placeholder="-"
             style={{
-                width: '56px',
-                height: '56px',
+                width: '60px',
+                height: '60px',
                 textAlign: 'center',
-                fontSize: '22px',
-                fontWeight: 800,
+                lineHeight: '60px',
+                padding: '0',
+                fontSize: '24px',
+                fontWeight: '900',
                 background: 'rgba(255,255,255,0.05)',
                 border: '2px solid var(--border-color)',
-                borderRadius: '12px',
+                borderRadius: '16px',
                 color: 'white',
                 outline: 'none',
                 transition: 'all 0.2s',
+                MozAppearance: 'textfield',
+                WebkitAppearance: 'none',
+                appearance: 'none',
             }}
             onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-color)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,46,46,0.2)'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.boxShadow = 'none'; }}
@@ -130,7 +142,7 @@ const Simulator: FC = () => {
     const MatchSimCard = ({ match }: { match: Match }) => {
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
-        const isFinished = match.status === 'finished';
+        const isSetSport = SET_SPORTS.includes(match.sport);
 
         return (
             <div className="premium-card" style={{
@@ -139,6 +151,9 @@ const Simulator: FC = () => {
                 border: hasPrediction ? '1px solid rgba(255,46,46,0.3)' : '1px solid var(--border-color)',
                 position: 'relative',
                 overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
             }}>
                 {/* Status badge */}
                 <div style={{
@@ -152,17 +167,16 @@ const Simulator: FC = () => {
                     borderRadius: '20px',
                     fontSize: '11px',
                     fontWeight: 700,
-                    background: match.status === 'live' ? 'rgba(255,46,46,0.15)' : match.status === 'finished' ? 'rgba(0,200,83,0.1)' : 'rgba(255,255,255,0.05)',
-                    color: match.status === 'live' ? '#ff4444' : match.status === 'finished' ? '#00c853' : 'var(--text-secondary)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-secondary)',
                 }}>
                     <div style={{
                         width: '6px',
                         height: '6px',
                         borderRadius: '50%',
-                        background: match.status === 'live' ? '#ff4444' : match.status === 'finished' ? '#00c853' : 'var(--text-secondary)',
-                        animation: match.status === 'live' ? 'pulse 1.5s infinite' : 'none',
+                        background: 'var(--text-secondary)',
                     }} />
-                    {match.status === 'live' ? 'AO VIVO' : match.status === 'finished' ? 'ENCERRADO' : match.time}
+                    {match.time}
                 </div>
 
                 {/* Sport & category */}
@@ -198,19 +212,22 @@ const Simulator: FC = () => {
                     </div>
                 </div>
 
-                {/* Real score if finished */}
-                {isFinished && (
+                {/* Set sport notice */}
+                {isSetSport && (
                     <div style={{
                         marginTop: '16px',
-                        padding: '10px',
+                        padding: '10px 14px',
                         borderRadius: '8px',
-                        background: 'rgba(0,200,83,0.05)',
-                        border: '1px solid rgba(0,200,83,0.15)',
-                        textAlign: 'center',
-                        fontSize: '13px',
-                        color: 'var(--text-secondary)',
+                        background: 'rgba(59,130,246,0.08)',
+                        border: '1px solid rgba(59,130,246,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        color: '#60a5fa',
                     }}>
-                        Resultado real: <strong style={{ color: 'white' }}>{match.scoreA} × {match.scoreB}</strong>
+                        <Info size={14} style={{ flexShrink: 0 }} />
+                        Placar em sets (ex: 3 × 1)
                     </div>
                 )}
 
@@ -237,27 +254,24 @@ const Simulator: FC = () => {
                 <main style={{ flex: 1, padding: '40px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
 
                     {/* Page header */}
-                    <div style={{ marginBottom: '30px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
-                            <div style={{
-                                width: '50px',
-                                height: '50px',
-                                borderRadius: '14px',
-                                background: 'linear-gradient(135deg, var(--accent-color), #ff6b35)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 20px rgba(255, 46, 46, 0.3)',
-                            }}>
-                                <Zap size={26} color="white" />
-                            </div>
-                            <div>
-                                <h1 style={{ fontSize: '32px', fontWeight: 800, margin: 0 }}>Simulador</h1>
-                                <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: '14px' }}>
-                                    Dê seus palpites nos jogos {showingAll ? 'disponíveis' : 'de hoje'}
-                                </p>
-                            </div>
+                    <div style={{ marginBottom: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '16px',
+                            background: 'linear-gradient(135deg, var(--accent-color), #ff6b35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 25px rgba(255, 46, 46, 0.4)',
+                            marginBottom: '16px'
+                        }}>
+                            <Zap size={32} color="white" />
                         </div>
+                        <h1 style={{ fontSize: '36px', fontWeight: 900, margin: 0, letterSpacing: '-1px' }}>Simulador</h1>
+                        <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0', fontSize: '16px', fontWeight: 500 }}>
+                            Dê seus palpites nos jogos de hoje
+                        </p>
                     </div>
 
                     {/* Stats bar */}
@@ -342,7 +356,7 @@ const Simulator: FC = () => {
                             gap: '10px',
                         }}>
                             <Calendar size={16} />
-                            Não há jogos programados para hoje. Mostrando todos os jogos disponíveis.
+                            Não há jogos programados para hoje. Mostrando todos os jogos disponíveis para palpites.
                         </div>
                     )}
 
@@ -351,6 +365,7 @@ const Simulator: FC = () => {
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
                         gap: '20px',
+                        alignItems: 'stretch',
                     }}>
                         {displayMatches.map(match => (
                             <MatchSimCard key={match.id} match={match} />
