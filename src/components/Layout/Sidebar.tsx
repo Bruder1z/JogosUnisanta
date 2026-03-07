@@ -1,10 +1,13 @@
-import { type FC } from 'react';
+import { useState, type FC } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Trophy,
     ChevronRight,
     History,
-    LayoutGrid
+    LayoutGrid,
+    Calendar,
+    X,
+    Download
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -14,6 +17,7 @@ interface SidebarProps {
 }
 
 const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRanking }) => {
+    const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
     const principalSports = [
         { name: 'Futsal', icon: '⚽' },
         { name: 'Futebol Society', icon: '⚽' },
@@ -122,6 +126,29 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 <Link to="/melhores-atletas" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>Melhores Atletas</Link>
                 <Link to="/historia" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>História dos Jogos</Link>
                 <Link to="/transmissao" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>Transmissão</Link>
+
+                <button
+                    onClick={() => setIsCalendarModalOpen(true)}
+                    className="sidebar-link"
+                    style={{
+                        padding: '10px 20px',
+                        fontSize: '13px',
+                        color: 'var(--text-secondary)',
+                        background: 'none',
+                        border: 'none',
+                        width: '100%',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}
+                >
+                    <Calendar size={16} />
+                    Calendário dos Jogos
+                </button>
+
                 <Link to="/simulador" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--accent-color)', textDecoration: 'none', fontWeight: 600 }}>⚡ Simulador</Link>
             </div>
 
@@ -131,6 +158,156 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
           color: var(--text-primary) !important;
         }
       `}</style>
+            {isCalendarModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: '20px',
+                    backdropFilter: 'blur(4px)'
+                }} onClick={() => setIsCalendarModalOpen(false)}>
+                    <div style={{
+                        background: 'var(--bg-main, #1a1a1a)',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '450px',
+                        padding: '24px',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
+                        border: '1px solid var(--border-color, #333)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        position: 'relative',
+                        color: 'var(--text-primary, #fff)'
+                    }} onClick={(e) => e.stopPropagation()}>
+
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <h2 style={{
+                                margin: 0,
+                                fontSize: '1.25rem',
+                                fontWeight: '700',
+                                color: 'var(--accent-color, #ef4444)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                lineHeight: '1.4'
+                            }}>
+                                <span>📅</span> Calendário Oficial - Jogos Unisanta 2025
+                            </h2>
+                            <button
+                                onClick={() => setIsCalendarModalOpen(false)}
+                                style={{
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: 'none',
+                                    color: 'var(--text-secondary, #a1a1aa)',
+                                    cursor: 'pointer',
+                                    padding: '6px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                                    e.currentTarget.style.color = '#fff';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                                    e.currentTarget.style.color = 'var(--text-secondary, #a1a1aa)';
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Info Cards */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                padding: '16px',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                                    <span style={{ marginRight: '8px', fontSize: '1.2rem' }}>📍</span>
+                                    <strong style={{ color: '#fff', fontSize: '1rem' }}>Locais Principais:</strong>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px', fontSize: '0.95rem', color: '#e5e7eb' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>🏟️</span> Centro de Treinamento
+                                    </div>
+                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative' }}>
+                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent-color)' }}></span>
+                                        Poliesportivo Unisanta (Bloco M)
+                                    </div>
+                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative' }}>
+                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent-color)' }}></span>
+                                        Laerte Gonçalves (Bloco D)
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                padding: '16px',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                <span style={{ marginRight: '8px', fontSize: '1.2rem' }}>📅</span>
+                                <strong style={{ color: '#fff', fontSize: '1rem', marginRight: '8px' }}>Período:</strong>
+                                <span style={{ color: '#d1d5db', fontSize: '0.95rem' }}>14 a 22 de maio de 2026</span>
+                            </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <a
+                            href="/docs/tabela-oficial-unisanta-2025.pdf"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download="tabela-oficial-unisanta-2025.pdf"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px',
+                                background: 'var(--accent-color, #ef4444)',
+                                color: '#fff',
+                                textDecoration: 'none',
+                                padding: '14px 24px',
+                                borderRadius: '12px',
+                                fontWeight: '700',
+                                fontSize: '1rem',
+                                transition: 'all 0.2s',
+                                marginTop: '8px',
+                                textAlign: 'center',
+                                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.6)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(239, 68, 68, 0.4)';
+                            }}
+                        >
+                            <Download size={20} />
+                            BAIXAR TABELA OFICIAL (PDF)
+                        </a>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 };
