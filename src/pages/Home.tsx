@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import MatchCard from '../components/Match/MatchCard';
@@ -18,6 +19,8 @@ import {
 
 const Home: React.FC = () => {
     const { user } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
     const [showLogin, setShowLogin] = useState(false);
     const [showModalities, setShowModalities] = useState(false);
     const [showRanking, setShowRanking] = useState(false);
@@ -28,6 +31,23 @@ const Home: React.FC = () => {
     const [showDateDropdown, setShowDateDropdown] = useState(false);
 
     const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const sportParam = params.get('sport');
+        const modalitiesParam = params.get('modalities');
+
+        if (sportParam) {
+            setSelectedSport(decodeURIComponent(sportParam));
+            setSelectedCategory('Todos');
+            // Remove params from URL after reading
+            navigate(location.pathname, { replace: true });
+        } else if (modalitiesParam === 'true') {
+            setShowModalities(true);
+            // Remove params from URL after reading
+            navigate(location.pathname, { replace: true });
+        }
+    }, [location.search, navigate, location.pathname]);
 
     const filteredMatches = mockMatches.filter(m => {
         const sportMatch = !selectedSport || m.sport === selectedSport;

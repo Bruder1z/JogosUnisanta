@@ -6,11 +6,11 @@ import RankingModal from '../components/Modals/RankingModal';
 const Transmissao: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
-            <div style={{ display: 'flex', flex: 1, paddingLeft: 'var(--sidebar-width)', paddingTop: 'var(--header-height)' }}>
-                <Sidebar onShowRanking={() => setShowRanking(true)} />
-                <main style={{ flex: 1, padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+            <Sidebar onShowRanking={() => setShowRanking(true)} />
+            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: '40px' }}>
+                <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '40px' }}>
                         <h1 style={{ fontSize: '36px', fontWeight: 800, marginBottom: '20px', color: 'var(--text-primary)' }}>Transmissão</h1>
 
@@ -45,8 +45,8 @@ const Transmissao: FC = () => {
                             </div>
                         </div>
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
         </div>
     );

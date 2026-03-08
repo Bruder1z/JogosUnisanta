@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     Trophy,
     ChevronRight,
@@ -18,6 +18,9 @@ interface SidebarProps {
 
 const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRanking }) => {
     const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const principalSports = [
         { name: 'Futsal', icon: '⚽' },
         { name: 'Futebol Society', icon: '⚽' },
@@ -25,6 +28,22 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
         { name: 'Vôlei', icon: '🏐' },
         { name: 'Handebol', icon: '🤾' },
     ];
+
+    const handleSelectSport = (sport: string) => {
+        if (location.pathname === '/') {
+            onSelectSport?.(sport);
+        } else {
+            navigate(`/?sport=${encodeURIComponent(sport)}`);
+        }
+    };
+
+    const handleShowModalities = () => {
+        if (location.pathname === '/') {
+            onShowModalities?.();
+        } else {
+            navigate('/?modalities=true');
+        }
+    };
 
     return (
         <aside style={{
@@ -36,7 +55,8 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
             background: 'var(--bg-main)',
             borderRight: '1px solid var(--border-color)',
             padding: '20px 0',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            zIndex: 40
         }}>
             <div style={{ padding: '0 20px 15px', borderBottom: '1px solid var(--border-color)', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 'bold', fontSize: '14px' }}>
@@ -49,7 +69,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 {principalSports.map((sport) => (
                     <div
                         key={sport.name}
-                        onClick={() => onSelectSport?.(sport.name)}
+                        onClick={() => handleSelectSport(sport.name)}
                         className="sidebar-link"
                         style={{
                             display: 'flex',
@@ -72,7 +92,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 ))}
 
                 <button
-                    onClick={onShowModalities}
+                    onClick={handleShowModalities}
                     className="sidebar-link"
                     style={{
                         display: 'flex',

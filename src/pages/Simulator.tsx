@@ -247,11 +247,11 @@ const Simulator: FC = () => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
-            <div style={{ display: 'flex', flex: 1, paddingLeft: 'var(--sidebar-width)', paddingTop: 'var(--header-height)' }}>
-                <Sidebar onShowRanking={() => setShowRanking(true)} />
-                <main style={{ flex: 1, padding: '40px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+            <Sidebar onShowRanking={() => setShowRanking(true)} />
+            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: '40px' }}>
+                <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
                     {/* Page header */}
                     <div style={{ marginBottom: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -378,8 +378,8 @@ const Simulator: FC = () => {
                             <p>Nenhum jogo disponível para simulação.</p>
                         </div>
                     )}
-                </main>
-            </div>
+                </div>
+            </main>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
         </div>

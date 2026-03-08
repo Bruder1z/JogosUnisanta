@@ -73,11 +73,11 @@ const Participants: FC = () => {
     }, []);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
-            <div style={{ display: 'flex', flex: 1, paddingLeft: 'var(--sidebar-width)', paddingTop: 'var(--header-height)' }}>
-                <Sidebar onShowRanking={() => setShowRanking(true)} />
-                <main style={{ flex: 1, padding: '40px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+            <Sidebar onShowRanking={() => setShowRanking(true)} />
+            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: '40px' }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
                         <div>
                             <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '10px' }}>Participantes</h1>
@@ -386,8 +386,8 @@ const Participants: FC = () => {
                             </div>
                         </div>
                     )}
-                </main>
-            </div>
+                </div>
+            </main>
 
             <style>{`
                 .hover-glow:hover {

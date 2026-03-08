@@ -1,120 +1,133 @@
-import { type FC } from 'react';
-import { User as UserIcon, LogOut, LayoutDashboard, Settings } from 'lucide-react';
+import { type FC, useState, useMemo } from 'react';
+import { User as UserIcon, Trophy, LayoutDashboard } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ProfileModal from '../Modals/ProfileModal';
-import { useState } from 'react';
+import { mockMatches } from '../../data/mockData';
 
 const Header: FC = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const location = useLocation();
     const [showProfile, setShowProfile] = useState(false);
 
     const isActive = (path: string) => location.pathname === path;
 
+    const totalPoints = useMemo(() => {
+        if (!user) return 0;
+        try {
+            const stored = localStorage.getItem('jogos-unisanta-predictions');
+            if (!stored) return 0;
+            const predictions = JSON.parse(stored);
+            let points = 0;
+            mockMatches.forEach(match => {
+                if (match.status === 'finished') {
+                    const pred = predictions[match.id];
+                    if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
+                        if (Number(pred.scoreA) === match.scoreA && Number(pred.scoreB) === match.scoreB) {
+                            points += 1;
+                        }
+                    }
+                }
+            });
+            return points;
+        } catch {
+            return 0;
+        }
+    }, [user, showProfile]); // Also update when profile closes to catch new points
+
     return (
-        <header className="glass" style={{
-            height: 'var(--header-height)',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 24px',
-            borderBottom: '1px solid var(--border-color)'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
-                <Link to="/" style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '-1px', textDecoration: 'none', color: 'inherit' }}>
-                    <span style={{ color: 'var(--accent-color)' }}>JOGOS</span> UNISANTA
-                </Link>
+        <>
+            <header className="glass" style={{
+                height: 'var(--header-height)',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 24px',
+                borderBottom: '1px solid var(--border-color)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+                    <Link to="/" style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '-1px', textDecoration: 'none', color: 'inherit' }}>
+                        <span style={{ color: 'var(--accent-color)' }}>JOGOS</span> UNISANTA
+                    </Link>
 
-                <nav style={{ display: 'flex', gap: '20px', fontSize: '14px', fontWeight: 500 }}>
-                    <Link to="/" style={{
-                        color: isActive('/') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s'
-                    }}>Resultados</Link>
-                    <Link to="/participantes" style={{
-                        color: isActive('/participantes') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s'
-                    }}>Participantes</Link>
-                    <Link to="/noticias" style={{
-                        color: isActive('/noticias') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s'
-                    }}>Notícias</Link>
-                </nav>
-            </div>
+                    <nav style={{ display: 'flex', gap: '20px', fontSize: '14px', fontWeight: 500 }}>
+                        <Link to="/" style={{
+                            color: isActive('/') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            transition: 'color 0.2s'
+                        }}>Resultados</Link>
+                        <Link to="/participantes" style={{
+                            color: isActive('/participantes') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            transition: 'color 0.2s'
+                        }}>Participantes</Link>
+                        <Link to="/noticias" style={{
+                            color: isActive('/noticias') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            transition: 'color 0.2s'
+                        }}>Notícias</Link>
+                    </nav>
+                </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                {user ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div
-                            onClick={() => setShowProfile(true)}
-                            style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                background: 'var(--accent-color)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 'bold',
-                                fontSize: '14px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {user.name[0]}
-                        </div>
-                        <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 600 }}>{user.name}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{user.role}</div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <button
-                                onClick={() => setShowProfile(true)}
-                                title="Configurações"
-                                style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
-                            >
-                                <Settings size={18} />
-                            </button>
-                            {user.role === 'superadmin' && (
-                                <button title="Dashboard Admin" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
-                                    <LayoutDashboard size={20} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    {user ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ffd700', fontSize: '13px', fontWeight: 700, marginRight: '10px' }}>
+                                    <Trophy size={14} /> {totalPoints} {totalPoints === 1 ? 'pt' : 'pts'}
+                                </div>
+
+                                {user.role === 'superadmin' && (
+                                    <button title="Dashboard Admin" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                                        <LayoutDashboard size={20} />
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => setShowProfile(true)}
+                                    title="Meu Perfil"
+                                    style={{
+                                        color: 'var(--text-secondary)',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        transition: 'color 0.2s'
+                                    }}
+                                >
+                                    <UserIcon size={24} color="#ccc" />
                                 </button>
-                            )}
-                            <button onClick={logout} title="Sair" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
-                                <LogOut size={20} />
-                            </button>
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <UserIcon size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} />
-                        <Link to="/login" style={{ textDecoration: 'none' }}>
-                            <button style={{
-                                padding: '8px 16px',
-                                borderRadius: 'var(--border-radius)',
-                                background: 'var(--accent-color)',
-                                fontWeight: 700,
-                                fontSize: '13px',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer'
-                            }}>
-                                Login / Cadastro
-                            </button>
-                        </Link>
-                    </div>
-                )}
-            </div>
-
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <UserIcon size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} />
+                            <Link to="/login" style={{ textDecoration: 'none' }}>
+                                <button style={{
+                                    padding: '8px 16px',
+                                    borderRadius: 'var(--border-radius)',
+                                    background: 'var(--accent-color)',
+                                    fontWeight: 700,
+                                    fontSize: '13px',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}>
+                                    Login / Cadastro
+                                </button>
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </header>
             {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
-        </header>
+        </>
     );
 };
 

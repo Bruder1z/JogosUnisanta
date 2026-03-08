@@ -116,6 +116,14 @@ export const mockMatches: Match[] = [
   { id: 'm12', sport: 'Beach Tennis', category: 'Feminino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '17:00', location: 'Quadra de Areia' },
   { id: 'm13', sport: 'Vôlei de Praia', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[2], scoreA: 1, scoreB: 1, status: 'live', date: '2026-03-04', time: '18:30', location: 'Quadra de Areia' },
   { id: 'm14', sport: 'Tamboréu', category: 'Masculino', teamA: mockTeams[3], teamB: mockTeams[0], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-04', time: '11:00', location: 'Quadra de Tamboréu' },
+
+  // Future Matches (March 9, 10, 11)
+  { id: 'm15', sport: 'Futsal', category: 'Masculino', teamA: mockTeams[2], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-09', time: '19:00', location: 'Ginásio Laerte Gonçalves' },
+  { id: 'm16', sport: 'Vôlei', category: 'Feminino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-09', time: '20:30', location: 'Poliesportivo Unisanta' },
+  { id: 'm17', sport: 'Basquete 3x3', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[2], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-10', time: '14:00', location: 'Pátio Bloco M' },
+  { id: 'm18', sport: 'Natação', category: 'Feminino', teamA: mockTeams[1], teamB: mockTeams[2], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-10', time: '08:00', location: 'Piscina Olímpica' },
+  { id: 'm19', sport: 'Futebol Society', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-11', time: '17:00', location: 'Campo Society' },
+  { id: 'm20', sport: 'Handebol', category: 'Masculino', teamA: mockTeams[1], teamB: mockTeams[3], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-11', time: '20:00', location: 'Ginásio Laerte' },
 ];
 
 export const AVAILABLE_COURSES = [
