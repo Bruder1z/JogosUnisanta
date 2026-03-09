@@ -8,6 +8,9 @@ interface AuthContextType {
     logout: () => void;
     updateUser: (updates: Partial<User>) => Promise<boolean>;
     isLoading: boolean;
+    isLoginModalOpen: boolean;
+    openLoginModal: () => void;
+    closeLoginModal: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
     useEffect(() => {
         const savedUser = localStorage.getItem('jogos_unisanta_user');
@@ -94,8 +98,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     };
 
+    const openLoginModal = () => setIsLoginModalOpen(true);
+    const closeLoginModal = () => setIsLoginModalOpen(false);
+
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, updateUser, isLoading }}>
+        <AuthContext.Provider value={{
+            user, login, register, logout, updateUser, isLoading,
+            isLoginModalOpen, openLoginModal, closeLoginModal
+        }}>
             {children}
         </AuthContext.Provider>
     );

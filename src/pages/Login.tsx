@@ -63,7 +63,7 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 2000,
+            zIndex: 9999,
             backdropFilter: 'blur(5px)'
         }}>
             <div className="premium-card" style={{

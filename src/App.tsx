@@ -6,25 +6,37 @@ import History from './pages/History';
 import Transmissao from './pages/Transmissao';
 import MelhoresAtletas from './pages/MelhoresAtletas';
 import Simulator from './pages/Simulator';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+
+const AppContent = () => {
+  const { isLoginModalOpen, closeLoginModal } = useAuth();
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/noticias" element={<News />} />
+        <Route path="/participantes" element={<Participants />} />
+        <Route path="/melhores-atletas" element={<MelhoresAtletas />} />
+        <Route path="/historia" element={<History />} />
+        <Route path="/transmissao" element={<Transmissao />} />
+        <Route path="/simulador" element={<Simulator />} />
+      </Routes>
+      {isLoginModalOpen && <Login onClose={closeLoginModal} />}
+    </>
+  );
+};
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/noticias" element={<News />} />
-          <Route path="/participantes" element={<Participants />} />
-          <Route path="/melhores-atletas" element={<MelhoresAtletas />} />
-          <Route path="/historia" element={<History />} />
-          <Route path="/transmissao" element={<Transmissao />} />
-          <Route path="/simulador" element={<Simulator />} />
-        </Routes>
+        <AppContent />
       </AuthProvider>
-
     </Router>
   );
 }
+
 
 export default App;

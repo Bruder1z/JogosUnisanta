@@ -6,7 +6,7 @@ import ProfileModal from '../Modals/ProfileModal';
 import { mockMatches } from '../../data/mockData';
 
 const Header: FC = () => {
-    const { user } = useAuth();
+    const { user, openLoginModal } = useAuth();
     const location = useLocation();
     const [showProfile, setShowProfile] = useState(false);
 
@@ -108,8 +108,9 @@ const Header: FC = () => {
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <UserIcon size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} />
-                            <Link to="/login" style={{ textDecoration: 'none' }}>
-                                <button style={{
+                            <button
+                                onClick={openLoginModal}
+                                style={{
                                     padding: '8px 16px',
                                     borderRadius: 'var(--border-radius)',
                                     background: 'var(--accent-color)',
@@ -118,10 +119,10 @@ const Header: FC = () => {
                                     color: 'white',
                                     border: 'none',
                                     cursor: 'pointer'
-                                }}>
-                                    Login / Cadastro
-                                </button>
-                            </Link>
+                                }}
+                            >
+                                Login / Cadastro
+                            </button>
                         </div>
                     )}
                 </div>
