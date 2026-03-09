@@ -7,19 +7,148 @@ import {
     Trophy,
     BookOpen,
     Clock,
-    Layout
+    Layout,
+    MapPin,
+    Calendar,
+    Save
 } from 'lucide-react';
-import { mockMatches } from '../../data/mockData';
+import { AVAILABLE_COURSES, COURSE_EMBLEMS, COURSE_ICONS } from '../../data/mockData';
+
+// Mock de dados interno
+const jogosIniciais = [
+    {
+        id: '1',
+        timeA: 'Fefesp',
+        timeB: 'Engenharia',
+        placarA: 0,
+        placarB: 0,
+        modalidade: 'Futsal Masculino',
+        status: 'LIVE',
+        local: 'Poliesportivo - 19:00'
+    },
+    {
+        id: '2',
+        timeA: 'Odonto',
+        timeB: 'Direito',
+        placarA: 0,
+        placarB: 0,
+        modalidade: 'Vôlei Feminino',
+        status: 'SCHEDULED',
+        local: 'Ginásio Principal - 20:30'
+    },
+    {
+        id: '3',
+        timeA: 'Fisioterapia',
+        timeB: 'Sistemas',
+        placarA: 2,
+        placarB: 1,
+        modalidade: 'Handebol Masculino',
+        status: 'LIVE',
+        local: 'Quadra 2 - 19:00'
+    }
+];
 
 const AdminDashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState('overview');
 
+    // Matches State and Filtering
+    const [matches, setMatches] = useState(jogosIniciais);
+    const [filter, setFilter] = useState<'all' | 'male' | 'female'>('all');
+
+    // Modal & Feedback States
+    const [selectedStat, setSelectedStat] = useState<any>(null);
+    const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
+    const [isScoreOpen, setIsScoreOpen] = useState(false);
+    const [selectedMatch, setSelectedMatch] = useState<any>(null);
+
+    // Form States
+    const [newMatchForm, setNewMatchForm] = useState({
+        teamA: '', teamB: '', sport: '', time: '', location: ''
+    });
+    const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
+    const [settingsForm, setSettingsForm] = useState({
+        regulationUrl: 'https://jogos.unisanta.br/regulamento.pdf',
+        liveStreamUrl: 'https://youtube.com/santaceciliatv'
+    });
+
+    const [isLoadingReports, setIsLoadingReports] = useState(false);
+    const [notification, setNotification] = useState('');
+
+    const showNotification = (msg: string) => {
+        setNotification(msg);
+        setTimeout(() => setNotification(''), 3000);
+    };
+
+    const handleReportClick = () => {
+        setActiveTab('reports');
+        setIsLoadingReports(true);
+        setTimeout(() => setIsLoadingReports(false), 2000);
+    };
+
+    const handleSaveNewMatch = () => {
+        if (!newMatchForm.teamA || !newMatchForm.teamB || !newMatchForm.sport || !newMatchForm.time || !newMatchForm.location) {
+            showNotification('Preencha todos os campos!');
+            return;
+        }
+        const newMatch = {
+            id: 'm' + Date.now(),
+            timeA: newMatchForm.teamA,
+            timeB: newMatchForm.teamB,
+            placarA: 0,
+            placarB: 0,
+            modalidade: newMatchForm.sport,
+            status: 'SCHEDULED',
+            local: `${newMatchForm.location} - ${newMatchForm.time}`
+        };
+        setMatches([newMatch as any, ...matches]);
+        setIsNewMatchOpen(false);
+        setNewMatchForm({ teamA: '', teamB: '', sport: '', time: '', location: '' });
+        showNotification("Partida criada com sucesso!");
+    };
+
+    const handleToggleStatus = (matchId: string) => {
+        setMatches(matches.map(m => {
+            if (m.id === matchId) {
+                const newStatus = m.status === 'LIVE' ? 'SCHEDULED' : 'LIVE';
+                showNotification(`Status alterado para ${newStatus}`);
+                return { ...m, status: newStatus };
+            }
+            return m;
+        }));
+    };
+
+    const handleUpdatePlacar = () => {
+        if (!selectedMatch) return;
+        setMatches(matches.map(m => {
+            if (m.id === selectedMatch.id) {
+                return { ...m, placarA: scoreForm.scoreA, placarB: scoreForm.scoreB };
+            }
+            return m;
+        }));
+        setIsScoreOpen(false);
+        showNotification("Placar atualizado!");
+    };
+
+    const filteredMatches = matches.filter(match => {
+        if (filter === 'all') return true;
+        if (filter === 'male' && match.modalidade.toLowerCase().includes('masculino')) return true;
+        if (filter === 'female' && match.modalidade.toLowerCase().includes('feminino')) return true;
+        return false;
+    });
+
+    const pendingResults = matches.filter(m => m.placarA === 0 && m.placarB === 0).length;
+
     const stats = [
-        { label: 'Total Atletas', value: '1,240', icon: <Users size={20} />, color: '#3b82f6' },
-        { label: 'Partidas Hoje', value: '12', icon: <Trophy size={20} />, color: '#ef4444' },
-        { label: 'Cursos Inscritos', value: '18', icon: <BookOpen size={20} />, color: '#10b981' },
-        { label: 'Resultados Pendentes', value: '5', icon: <PlusCircle size={20} />, color: '#f59e0b' },
+        { label: 'Total Atletas', value: '1,240', icon: <Users size={20} />, color: '#3b82f6', type: 'athletes' },
+        { label: 'Partidas Hoje', value: matches.filter(m => m.status === 'LIVE').length.toString(), icon: <Trophy size={20} />, color: '#ef4444', type: 'matches' },
+        { label: 'Cursos Inscritos', value: AVAILABLE_COURSES.length.toString(), icon: <BookOpen size={20} />, color: '#10b981', type: 'courses' },
+        { label: 'Resultados Pendentes', value: pendingResults.toString(), icon: <PlusCircle size={20} />, color: '#f59e0b', type: 'pending' },
     ];
+
+    const getCourseIcon = (name: string) => {
+        const foundKey = Object.keys(COURSE_ICONS).find(key => name.includes(key));
+        return foundKey ? COURSE_ICONS[foundKey] : '🎓';
+    };
 
     return (
         <div style={{ padding: '20px' }}>
@@ -31,7 +160,14 @@ const AdminDashboard: React.FC = () => {
             {/* Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
                 {stats.map(stat => (
-                    <div key={stat.label} className="premium-card" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div
+                        key={stat.label}
+                        className="premium-card"
+                        onClick={() => setSelectedStat(stat)}
+                        style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', transition: 'transform 0.2s' }}
+                        onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                        onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
                         <div style={{
                             width: '48px',
                             height: '48px',
@@ -64,89 +200,496 @@ const AdminDashboard: React.FC = () => {
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => tab.id === 'reports' ? handleReportClick() : setActiveTab(tab.id)}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
-                                padding: '12px 16px',
+                                padding: '14px 18px',
                                 borderRadius: '8px',
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                background: activeTab === tab.id ? 'var(--bg-hover)' : 'transparent',
-                                color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
+                                fontSize: '15px',
+                                fontWeight: activeTab === tab.id ? 700 : 500,
+                                background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
+                                color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)',
                                 transition: 'all 0.2s',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                border: 'none',
+                                cursor: 'pointer',
+                                outline: 'none'
+                            }}
+                            onMouseEnter={(e) => {
+                                if (activeTab !== tab.id) {
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (activeTab !== tab.id) {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                }
                             }}
                         >
-                            {tab.icon}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '20px',
+                                opacity: activeTab === tab.id ? 1 : 0.7
+                            }}>
+                                {tab.icon}
+                            </div>
                             {tab.label}
                         </button>
                     ))}
                 </div>
 
-                <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                    <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
-                        <button style={{
-                            background: 'var(--accent-color)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <PlusCircle size={16} />
-                            Nova Partida
-                        </button>
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                    <div style={{ padding: '20px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                            <thead>
-                                <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '12px' }}>PARTIDA</th>
-                                    <th style={{ padding: '12px' }}>MODALIDADE</th>
-                                    <th style={{ padding: '12px' }}>STATUS</th>
-                                    <th style={{ padding: '12px' }}>AÇÕES</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {mockMatches.map(match => (
-                                    <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '15px 12px' }}>
-                                            <div style={{ fontWeight: 600 }}>{match.teamA.name} vs {match.teamB.name}</div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{match.location}</div>
-                                        </td>
-                                        <td style={{ padding: '15px 12px' }}>{match.sport}</td>
-                                        <td style={{ padding: '15px 12px' }}>
-                                            <span style={{
-                                                padding: '4px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                background: match.status === 'live' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                color: match.status === 'live' ? '#ef4444' : 'var(--text-secondary)'
-                                            }}>
-                                                {match.status.toUpperCase()}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '15px 12px' }}>
-                                            <button style={{ color: 'var(--accent-color)', fontWeight: 600, marginRight: '15px' }}>Editar</button>
-                                            <button style={{ color: 'var(--text-secondary)' }}>Placar</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    {activeTab === 'overview' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
+                                <button
+                                    onClick={() => setIsNewMatchOpen(true)}
+                                    style={{
+                                        background: 'var(--accent-color)',
+                                        color: 'white',
+                                        padding: '8px 16px',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        border: 'none',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#c10510'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
+                                >
+                                    <PlusCircle size={16} />
+                                    Nova Partida
+                                </button>
+                            </div>
+
+                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={() => setFilter('all')}
+                                    style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', background: filter === 'all' ? 'var(--accent-color)' : 'var(--bg-hover)', color: filter === 'all' ? 'white' : 'var(--text-secondary)' }}
+                                >
+                                    TODOS
+                                </button>
+                                <button
+                                    onClick={() => setFilter('male')}
+                                    style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', background: filter === 'male' ? 'var(--accent-color)' : 'var(--bg-hover)', color: filter === 'male' ? 'white' : 'var(--text-secondary)' }}
+                                >
+                                    MASCULINO
+                                </button>
+                                <button
+                                    onClick={() => setFilter('female')}
+                                    style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', background: filter === 'female' ? 'var(--accent-color)' : 'var(--bg-hover)', color: filter === 'female' ? 'white' : 'var(--text-secondary)' }}
+                                >
+                                    FEMININO
+                                </button>
+                            </div>
+
+                            <div style={{ padding: '0', overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>MODALIDADE</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>STATUS</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>AÇÕES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredMatches.map(match => (
+                                            <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '16px 20px' }}>
+                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.timeA} {match.placarA} x {match.placarB} {match.timeB}</div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.local}</div>
+                                                </td>
+                                                <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.modalidade}</td>
+                                                <td style={{ padding: '16px 20px' }}>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        background: match.status === 'LIVE' ? 'rgba(227, 6, 19, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                        color: match.status === 'LIVE' ? 'var(--accent-color)' : 'var(--text-secondary)'
+                                                    }}>
+                                                        {match.status}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '16px 20px' }}>
+                                                    <button
+                                                        onClick={() => handleToggleStatus(match.id)}
+                                                        style={{ color: 'var(--accent-color)', fontWeight: 600, marginRight: '15px', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.2s' }}
+                                                        onMouseOver={e => e.currentTarget.style.opacity = '0.7'}
+                                                        onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                                                    >
+                                                        Status
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedMatch(match);
+                                                            setScoreForm({ scoreA: match.placarA || 0, scoreB: match.placarB || 0 });
+                                                            setIsScoreOpen(true);
+                                                        }}
+                                                        style={{ color: 'var(--text-secondary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.2s' }}
+                                                        onMouseOver={e => e.currentTarget.style.opacity = '0.7'}
+                                                        onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                                                    >
+                                                        Placar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'matches' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <Clock size={24} color="var(--accent-color)" />
+                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Todas as Partidas</h2>
+                            </div>
+                            <div style={{ padding: '0', overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>MODALIDADE</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>AÇÕES (AGENDAMENTO)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {matches.map(match => (
+                                            <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '16px 20px' }}>
+                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.timeA} x {match.timeB}</div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.local}</div>
+                                                </td>
+                                                <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.modalidade}</td>
+                                                <td style={{ padding: '16px 20px' }}>
+                                                    <button
+                                                        onClick={() => showNotification("Editar Horário em desenvolvimento...")}
+                                                        style={{ color: 'var(--text-primary)', fontWeight: 600, marginRight: '15px', background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                                    >
+                                                        <Calendar size={14} /> Horário
+                                                    </button>
+                                                    <button
+                                                        onClick={() => showNotification("Definir Local em desenvolvimento...")}
+                                                        style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                                    >
+                                                        <MapPin size={14} /> Local
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'teams' && (
+                        <div className="premium-card" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+                                <Users size={24} color="var(--accent-color)" />
+                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Equipes & Cursos Inscritos</h2>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                                {AVAILABLE_COURSES.map((course, index) => {
+                                    const [name, university] = course.split(' - ');
+                                    const icon = getCourseIcon(name);
+                                    const emblemUrl = course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[course]}` : null;
+
+                                    return (
+                                        <div key={index} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            padding: '12px',
+                                            background: 'var(--bg-hover)',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)'
+                                        }}>
+                                            {emblemUrl ? (
+                                                <img
+                                                    src={emblemUrl}
+                                                    alt={name}
+                                                    style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                                                    {icon}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{name}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{university}</div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'reports' && (
+                        <div className="premium-card" style={{ padding: '40px', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', padding: '16px', borderRadius: '50%', background: 'rgba(227, 6, 19, 0.1)', color: 'var(--accent-color)', marginBottom: '20px' }}>
+                                <FileText size={32} />
+                            </div>
+                            <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '10px' }}>Relatórios PDF</h2>
+
+                            {isLoadingReports ? (
+                                <div style={{ color: 'var(--accent-color)', fontWeight: 700, margin: '20px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ width: '20px', height: '20px', border: '3px solid var(--accent-color)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                                    Gerando relatórios...
+                                </div>
+                            ) : (
+                                <>
+                                    <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 20px' }}>
+                                        Baixe a versão em PDF do quadro atual de classificação e resultados das partidas recentes.
+                                    </p>
+                                    <button
+                                        onClick={() => showNotification("Relatório PDF baixado com sucesso!")}
+                                        style={{
+                                            background: 'var(--accent-color)',
+                                            color: '#fff',
+                                            padding: '12px 24px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Baixar Relatório Mestre
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'settings' && (
+                        <div className="premium-card" style={{ padding: '30px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+                                <Settings size={24} color="var(--accent-color)" />
+                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configurações do Sistema</h2>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                        Link do Regulamento Geral (PDF)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        style={inputStyle}
+                                        value={settingsForm.regulationUrl}
+                                        onChange={e => setSettingsForm({ ...settingsForm, regulationUrl: e.target.value })}
+                                        placeholder="Ex: https://dominio.com/regulamento.pdf"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                        Link da Transmissão (Padrão)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        style={inputStyle}
+                                        value={settingsForm.liveStreamUrl}
+                                        onChange={e => setSettingsForm({ ...settingsForm, liveStreamUrl: e.target.value })}
+                                        placeholder="Ex: https://youtube.com/..."
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => showNotification('Configurações salvas!')}
+                                    style={{
+                                        background: 'var(--accent-color)',
+                                        color: 'white',
+                                        padding: '12px 24px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        alignSelf: 'flex-start',
+                                        marginTop: '10px'
+                                    }}
+                                >
+                                    <Save size={18} />
+                                    Salvar Alterações
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             </div>
+
+            {/* Notification Toast */}
+            {notification && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '20px',
+                    background: '#0bb34c',
+                    color: 'white',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    zIndex: 9999,
+                    animation: 'slideInRight 0.3s ease-out'
+                }}>
+                    {notification}
+                </div>
+            )}
+
+            {/* Modals */}
+            {selectedStat && (
+                <ModalOverlay onClose={() => setSelectedStat(null)}>
+                    <h2 style={{ marginBottom: '16px' }}>{selectedStat.label}</h2>
+
+                    {selectedStat.type === 'courses' ? (
+                        <>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Lista oficial de faculdades participantes.</p>
+                            <div style={{ background: 'var(--bg-hover)', borderRadius: '8px', padding: '16px', maxHeight: '400px', overflowY: 'auto' }}>
+                                {AVAILABLE_COURSES.map((course, i) => {
+                                    const [name, university] = course.split(' - ');
+                                    return (
+                                        <div key={i} style={{ padding: '12px 0', borderBottom: i < AVAILABLE_COURSES.length - 1 ? '1px solid var(--border-color)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-primary)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{ width: '30px', height: '30px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                                                    {getCourseIcon(name)}
+                                                </div>
+                                                <span style={{ fontWeight: 600 }}>{name}</span>
+                                            </div>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '12px', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '10px' }}>{university}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Lista de dados desta categoria.</p>
+                            <div style={{ background: 'var(--bg-hover)', borderRadius: '8px', padding: '16px' }}>
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} style={{ padding: '12px 0', borderBottom: i < 2 ? '1px solid var(--border-color)' : 'none', display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)' }}>
+                                        <span>Registro #{i + 1}</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Detalhes...</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                    <button onClick={() => setSelectedStat(null)} style={{ ...modalButtonStyle, marginTop: '20px', width: '100%' }}>Fechar</button>
+                </ModalOverlay>
+            )}
+
+            {isNewMatchOpen && (
+                <ModalOverlay onClose={() => setIsNewMatchOpen(false)}>
+                    <h2 style={{ marginBottom: '16px' }}>Nova Partida</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <input type="text" placeholder="Equipe A (Ex: Engenharia)" style={inputStyle} value={newMatchForm.teamA} onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })} />
+                        <input type="text" placeholder="Equipe B (Ex: Fefesp)" style={inputStyle} value={newMatchForm.teamB} onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })} />
+                        <select style={inputStyle} value={newMatchForm.sport} onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}>
+                            <option value="">Selecione a Modalidade</option>
+                            <option value="Futsal Masculino">Futsal Masculino</option>
+                            <option value="Futsal Feminino">Futsal Feminino</option>
+                            <option value="Vôlei Masculino">Vôlei Masculino</option>
+                            <option value="Vôlei Feminino">Vôlei Feminino</option>
+                            <option value="Handebol Masculino">Handebol Masculino</option>
+                            <option value="Handebol Feminino">Handebol Feminino</option>
+                        </select>
+                        <input type="time" style={inputStyle} value={newMatchForm.time} onChange={e => setNewMatchForm({ ...newMatchForm, time: e.target.value })} />
+                        <input type="text" placeholder="Local (Ex: Poliesportivo)" style={inputStyle} value={newMatchForm.location} onChange={e => setNewMatchForm({ ...newMatchForm, location: e.target.value })} />
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                            <button onClick={handleSaveNewMatch} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Partida</button>
+                            <button onClick={() => setIsNewMatchOpen(false)} style={modalButtonStyle}>Cancelar</button>
+                        </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {isScoreOpen && selectedMatch && (
+                <ModalOverlay onClose={() => setIsScoreOpen(false)}>
+                    <h2 style={{ marginBottom: '8px' }}>Atualizar Placar</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px' }}>{selectedMatch.timeA} vs {selectedMatch.timeB}</p>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', background: 'var(--bg-hover)', padding: '20px', borderRadius: '8px' }}>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedMatch.timeA}</div>
+                            <input type="number" value={scoreForm.scoreA} onChange={e => setScoreForm({ ...scoreForm, scoreA: Number(e.target.value) })} style={{ ...inputStyle, textAlign: 'center', fontSize: '24px', padding: '10px' }} />
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-secondary)' }}>X</div>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedMatch.timeB}</div>
+                            <input type="number" value={scoreForm.scoreB} onChange={e => setScoreForm({ ...scoreForm, scoreB: Number(e.target.value) })} style={{ ...inputStyle, textAlign: 'center', fontSize: '24px', padding: '10px' }} />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                        <button onClick={handleUpdatePlacar} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Placar</button>
+                        <button onClick={() => setIsScoreOpen(false)} style={modalButtonStyle}>Cancelar</button>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
+};
+
+const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, backdropFilter: 'blur(5px)' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={onClose} />
+        <div className="premium-card" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
+            {children}
+        </div>
+    </div>
+);
+
+const inputStyle = {
+    background: '#2a2a2a',
+    border: '1px solid #333',
+    padding: '12px',
+    borderRadius: '6px',
+    color: '#fff',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box' as const
+};
+
+const modalButtonStyle = {
+    flex: 1,
+    padding: '12px',
+    borderRadius: '6px',
+    border: 'none',
+    background: 'var(--bg-hover)',
+    color: 'white',
+    fontWeight: 700,
+    cursor: 'pointer'
 };
 
 export default AdminDashboard;
