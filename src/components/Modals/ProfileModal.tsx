@@ -205,12 +205,12 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Curso / Faculdade</label>
+                                <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Faculdade</label>
                                 <input
                                     type="text"
                                     value={preferredCourse}
                                     onChange={(e) => setPreferredCourse(e.target.value)}
-                                    placeholder="Ex: Engenharia"
+                                    placeholder="Ex: Unisanta"
                                     style={{
                                         background: '#2a2a2a',
                                         border: '1px solid #333',
