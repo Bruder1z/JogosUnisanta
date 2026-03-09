@@ -64,7 +64,7 @@ const AdminDashboard: React.FC = () => {
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     // DataContext
-    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete } = useData();
+    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete, customEmblems, addCustomEmblem } = useData();
 
     // Form and Data States
     const [newCourseForm, setNewCourseForm] = useState({ name: '', university: '', emblem: '' });
@@ -159,6 +159,11 @@ const AdminDashboard: React.FC = () => {
         }
         const fullCourseString = `${newCourseForm.name} - ${newCourseForm.university}`;
         addCourse(fullCourseString);
+
+        if (newCourseForm.emblem) {
+            addCustomEmblem(fullCourseString, newCourseForm.emblem);
+        }
+
         setIsNewCourseOpen(false);
         setNewCourseForm({ name: '', university: '', emblem: '' });
         showNotification("Curso cadastrado com sucesso!");
@@ -480,10 +485,10 @@ const AdminDashboard: React.FC = () => {
 
                             <div style={{ padding: '20px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-                                    {coursesList.map((course, index) => {
+                                    {[...coursesList].sort((a, b) => a.localeCompare(b)).map((course, index) => {
                                         const [name, university] = course.split(' - ');
                                         const icon = getCourseIcon(name);
-                                        const emblemUrl = course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[course]}` : null;
+                                        const emblemUrl = customEmblems[course] || (course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[course]}` : null);
 
                                         return (
                                             <div key={index} style={{
@@ -585,7 +590,7 @@ const AdminDashboard: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
-                                        {athletesList.map((athlete) => (
+                                        {[...athletesList].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)).map((athlete) => (
                                             <div key={athlete.id} style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -806,11 +811,23 @@ const AdminDashboard: React.FC = () => {
                             <input type="text" placeholder="Unip" style={inputStyle} value={newCourseForm.university} onChange={e => setNewCourseForm({ ...newCourseForm, university: e.target.value })} />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Emblema Oficial (Upload simulado)</label>
-                            <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setNewCourseForm({ ...newCourseForm, emblem: 'uploaded' })}>
-                                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '4px', fontSize: '12px' }}>Escolher Arquivo</span>
-                                <span style={{ fontSize: '13px' }}>{newCourseForm.emblem ? 'emblema.png' : 'Nenhum arquivo /emblemas/...'}</span>
-                            </div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Emblema Oficial</label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                style={{ ...inputStyle, padding: '8px', color: 'var(--text-secondary)' }}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => {
+                                            setNewCourseForm({ ...newCourseForm, emblem: reader.result as string });
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }}
+                            />
+                            {newCourseForm.emblem && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent-color)' }}>✓ Imagem carregada com sucesso</div>}
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>

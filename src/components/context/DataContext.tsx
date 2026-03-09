@@ -17,6 +17,8 @@ interface DataContextType {
     athletes: Athlete[];
     addAthlete: (athlete: Athlete) => void;
     removeAthlete: (id: string) => void;
+    customEmblems: Record<string, string>;
+    addCustomEmblem: (course: string, base64: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -44,6 +46,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('jg_athletes', JSON.stringify(athletes));
     }, [athletes]);
 
+    const [customEmblems, setCustomEmblems] = useState<Record<string, string>>(() => {
+        const saved = localStorage.getItem('jg_emblems');
+        if (saved) return JSON.parse(saved);
+        return {};
+    });
+
+    useEffect(() => {
+        localStorage.setItem('jg_emblems', JSON.stringify(customEmblems));
+    }, [customEmblems]);
+
     const addCourse = (course: string) => setCourses(prev => [course, ...prev]);
     const removeCourse = (courseToRemove: string) => {
         setCourses(prev => prev.filter(c => c !== courseToRemove));
@@ -56,10 +68,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const addAthlete = (athlete: Athlete) => setAthletes(prev => [athlete, ...prev]);
     const removeAthlete = (id: string) => setAthletes(prev => prev.filter(a => a.id !== id));
 
+    const addCustomEmblem = (course: string, base64: string) => {
+        setCustomEmblems(prev => ({ ...prev, [course]: base64 }));
+    };
+
     return (
         <DataContext.Provider value={{
             courses, addCourse, removeCourse,
-            athletes, addAthlete, removeAthlete
+            athletes, addAthlete, removeAthlete,
+            customEmblems, addCustomEmblem
         }}>
             {children}
         </DataContext.Provider>

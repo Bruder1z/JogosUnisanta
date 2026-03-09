@@ -36,7 +36,7 @@ const Participants: FC = () => {
     const [selectedInstitution, setSelectedInstitution] = useState('Todas');
 
     // Context Data
-    const { courses, athletes } = useData();
+    const { courses, athletes, customEmblems } = useData();
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -63,13 +63,13 @@ const Participants: FC = () => {
                 athlete.institution.toLowerCase().includes(selectedInstitution.toLowerCase());
 
             return nameMatch && sportMatch && courseMatch && instMatch;
-        });
+        }).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
     }, [searchTerm, selectedSport, selectedCourse, selectedInstitution, athletes]);
 
     const filteredCourses = useMemo(() => {
         return courses.filter(course => {
             return course.toLowerCase().includes(searchTerm.toLowerCase());
-        });
+        }).sort((a, b) => a.localeCompare(b));
     }, [searchTerm, courses]);
 
     const uniqueInstitutions = useMemo(() => {
@@ -204,7 +204,7 @@ const Participants: FC = () => {
                             {filteredCourses.map((course, index) => {
                                 const [name, university] = course.split(' - ');
                                 const icon = getCourseIcon(name);
-                                const emblemUrl = course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[course]}` : null;
+                                const emblemUrl = customEmblems[course] || (course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[course]}` : null);
 
                                 return (
                                     <div
