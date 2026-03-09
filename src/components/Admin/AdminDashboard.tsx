@@ -3,7 +3,6 @@ import {
     Users,
     Settings,
     PlusCircle,
-    FileText,
     Trophy,
     BookOpen,
     Clock,
@@ -81,18 +80,11 @@ const AdminDashboard: React.FC = () => {
         liveStreamUrl: 'https://youtube.com/santaceciliatv'
     });
 
-    const [isLoadingReports, setIsLoadingReports] = useState(false);
     const [notification, setNotification] = useState('');
 
     const showNotification = (msg: string) => {
         setNotification(msg);
         setTimeout(() => setNotification(''), 3000);
-    };
-
-    const handleReportClick = () => {
-        setActiveTab('reports');
-        setIsLoadingReports(true);
-        setTimeout(() => setIsLoadingReports(false), 2000);
     };
 
     const handleSaveNewMatch = () => {
@@ -251,12 +243,11 @@ const AdminDashboard: React.FC = () => {
                         { id: 'matches', label: 'Gerenciar Partidas', icon: <Clock size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
-                        { id: 'reports', label: 'Relatórios PDF', icon: <FileText size={18} /> },
                         { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => tab.id === 'reports' ? handleReportClick() : setActiveTab(tab.id)}
+                            onClick={() => setActiveTab(tab.id)}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -657,42 +648,6 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'reports' && (
-                        <div className="premium-card" style={{ padding: '40px', textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', padding: '16px', borderRadius: '50%', background: 'rgba(227, 6, 19, 0.1)', color: 'var(--accent-color)', marginBottom: '20px' }}>
-                                <FileText size={32} />
-                            </div>
-                            <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '10px' }}>Relatórios PDF</h2>
-
-                            {isLoadingReports ? (
-                                <div style={{ color: 'var(--accent-color)', fontWeight: 700, margin: '20px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ width: '20px', height: '20px', border: '3px solid var(--accent-color)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                                    Gerando relatórios...
-                                </div>
-                            ) : (
-                                <>
-                                    <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 20px' }}>
-                                        Baixe a versão em PDF do quadro atual de classificação e resultados das partidas recentes.
-                                    </p>
-                                    <button
-                                        onClick={() => showNotification("Relatório PDF baixado com sucesso!")}
-                                        style={{
-                                            background: 'var(--accent-color)',
-                                            color: '#fff',
-                                            padding: '12px 24px',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            fontWeight: 700,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Baixar Relatório Mestre
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    )}
-
                     {activeTab === 'settings' && (
                         <div className="premium-card" style={{ padding: '30px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
@@ -886,14 +841,20 @@ const AdminDashboard: React.FC = () => {
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade Principal</label>
                             <select style={inputStyle} value={newAthleteForm.sport} onChange={e => setNewAthleteForm({ ...newAthleteForm, sport: e.target.value })}>
                                 <option value="">Selecione a Modalidade...</option>
-                                <option value="Futsal Masculino">Futsal Masculino</option>
-                                <option value="Futsal Feminino">Futsal Feminino</option>
-                                <option value="Vôlei Masculino">Vôlei Masculino</option>
-                                <option value="Vôlei Feminino">Vôlei Feminino</option>
-                                <option value="Basquete Masculino">Basquete Masculino</option>
-                                <option value="Handebol Masculino">Handebol Masculino</option>
+                                <option value="Futsal">Futsal</option>
+                                <option value="Futebol Society">Futebol Society</option>
+                                <option value="Handebol">Handebol</option>
+                                <option value="Vôlei">Vôlei</option>
                                 <option value="Natação">Natação</option>
-                                <option value="E-Sports (LoL)">E-Sports (LoL)</option>
+                                <option value="Karatê">Karatê</option>
+                                <option value="Judô">Judô</option>
+                                <option value="Tamboréu">Tamboréu</option>
+                                <option value="Xadrez">Xadrez</option>
+                                <option value="Tênis de Mesa">Tênis de Mesa</option>
+                                <option value="Futevôlei">Futevôlei</option>
+                                <option value="Beach Tennis">Beach Tennis</option>
+                                <option value="Vôlei de Praia">Vôlei de Praia</option>
+                                <option value="Basquete 3x3">Basquete 3x3</option>
                             </select>
                         </div>
 
