@@ -327,6 +327,7 @@ const Home: React.FC = () => {
                                     <p>Nenhum jogo encontrado para este filtro.</p>
                                 </div>
                             )}
+
                         </section>
 
                         {/* Right Column: Mini Tables / Stats */}

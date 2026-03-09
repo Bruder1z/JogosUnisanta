@@ -19,6 +19,7 @@ export interface Team {
   id: string;
   name: string;
   course: string;
+  faculty?: string;
   logo?: string;
 }
 

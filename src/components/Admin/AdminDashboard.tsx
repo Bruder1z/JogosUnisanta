@@ -37,7 +37,7 @@ const AdminDashboard: React.FC = () => {
 
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
-        teamA: '', teamB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: '', time: '', location: ''
+        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
     const [settingsForm, setSettingsForm] = useState({
@@ -59,8 +59,8 @@ const AdminDashboard: React.FC = () => {
         }
         const newMatch: any = { // Using any to bypass deep Team type check since we just need simple mapping for now
             id: 'm' + Date.now(),
-            teamA: { id: 't1', name: newMatchForm.teamA, course: newMatchForm.teamA },
-            teamB: { id: 't2', name: newMatchForm.teamB, course: newMatchForm.teamB },
+            teamA: { id: 't1', name: newMatchForm.teamA, course: newMatchForm.teamA, faculty: newMatchForm.facultyA },
+            teamB: { id: 't2', name: newMatchForm.teamB, course: newMatchForm.teamB, faculty: newMatchForm.facultyB },
             scoreA: 0,
             scoreB: 0,
             sport: newMatchForm.sport,
@@ -72,7 +72,7 @@ const AdminDashboard: React.FC = () => {
         };
         addMatch(newMatch);
         setIsNewMatchOpen(false);
-        setNewMatchForm({ teamA: '', teamB: '', sport: '', category: 'Masculino', date: '', time: '', location: '' });
+        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', date: '', time: '', location: '' });
         showNotification("Partida criada com sucesso!");
     };
 
@@ -763,8 +763,53 @@ const AdminDashboard: React.FC = () => {
                 <ModalOverlay onClose={() => setIsNewMatchOpen(false)}>
                     <h2 style={{ marginBottom: '16px' }}>Nova Partida</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <input type="text" placeholder="Equipe A (Ex: Engenharia)" style={inputStyle} value={newMatchForm.teamA} onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })} />
-                        <input type="text" placeholder="Equipe B (Ex: Fefesp)" style={inputStyle} value={newMatchForm.teamB} onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })} />
+                        {/* Equipe A */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Equipe A *</label>
+                            <input type="text" placeholder="Equipe A (Ex: Engenharia)" style={inputStyle} value={newMatchForm.teamA} onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })} />
+
+                            <select style={{ ...inputStyle, marginTop: '8px' }} value={newMatchForm.facultyA} onChange={e => setNewMatchForm({ ...newMatchForm, facultyA: e.target.value })}>
+                                <option value="" disabled>Selecione a Faculdade (Opcional)</option>
+                                <option value="Unisanta">Unisanta</option>
+                                <option value="Unimes">Unimes</option>
+                                <option value="Unip">Unip</option>
+                                <option value="Unaerp">Unaerp</option>
+                                <option value="Unisantos">Unisantos</option>
+                                <option value="Esamc">Esamc</option>
+                                <option value="Federal de Cubatão">Federal de Cubatão</option>
+                                <option value="São Judas">São Judas</option>
+                                <option value="Unifesp">Unifesp</option>
+                                <option value="Unilus">Unilus</option>
+                                <option value="Unoeste">Unoeste</option>
+                                <option value="Strong">Strong</option>
+                                <option value="FPG">FPG</option>
+                            </select>
+                        </div>
+
+                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 800, margin: '10px 0', fontSize: '14px' }}>X</div>
+
+                        {/* Equipe B */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Equipe B *</label>
+                            <input type="text" placeholder="Equipe B (Ex: Fefesp)" style={inputStyle} value={newMatchForm.teamB} onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })} />
+
+                            <select style={{ ...inputStyle, marginTop: '8px' }} value={newMatchForm.facultyB} onChange={e => setNewMatchForm({ ...newMatchForm, facultyB: e.target.value })}>
+                                <option value="" disabled>Selecione a Faculdade (Opcional)</option>
+                                <option value="Unisanta">Unisanta</option>
+                                <option value="Unimes">Unimes</option>
+                                <option value="Unip">Unip</option>
+                                <option value="Unaerp">Unaerp</option>
+                                <option value="Unisantos">Unisantos</option>
+                                <option value="Esamc">Esamc</option>
+                                <option value="Federal de Cubatão">Federal de Cubatão</option>
+                                <option value="São Judas">São Judas</option>
+                                <option value="Unifesp">Unifesp</option>
+                                <option value="Unilus">Unilus</option>
+                                <option value="Unoeste">Unoeste</option>
+                                <option value="Strong">Strong</option>
+                                <option value="FPG">FPG</option>
+                            </select>
+                        </div>
                         <select style={inputStyle} value={newMatchForm.sport} onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}>
                             <option value="">Selecione a Modalidade</option>
                             {AVAILABLE_SPORTS.map(sport => (
@@ -784,6 +829,11 @@ const AdminDashboard: React.FC = () => {
                             <option value="Centro de Treinamento">Centro de Treinamento</option>
                             <option value="Poliesportivo Unisanta (Bloco M)">Poliesportivo Unisanta (Bloco M)</option>
                             <option value="Laerte Gonçalves (Bloco D)">Laerte Gonçalves (Bloco D)</option>
+                            <option value="Clube dos Ingleses">Clube dos Ingleses</option>
+                            <option value="Arena Unisanta">Arena Unisanta</option>
+                            <option value="Rebouças">Rebouças</option>
+                            <option value="Piscina Olímpica">Piscina Olímpica</option>
+                            <option value="Bloco A">Bloco A</option>
                         </select>
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>

@@ -15,7 +15,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
         return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
     };
 
-    const TeamDisplay = ({ team, side }: { team: any, side: 'left' | 'right' }) => {
+    const TeamDisplay = ({ team }: { team: any }) => {
         const emblemUrl = getTeamEmblem(team.name);
 
         return (
@@ -48,6 +48,11 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: 600 }}>{team.name.split(' - ')[0]}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.name.split(' - ')[1]}</div>
+                {team.faculty && (
+                    <div style={{ fontSize: '11px', color: 'var(--accent-color)', fontWeight: 600, marginTop: '2px' }}>
+                        {team.faculty}
+                    </div>
+                )}
             </div>
         );
     };
@@ -83,7 +88,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <TeamDisplay team={match.teamA} side="left" />
+                <TeamDisplay team={match.teamA} />
 
                 <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ fontSize: '32px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -93,7 +98,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                     </div>
                 </div>
 
-                <TeamDisplay team={match.teamB} side="right" />
+                <TeamDisplay team={match.teamB} />
             </div>
 
             <div style={{

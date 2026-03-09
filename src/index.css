@@ -19,3 +19,15 @@
   width: 100%;
   min-height: 100vh;
 }
+
+/* Custom Scrollbar for History Page */
+.history-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.history-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.history-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cc0000;
+  border-radius: 10px;
+}

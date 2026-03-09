@@ -274,13 +274,25 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '1.1rem' }}>🏟️</span> Centro de Treinamento
                                     </div>
-                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative' }}>
+                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative', marginBottom: '4px' }}>
                                         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent-color)' }}></span>
                                         Poliesportivo Unisanta (Bloco M)
                                     </div>
-                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative' }}>
+                                    <div style={{ paddingLeft: '30px', color: '#d1d5db', position: 'relative', marginBottom: '8px' }}>
                                         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent-color)' }}></span>
                                         Laerte Gonçalves (Bloco D)
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>🏟️</span> Arena Unisanta
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>🏟️</span> Rebouças
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>🏟️</span> Piscina Olímpica
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>🏟️</span> Bloco A
                                     </div>
                                 </div>
                             </div>
