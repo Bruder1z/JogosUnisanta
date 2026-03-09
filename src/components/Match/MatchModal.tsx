@@ -99,6 +99,15 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const teamAForm = getTeamForm(currentMatch.teamA.id, currentMatch.sport);
     const teamBForm = getTeamForm(currentMatch.teamB.id, currentMatch.sport);
 
+    const seedVotesStr = currentMatch.id + "votes";
+    const baseVotesA = Math.floor(pseudoRandom(seedVotesStr + "A") * 200) + 50;
+    const baseVotesB = Math.floor(pseudoRandom(seedVotesStr + "B") * 200) + 50;
+    const votesA = baseVotesA + (votedFor === currentMatch.teamA.id ? 1 : 0);
+    const votesB = baseVotesB + (votedFor === currentMatch.teamB.id ? 1 : 0);
+    const totalVotes = votesA + votesB;
+    const percentA = Math.round((votesA / totalVotes) * 100);
+    const percentB = Math.round((votesB / totalVotes) * 100);
+
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
             courseKey.toLowerCase().includes(teamName.toLowerCase())
@@ -349,8 +358,22 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                 </button>
                             </div>
 
+                            {votedFor && (
+                                <div style={{ marginTop: '15px', padding: '0 10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                                        <span style={{ color: 'var(--accent-color)' }}>{percentA}%</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Votos da Galera</span>
+                                        <span>{percentB}%</span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '8px', background: 'var(--bg-hover)', borderRadius: '4px', display: 'flex', overflow: 'hidden' }}>
+                                        <div style={{ width: `${percentA}%`, background: 'var(--accent-color)', height: '100%', transition: 'width 0.5s ease-out' }} />
+                                        <div style={{ width: `${percentB}%`, background: 'var(--text-secondary)', height: '100%', transition: 'width 0.5s ease-out' }} />
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Simulate Button (Admin or any for testing) */}
-                            <div style={{ marginTop: '15px' }}>
+                            <div style={{ marginTop: '20px' }}>
                                 <button
                                     onClick={simulateMatch}
                                     style={{
@@ -374,11 +397,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                             {!user && (
                                 <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                                     Faça login para registrar seu palpite!
-                                </div>
-                            )}
-                            {user && votedFor && (
-                                <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent-color)', fontWeight: 600 }}>
-                                    Palpite registrado!
                                 </div>
                             )}
                         </div>

@@ -60,6 +60,9 @@ const MelhoresAtletas: FC = () => {
                                         <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '4px' }}>
                                             {athlete.firstName} {athlete.lastName}
                                         </div>
+                                        <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                            <Trophy size={14} /> {(athlete.id.charCodeAt(athlete.id.length - 1) % 5) + 3} MVP
+                                        </div>
                                         <div style={{ marginTop: '15px', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
                                             {athlete.sports.map(sport => (
                                                 <span key={sport} style={{
