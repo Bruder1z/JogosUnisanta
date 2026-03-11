@@ -82,8 +82,8 @@ export const mockTeams: Team[] = [
 export const mockMatches: Match[] = [
   // Único jogo para teste
   {
-    id: 'm1', sport: 'Futsal', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 3, scoreB: 1, status: 'live', date: '2026-03-11', time: '19:00', location: 'Ginásio Laerte Gonçalves',
-    events: [{ id: 'e1', type: 'start', minute: 0 }, { id: 'e2', type: 'goal', minute: 12, teamId: '1', player: 'Juninho' }]
+    id: 'm1', sport: 'Futsal', category: 'Masculino', teamA: mockTeams[0], teamB: mockTeams[1], scoreA: 0, scoreB: 0, status: 'scheduled', date: '2026-03-11', time: '19:00', location: 'Ginásio Laerte Gonçalves',
+    events: []
   },
 ];
 
