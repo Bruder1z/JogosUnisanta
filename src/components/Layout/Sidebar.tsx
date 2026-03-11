@@ -155,6 +155,9 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 <Link to="/transmissao" className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                     <span style={{ fontSize: '16px' }}>📺</span> Transmissão
                 </Link>
+                <Link to="/controle-partida" className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                    <span style={{ fontSize: '16px' }}>⚽</span> Controle de Partida
+                </Link>
 
                 <button
                     onClick={() => setIsCalendarModalOpen(true)}

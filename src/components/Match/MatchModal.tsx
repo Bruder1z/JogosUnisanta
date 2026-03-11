@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { X, Clock, MapPin, Trophy, Play, CheckCircle } from 'lucide-react';
+import { X, Clock, MapPin, Trophy, Play, CheckCircle, Pause } from 'lucide-react';
 import { type Match, type MatchEvent, mockAthletes, COURSE_EMBLEMS, mockMatches, mockTeams } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -169,7 +169,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             case 'set_win': return <Trophy size={16} color="#ffd700" />;
             case 'yellow_card': return <div style={{ width: 12, height: 16, background: '#ffcc00', borderRadius: 2 }} />;
             case 'red_card': return <div style={{ width: 12, height: 16, background: '#ff4444', borderRadius: 2 }} />;
+            case 'penalty_scored': return <div style={{ fontSize: '16px' }}>🎯</div>;
+            case 'penalty_missed': return <div style={{ fontSize: '16px' }}>❌</div>;
             case 'start': return <Play size={16} color="var(--accent-color)" />;
+            case 'halftime': return <Pause size={16} color="#f59e0b" />;
             case 'end': return <CheckCircle size={16} color="#44ff44" />;
             default: return null;
         }
@@ -181,7 +184,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             case 'set_win': return 'Fim do Set';
             case 'yellow_card': return 'Cartão Amarelo';
             case 'red_card': return 'Cartão Vermelho';
+            case 'penalty_scored': return 'Pênalti Marcado';
+            case 'penalty_missed': return 'Pênalti Perdido';
             case 'start': return 'Início da Partida';
+            case 'halftime': return 'Intervalo';
             case 'end': return 'Fim da Partida';
             default: return '';
         }
@@ -526,13 +532,22 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                     </div>
                                                                     {(event.player || event.teamId) && (
                                                                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                                            {event.player ? `${event.player} (` : ''}
-                                                                            {isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0]}
-                                                                            {event.player ? ')' : ''}
+                                                                            {event.player && event.player !== 'Pênalti perdido' ? `${event.player} - ` : ''}
+                                                                            {event.teamId && (isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0])}
                                                                             {event.type === 'set_win' ? ' venceu o set' : ''}
                                                                         </div>
                                                                     )}
                                                                 </div>
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: '14px', 
+                                                                fontWeight: 700, 
+                                                                color: 'var(--accent-color)',
+                                                                marginLeft: '12px',
+                                                                minWidth: '40px',
+                                                                textAlign: 'right'
+                                                            }}>
+                                                                {event.minute}'
                                                             </div>
                                                         </div>
                                                     </div>

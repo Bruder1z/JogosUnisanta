@@ -6,6 +6,7 @@ import History from './pages/History';
 import Transmissao from './pages/Transmissao';
 import MelhoresAtletas from './pages/MelhoresAtletas';
 import Simulator from './pages/Simulator';
+import MatchControl from './pages/MatchControl';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './components/context/DataContext';
 import Login from './pages/Login';
@@ -23,6 +24,7 @@ const AppContent = () => {
         <Route path="/historia" element={<History />} />
         <Route path="/transmissao" element={<Transmissao />} />
         <Route path="/simulador" element={<Simulator />} />
+        <Route path="/controle-partida" element={<MatchControl />} />
       </Routes>
       {isLoginModalOpen && <Login onClose={closeLoginModal} />}
     </>
