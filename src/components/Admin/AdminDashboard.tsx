@@ -182,18 +182,18 @@ const AdminDashboard: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: '20px' }}>
+        <div className="admin-dashboard-root" style={{ padding: '20px' }}>
             <div style={{ marginBottom: '30px' }}>
-                <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px' }}>Painel de Controle Super Admin</h1>
+                <h1 className="admin-page-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px' }}>Painel de Controle Super Admin</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>Gerencie os Jogos Unisanta, equipes e resultados.</p>
             </div>
 
             {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
+            <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
                 {stats.map(stat => (
                     <div
                         key={stat.label}
-                        className="premium-card"
+                        className="premium-card admin-stat-card"
                         onClick={() => setSelectedStat(stat)}
                         style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', transition: 'transform 0.2s' }}
                         onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
@@ -220,8 +220,8 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Main Admin Area */}
-            <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '30px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="admin-main-grid" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '30px' }}>
+                <div className="admin-tabs-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
                         { id: 'overview', label: 'Visão Geral', icon: <Layout size={18} /> },
                         { id: 'matches', label: 'Gerenciar Partidas', icon: <Clock size={18} /> },
@@ -231,6 +231,7 @@ const AdminDashboard: React.FC = () => {
                     ].map(tab => (
                         <button
                             key={tab.id}
+                            className="admin-tab-button"
                             onClick={() => setActiveTab(tab.id)}
                             style={{
                                 display: 'flex',
@@ -275,13 +276,14 @@ const AdminDashboard: React.FC = () => {
                     ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                     {activeTab === 'overview' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewMatchOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -305,7 +307,7 @@ const AdminDashboard: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
+                            <div className="admin-filter-row" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
                                 <button
                                     onClick={() => setFilter('all')}
                                     style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', background: filter === 'all' ? 'var(--accent-color)' : 'var(--bg-hover)', color: filter === 'all' ? 'white' : 'var(--text-secondary)' }}
@@ -326,8 +328,8 @@ const AdminDashboard: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div style={{ padding: '0', overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                     <thead>
                                         <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
                                             <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
@@ -340,12 +342,12 @@ const AdminDashboard: React.FC = () => {
                                         {filteredMatches.map(match => (
                                             <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} {match.scoreA} x {match.scoreB} {match.teamB.course}</div>
+                                                    <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} {match.scoreA} x {match.scoreB} {match.teamB.course}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
                                                 </td>
                                                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <span style={{
+                                                    <span className="admin-status-badge" style={{
                                                         padding: '4px 8px',
                                                         borderRadius: '4px',
                                                         fontSize: '11px',
@@ -356,7 +358,7 @@ const AdminDashboard: React.FC = () => {
                                                         {match.status.toUpperCase()}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '16px 20px' }}>
+                                                <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
                                                     <button
                                                         onClick={() => handleToggleStatus(match.id)}
                                                         style={{ color: 'var(--accent-color)', fontWeight: 600, marginRight: '15px', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.2s' }}
@@ -396,12 +398,12 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'matches' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                 <Clock size={24} color="var(--accent-color)" />
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Todas as Partidas</h2>
                             </div>
-                            <div style={{ padding: '0', overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                     <thead>
                                         <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
                                             <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
@@ -413,11 +415,11 @@ const AdminDashboard: React.FC = () => {
                                         {matches.map(match => (
                                             <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} x {match.teamB.course}</div>
+                                                    <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} x {match.teamB.course}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
                                                 </td>
                                                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
-                                                <td style={{ padding: '16px 20px' }}>
+                                                <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
                                                     <button
                                                         onClick={() => showNotification("Editar Horário em desenvolvimento...")}
                                                         style={{ color: 'var(--text-primary)', fontWeight: 600, marginRight: '15px', background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -441,12 +443,13 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'teams' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <Users size={24} color="var(--accent-color)" />
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Equipes & Cursos Inscritos</h2>
                                 </div>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewCourseOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -541,12 +544,13 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'athletes' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <Users size={24} color="var(--accent-color)" />
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Atletas</h2>
                                 </div>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewAthleteOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -642,7 +646,7 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'settings' && (
                         <div className="premium-card" style={{ padding: '30px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+                            <div className="admin-section-header" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
                                 <Settings size={24} color="var(--accent-color)" />
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configurações do Sistema</h2>
                             </div>
@@ -820,7 +824,7 @@ const AdminDashboard: React.FC = () => {
                             <option value="Masculino">Masculino</option>
                             <option value="Feminino">Feminino</option>
                         </select>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="admin-form-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <input type="date" style={inputStyle} value={newMatchForm.date} onChange={e => setNewMatchForm({ ...newMatchForm, date: e.target.value })} />
                             <input type="time" style={inputStyle} value={newMatchForm.time} onChange={e => setNewMatchForm({ ...newMatchForm, time: e.target.value })} />
                         </div>
@@ -836,7 +840,7 @@ const AdminDashboard: React.FC = () => {
                             <option value="Bloco A">Bloco A</option>
                         </select>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button onClick={handleSaveNewMatch} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Partida</button>
                             <button onClick={() => setIsNewMatchOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
@@ -876,7 +880,7 @@ const AdminDashboard: React.FC = () => {
                             {newCourseForm.emblem && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent-color)' }}>✓ Imagem carregada com sucesso</div>}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewCourse} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Cadastro</button>
                             <button onClick={() => setIsNewCourseOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
@@ -921,7 +925,7 @@ const AdminDashboard: React.FC = () => {
                             </select>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewAthlete} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Atleta</button>
                             <button onClick={() => setIsNewAthleteOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
@@ -934,7 +938,7 @@ const AdminDashboard: React.FC = () => {
                     <h2 style={{ marginBottom: '8px' }}>Atualizar Placar</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px' }}>{selectedMatch.timeA} vs {selectedMatch.timeB}</p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', background: 'var(--bg-hover)', padding: '20px', borderRadius: '8px' }}>
+                    <div className="admin-score-grid" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', background: 'var(--bg-hover)', padding: '20px', borderRadius: '8px' }}>
                         <div style={{ textAlign: 'center', flex: 1 }}>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedMatch.timeA}</div>
                             <input type="number" value={scoreForm.scoreA} onChange={e => setScoreForm({ ...scoreForm, scoreA: Number(e.target.value) })} style={{ ...inputStyle, textAlign: 'center', fontSize: '24px', padding: '10px' }} />
@@ -946,7 +950,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                    <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                         <button onClick={handleUpdatePlacar} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Placar</button>
                         <button onClick={() => setIsScoreOpen(false)} style={modalButtonStyle}>Cancelar</button>
                     </div>
@@ -966,7 +970,7 @@ const AdminDashboard: React.FC = () => {
 const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, backdropFilter: 'blur(5px)' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={onClose} />
-        <div className="premium-card" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
+        <div className="premium-card modal-content-wide" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
             {children}
         </div>
     </div>

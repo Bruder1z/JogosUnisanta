@@ -43,7 +43,7 @@ const News: FC = () => {
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
             <Sidebar onShowRanking={() => setShowRanking(true)} />
-            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: '40px' }}>
+            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <div>
@@ -61,7 +61,7 @@ const News: FC = () => {
 
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+                        gridTemplateColumns: 'var(--news-grid-cols)',
                         gap: '30px'
                     }}>
                         {mockNews.map((article) => (

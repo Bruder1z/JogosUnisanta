@@ -46,7 +46,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                         {team.logo}
                     </div>
                 </div>
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>{team.name.split(' - ')[0]}</div>
+                <div className="match-team-name" style={{ fontSize: '14px', fontWeight: 600 }}>{team.name.split(' - ')[0]}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.name.split(' - ')[1]}</div>
                 {team.faculty && (
                     <div style={{ fontSize: '11px', color: 'var(--accent-color)', fontWeight: 600, marginTop: '2px' }}>
@@ -59,7 +59,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
 
     return (
         <div
-            className="premium-card hover-glow"
+            className="premium-card hover-glow match-card-wrapper"
             onClick={onClick}
             style={{
                 padding: '20px',
@@ -91,7 +91,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 <TeamDisplay team={match.teamA} />
 
                 <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ fontSize: '32px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div className="match-score" style={{ fontSize: '32px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <span>{match.scoreA}</span>
                         <span style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600 }}>X</span>
                         <span>{match.scoreB}</span>

@@ -1,14 +1,18 @@
 import { type FC, useState, useMemo } from 'react';
-import { User as UserIcon, Trophy, LayoutDashboard } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { User as UserIcon, Trophy, LayoutDashboard, Menu } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSidebar } from '../../context/SidebarContext';
 import ProfileModal from '../Modals/ProfileModal';
 import { mockMatches } from '../../data/mockData';
 
 const Header: FC = () => {
     const { user, openLoginModal } = useAuth();
+    const { toggle } = useSidebar();
     const location = useLocation();
+    const navigate = useNavigate();
     const [showProfile, setShowProfile] = useState(false);
+    const showAdminShortcut = user?.role === 'superadmin' && location.pathname !== '/';
 
     const isActive = (path: string) => location.pathname === path;
 
@@ -47,15 +51,31 @@ const Header: FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0 24px',
+                padding: 'var(--header-padding)',
                 borderBottom: '1px solid var(--border-color)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
-                    <Link to="/" style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '-1px', textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Hamburger - visível só no mobile */}
+                    <button
+                        className="mobile-menu-btn"
+                        onClick={toggle}
+                        style={{
+                            color: 'var(--text-primary)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '6px',
+                        }}
+                    >
+                        <Menu size={24} />
+                    </button>
+
+                    <Link to="/" style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '-1px', textDecoration: 'none', color: 'inherit', whiteSpace: 'nowrap' }}>
                         <span style={{ color: 'var(--accent-color)' }}>JOGOS</span> UNISANTA
                     </Link>
 
-                    <nav style={{ display: 'flex', gap: '20px', fontSize: '14px', fontWeight: 500 }}>
+                    <nav className="header-desktop-nav" style={{ display: 'flex', gap: '20px', fontSize: '14px', fontWeight: 500, marginLeft: '28px' }}>
                         <Link to="/" style={{
                             color: isActive('/') ? 'var(--text-primary)' : 'var(--text-secondary)',
                             textDecoration: 'none',
@@ -78,12 +98,16 @@ const Header: FC = () => {
                     {user ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ffd700', fontSize: '13px', fontWeight: 700, marginRight: '10px' }}>
+                                <div className="header-user-pts" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ffd700', fontSize: '13px', fontWeight: 700, marginRight: '10px' }}>
                                     <Trophy size={14} /> {totalPoints} {totalPoints === 1 ? 'pt' : 'pts'}
                                 </div>
 
-                                {user.role === 'superadmin' && (
-                                    <button title="Dashboard Admin" style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                                {showAdminShortcut && (
+                                    <button
+                                        title="Dashboard Admin"
+                                        onClick={() => navigate('/?view=admin')}
+                                        style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                                    >
                                         <LayoutDashboard size={20} />
                                     </button>
                                 )}
@@ -106,10 +130,11 @@ const Header: FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <UserIcon size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* Botão completo - desktop */}
                             <button
                                 onClick={openLoginModal}
+                                className="header-login-text"
                                 style={{
                                     padding: '8px 16px',
                                     borderRadius: 'var(--border-radius)',
@@ -118,10 +143,29 @@ const Header: FC = () => {
                                     fontSize: '13px',
                                     color: 'white',
                                     border: 'none',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap'
                                 }}
                             >
                                 Login / Cadastro
+                            </button>
+                            {/* Apenas ícone - mobile */}
+                            <button
+                                onClick={openLoginModal}
+                                className="header-login-icon-only"
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'none',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--text-secondary)'
+                                }}
+                                title="Entrar"
+                            >
+                                <UserIcon size={24} color="#ccc" />
                             </button>
                         </div>
                     )}
