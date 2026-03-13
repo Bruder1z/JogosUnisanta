@@ -108,6 +108,7 @@ const Simulator: FC = () => {
 
     const ScoreInput = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => (
         <input
+            className="sim-score-input"
             type="text"
             inputMode="numeric"
             value={value}
@@ -145,7 +146,7 @@ const Simulator: FC = () => {
         const isSetSport = SET_SPORTS.includes(match.sport);
 
         return (
-            <div className="premium-card" style={{
+            <div className="premium-card sim-match-card" style={{
                 padding: '24px',
                 transition: 'all 0.3s',
                 border: hasPrediction ? '1px solid rgba(255,46,46,0.3)' : '1px solid var(--border-color)',
@@ -187,7 +188,7 @@ const Simulator: FC = () => {
                 </div>
 
                 {/* Teams and scores */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                <div className="sim-matchup-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
                     {/* Team A */}
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                         <TeamEmblem teamName={match.teamA.name} size={48} />
@@ -197,7 +198,7 @@ const Simulator: FC = () => {
                     </div>
 
                     {/* Score inputs */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="sim-score-inputs-row" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ScoreInput matchId={match.id} field="scoreA" value={pred?.scoreA ?? ''} />
                         <span style={{ fontSize: '20px', fontWeight: 300, color: 'var(--text-secondary)' }}>×</span>
                         <ScoreInput matchId={match.id} field="scoreB" value={pred?.scoreB ?? ''} />
@@ -247,7 +248,7 @@ const Simulator: FC = () => {
     };
 
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} className="simulator-root">
             <Header />
             <Sidebar onShowRanking={() => setShowRanking(true)} />
             <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
@@ -275,14 +276,14 @@ const Simulator: FC = () => {
                     </div>
 
                     {/* Stats bar */}
-                    <div className="premium-card" style={{
+                    <div className="premium-card simulator-stats-bar" style={{
                         padding: '16px 24px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         marginBottom: '24px',
                     }}>
-                        <div style={{ display: 'flex', gap: '24px' }}>
+                        <div style={{ display: 'flex', gap: '24px' }} className="simulator-stats-metrics">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Calendar size={16} color="var(--text-secondary)" />
                                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -296,7 +297,7 @@ const Simulator: FC = () => {
                                 </span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }} className="simulator-stats-actions">
                             <button
                                 onClick={resetPredictions}
                                 style={{
@@ -361,7 +362,7 @@ const Simulator: FC = () => {
                     )}
 
                     {/* Match cards grid */}
-                    <div style={{
+                    <div className="simulator-grid" style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
                         gap: '20px',
@@ -379,6 +380,124 @@ const Simulator: FC = () => {
                         </div>
                     )}
                 </div>
+                <style>{`
+                    @media (max-width: 768px) {
+                        .simulator-root main {
+                            padding: 14px !important;
+                        }
+
+                        .simulator-stats-bar {
+                            flex-direction: column;
+                            align-items: stretch !important;
+                            gap: 12px;
+                            padding: 14px !important;
+                        }
+
+                        .simulator-stats-metrics {
+                            justify-content: space-between;
+                            gap: 12px !important;
+                        }
+
+                        .simulator-stats-actions {
+                            width: 100%;
+                        }
+
+                        .simulator-stats-actions button {
+                            flex: 1;
+                            justify-content: center;
+                        }
+
+                        .simulator-grid {
+                            grid-template-columns: 1fr !important;
+                        }
+
+                        .sim-match-card {
+                            padding: 18px 12px !important;
+                        }
+
+                        .sim-matchup-row {
+                            gap: 8px !important;
+                        }
+
+                        .sim-score-inputs-row {
+                            gap: 8px !important;
+                        }
+
+                        .sim-score-input {
+                            width: 52px !important;
+                            height: 52px !important;
+                            line-height: 52px !important;
+                            font-size: 20px !important;
+                        }
+
+                        .sim-match-card {
+                            overflow: hidden;
+                        }
+                    }
+
+                    @media (max-width: 480px) {
+                        .simulator-stats-metrics {
+                            flex-wrap: wrap;
+                        }
+
+                        .simulator-stats-actions {
+                            flex-direction: row;
+                        }
+
+                        .sim-matchup-row {
+                            display: grid !important;
+                            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                            align-items: center;
+                        }
+
+                        .sim-match-card span {
+                            word-break: break-word;
+                        }
+                    }
+
+                    @media (max-width: 390px) {
+                        .simulator-root main {
+                            padding: 10px !important;
+                        }
+
+                        .simulator-root h1 {
+                            font-size: 2rem !important;
+                            letter-spacing: -0.02em !important;
+                        }
+
+                        .simulator-root p {
+                            font-size: 0.95rem !important;
+                        }
+
+                        .simulator-stats-actions {
+                            flex-direction: column !important;
+                        }
+
+                        .simulator-stats-actions button {
+                            width: 100%;
+                        }
+
+                        .sim-matchup-row {
+                            grid-template-columns: minmax(0, 1fr) 108px minmax(0, 1fr) !important;
+                        }
+
+                        .sim-score-input {
+                            width: 44px !important;
+                            height: 44px !important;
+                            line-height: 44px !important;
+                            font-size: 17px !important;
+                            border-radius: 12px !important;
+                        }
+
+                        .sim-score-inputs-row {
+                            gap: 5px !important;
+                        }
+
+                        .simulator-grid {
+                            gap: 14px !important;
+                        }
+                    }
+                `}</style>
             </main>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}

@@ -17,7 +17,7 @@ const TEAM_PLAYERS: Record<string, string[]> = {
 
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const { matches, updateMatch } = useData();
-    
+
     const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
     const [currentMinute, setCurrentMinute] = useState<number>(0);
     const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -25,7 +25,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
 
     // Filtrar apenas Futsal e Futebol Society
-    const soccerMatches = matches.filter((m: Match) => 
+    const soccerMatches = matches.filter((m: Match) =>
         m.sport === 'Futsal' || m.sport === 'Futebol Society'
     );
 
@@ -66,7 +66,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         };
 
         const updatedEvents = [...(selectedMatch.events || []), newEvent];
-        
+
         // Atualizar pontuação se for gol
         let newScoreA = selectedMatch.scoreA;
         let newScoreB = selectedMatch.scoreB;
@@ -139,13 +139,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     // Obter estatísticas de um jogador
     const getPlayerStats = (playerName: string) => {
         if (!selectedMatch?.events) return { goals: 0, yellowCards: 0, redCards: 0, canPlay: true };
-        
+
         const playerEvents = selectedMatch.events.filter(e => e.player === playerName);
         const goals = playerEvents.filter(e => e.type === 'goal' || e.type === 'penalty_scored').length;
         const yellowCards = playerEvents.filter(e => e.type === 'yellow_card').length;
         const redCards = playerEvents.filter(e => e.type === 'red_card').length;
         const canPlay = redCards === 0;
-        
+
         return { goals, yellowCards, redCards, canPlay };
     };
 
@@ -182,11 +182,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     const getEventLabel = (event: MatchEvent) => {
-        const teamName = !selectedMatch ? '' : event.teamId === selectedMatch.teamA.id 
-            ? selectedMatch.teamA.name 
-            : event.teamId === selectedMatch.teamB.id 
-            ? selectedMatch.teamB.name 
-            : '';
+        const teamName = !selectedMatch ? '' : event.teamId === selectedMatch.teamA.id
+            ? selectedMatch.teamA.name
+            : event.teamId === selectedMatch.teamB.id
+                ? selectedMatch.teamB.name
+                : '';
 
         switch (event.type) {
             case 'goal':
@@ -250,19 +250,19 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     return (
-        <div style={styles.container}>
+        <div style={styles.container} className="match-timeline-root">
             <div style={styles.header}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div className="match-timeline-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
                         <h1 style={styles.title}>⚽ Controle de Partida</h1>
-                        <button 
+                        <button
                             style={styles.changeMatchBtn}
                             onClick={() => setSelectedMatch(null)}
                         >
                             ← Trocar partida
                         </button>
                     </div>
-                    <button 
+                    <button
                         style={styles.resetBtn}
                         className="reset-btn-hover"
                         onClick={() => setShowResetConfirm(true)}
@@ -274,22 +274,22 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
             <div style={styles.content}>
                 {/* Placar */}
-                <div style={styles.scoreboard}>
+                <div style={styles.scoreboard} className="match-timeline-scoreboard">
                     <div style={styles.teamLeft}>
-                        <h2>{selectedMatch.teamA.name}</h2>
+                        <h2 style={styles.teamName} className="match-timeline-team-name">{selectedMatch.teamA.name}</h2>
                         <div style={styles.score}>{selectedMatch.scoreA}</div>
                     </div>
-                    <div style={styles.timeDisplay}>
+                    <div style={styles.timeDisplay} className="match-timeline-time-display">
                         <Clock size={24} />
                         <span style={styles.minute}>{currentMinute}'</span>
                         {isRunning && (
                             <span style={styles.liveBadge} className="pulse-animation">
-                                🔴 AO VIVO
+                                AO VIVO
                             </span>
                         )}
                     </div>
                     <div style={styles.teamRight}>
-                        <h2>{selectedMatch.teamB.name}</h2>
+                        <h2 style={styles.teamName} className="match-timeline-team-name">{selectedMatch.teamB.name}</h2>
                         <div style={styles.score}>{selectedMatch.scoreB}</div>
                     </div>
                 </div>
@@ -297,7 +297,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Controles do Jogo */}
                 <div style={styles.gameControls}>
                     <h3 style={styles.sectionTitle}>Controle da Partida</h3>
-                    <div style={styles.controlButtons}>
+                    <div style={styles.controlButtons} className="match-timeline-control-grid">
                         <button
                             style={{ ...styles.controlBtn, ...styles.startBtn }}
                             onClick={handleStartMatch}
@@ -336,7 +336,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Eventos - Gols */}
                 <div style={styles.eventSection}>
                     <h3 style={styles.sectionTitle}>⚽ Gols</h3>
-                    <div style={styles.eventButtons}>
+                    <div style={styles.eventButtons} className="match-timeline-event-grid">
                         <button
                             style={{ ...styles.eventBtn, ...styles.teamABtn }}
                             onClick={() => handleGoal('A')}
@@ -357,7 +357,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Eventos - Cartões */}
                 <div style={styles.eventSection}>
                     <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
-                    <div style={styles.eventButtons}>
+                    <div style={styles.eventButtons} className="match-timeline-event-grid">
                         <button
                             style={{ ...styles.eventBtn, ...styles.yellowBtn }}
                             onClick={() => handleCard('yellow_card', 'A')}
@@ -375,7 +375,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                 <div style={styles.eventSection}>
                     <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
-                    <div style={styles.eventButtons}>
+                    <div style={styles.eventButtons} className="match-timeline-event-grid">
                         <button
                             style={{ ...styles.eventBtn, ...styles.redBtn }}
                             onClick={() => handleCard('red_card', 'A')}
@@ -394,7 +394,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Eventos - Pênaltis */}
                 <div style={styles.eventSection}>
                     <h3 style={styles.sectionTitle}>🎯 Pênaltis</h3>
-                    <div style={styles.eventButtons}>
+                    <div style={styles.eventButtons} className="match-timeline-event-grid">
                         <button
                             style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
                             onClick={() => handlePenalty('penalty_scored', 'A')}
@@ -408,7 +408,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             🎯 Pênalti Marcado {selectedMatch.teamB.name.split(' - ')[0]}
                         </button>
                     </div>
-                    <div style={{ ...styles.eventButtons, marginTop: '12px' }}>
+                    <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
                         <button
                             style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
                             onClick={() => handlePenalty('penalty_missed', 'A')}
@@ -504,7 +504,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Cronologia de Eventos */}
                 <div style={styles.timeline}>
                     <h3 style={styles.sectionTitle}>📋 Cronologia</h3>
-                    <div style={styles.timelineList}>
+                    <div style={styles.timelineList} className="timeline-list-beauty">
                         {(!selectedMatch.events || selectedMatch.events.length === 0) ? (
                             <p style={styles.noEvents}>Nenhum evento registrado ainda.</p>
                         ) : (
@@ -512,21 +512,24 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 const isTeamA = event.teamId === selectedMatch.teamA.id;
                                 const isTeamB = event.teamId === selectedMatch.teamB.id;
                                 const isGeneral = !event.teamId;
-                                
+                                const shortTeamName = isTeamA
+                                    ? selectedMatch.teamA.name.split(' - ')[0]
+                                    : isTeamB
+                                        ? selectedMatch.teamB.name.split(' - ')[0]
+                                        : 'Jogo';
+
                                 return (
-                                    <div 
-                                        key={event.id} 
-                                        style={{
-                                            ...styles.timelineItem,
-                                            ...(isTeamA ? styles.timelineItemLeft : {}),
-                                            ...(isTeamB ? styles.timelineItemRight : {}),
-                                            ...(isGeneral ? styles.timelineItemCenter : {})
-                                        }}
+                                    <div
+                                        key={event.id}
+                                        className={`timeline-item-beauty ${isTeamA ? 'timeline-team-a' : ''} ${isTeamB ? 'timeline-team-b' : ''} ${isGeneral ? 'timeline-neutral' : ''}`}
+                                        style={styles.timelineItem}
                                     >
-                                        {isTeamB && <span style={styles.eventTime}>{event.minute}'</span>}
-                                        <span style={styles.eventIcon}>{getEventIcon(event.type)}</span>
-                                        <span style={styles.eventText}>{getEventLabel(event)}</span>
-                                        {(isTeamA || isGeneral) && <span style={styles.eventTime}>{event.minute}'</span>}
+                                        <span style={styles.eventTimePill}>{event.minute}'</span>
+                                        <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
+                                        <div style={styles.eventContentWrap}>
+                                            <span style={styles.eventText}>{getEventLabel(event)}</span>
+                                            <span style={styles.eventMetaTag}>{shortTeamName}</span>
+                                        </div>
                                     </div>
                                 );
                             })
@@ -576,6 +579,164 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     
                     .pulse-animation {
                         animation: pulse 1.5s ease-in-out infinite;
+                    }
+
+                    .timeline-list-beauty {
+                        position: relative;
+                        padding-left: 6px;
+                    }
+
+                    .timeline-list-beauty::before {
+                        content: '';
+                        position: absolute;
+                        left: 18px;
+                        top: 6px;
+                        bottom: 6px;
+                        width: 2px;
+                        background: linear-gradient(180deg, rgba(227, 6, 19, 0.55), rgba(227, 6, 19, 0.1));
+                    }
+
+                    .timeline-item-beauty {
+                        position: relative;
+                        margin-left: 10px;
+                        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+                    }
+
+                    .timeline-item-beauty::before {
+                        content: '';
+                        position: absolute;
+                        left: -20px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 999px;
+                        border: 2px solid var(--accent-color);
+                        background: var(--bg-main);
+                    }
+
+                    .timeline-team-a {
+                        border-left: 3px solid #3b82f6 !important;
+                    }
+
+                    .timeline-team-b {
+                        border-left: 3px solid #ef4444 !important;
+                    }
+
+                    .timeline-neutral {
+                        border-left: 3px solid var(--accent-color) !important;
+                    }
+
+                    @media (max-width: 768px) {
+                        .match-timeline-root {
+                            padding: 12px !important;
+                        }
+
+                        .match-timeline-header-row {
+                            flex-direction: column;
+                            align-items: stretch !important;
+                            gap: 12px;
+                        }
+
+                        .match-timeline-scoreboard {
+                            padding: 18px 12px !important;
+                            gap: 10px;
+                        }
+
+                        .match-timeline-team-name {
+                            font-size: 1.05rem !important;
+                            line-height: 1.3 !important;
+                        }
+
+                        .match-timeline-time-display {
+                            padding: 0 6px !important;
+                        }
+
+                        .match-timeline-control-grid,
+                        .match-timeline-event-grid {
+                            grid-template-columns: 1fr !important;
+                        }
+
+                        .match-timeline-root button {
+                            min-height: 44px;
+                        }
+                    }
+
+                    @media (max-width: 480px) {
+                        .match-timeline-scoreboard {
+                            display: grid !important;
+                            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                            align-items: center;
+                        }
+
+                        .match-timeline-team-name {
+                            font-size: 0.95rem !important;
+                            word-break: break-word;
+                        }
+
+                        .match-timeline-time-display {
+                            gap: 4px !important;
+                        }
+
+                        .match-timeline-root h1 {
+                            font-size: 1.45rem !important;
+                        }
+
+                        .match-timeline-root h3 {
+                            font-size: 1rem !important;
+                        }
+
+                        .match-timeline-root .player-list {
+                            max-height: 52dvh;
+                        }
+
+                        .timeline-item-beauty {
+                            margin-left: 8px;
+                        }
+
+                        .timeline-list-beauty::before {
+                            left: 16px;
+                        }
+                    }
+
+                    @media (max-width: 390px) {
+                        .match-timeline-root {
+                            padding: 8px !important;
+                        }
+
+                        .match-timeline-scoreboard {
+                            padding: 14px 8px !important;
+                        }
+
+                        .match-timeline-team-name {
+                            font-size: 0.82rem !important;
+                        }
+
+                        .match-timeline-time-display {
+                            gap: 2px !important;
+                        }
+
+                        .match-timeline-root .pulse-animation {
+                            font-size: 10px !important;
+                            padding: 3px 8px !important;
+                        }
+
+                        .match-timeline-root .player-item-hover,
+                        .match-timeline-root .player-list button {
+                            padding: 10px 10px !important;
+                        }
+
+                        .timeline-item-beauty {
+                            margin-left: 4px;
+                        }
+
+                        .timeline-item-beauty::before {
+                            left: -16px;
+                        }
+
+                        .timeline-list-beauty::before {
+                            left: 12px;
+                        }
                     }
                 `}</style>
             </div>
@@ -704,6 +865,11 @@ const styles: Record<string, React.CSSProperties> = {
         flex: 1,
         textAlign: 'right',
     },
+    teamName: {
+        fontSize: '1.4rem',
+        lineHeight: 1.3,
+        margin: 0,
+    },
     score: {
         fontSize: '64px',
         fontWeight: 700,
@@ -728,8 +894,11 @@ const styles: Record<string, React.CSSProperties> = {
         borderRadius: '12px',
         fontSize: '12px',
         fontWeight: 700,
-        letterSpacing: '1px',
+        letterSpacing: '0.4px',
         marginTop: '8px',
+        whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
     },
     gameControls: {
         backgroundColor: 'var(--bg-card)',
@@ -848,14 +1017,14 @@ const styles: Record<string, React.CSSProperties> = {
         backgroundColor: 'var(--bg-card)',
         padding: '32px',
         borderRadius: 'var(--border-radius)',
-        minWidth: '400px',
+        width: 'min(420px, calc(100vw - 24px))',
         border: '1px solid var(--border-color)',
     },
     modalContentLarge: {
         backgroundColor: 'var(--bg-card)',
         padding: '32px',
         borderRadius: 'var(--border-radius)',
-        minWidth: '500px',
+        width: 'min(600px, calc(100vw - 24px))',
         maxWidth: '600px',
         maxHeight: '80vh',
         overflow: 'hidden',
@@ -960,36 +1129,55 @@ const styles: Record<string, React.CSSProperties> = {
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        padding: '12px',
+        padding: '12px 14px',
         backgroundColor: 'var(--bg-main)',
         borderRadius: 'var(--border-radius)',
         border: '1px solid var(--border-color)',
-    },
-    timelineItemLeft: {
         justifyContent: 'flex-start',
-        marginRight: '20%',
     },
-    timelineItemRight: {
-        justifyContent: 'flex-end',
-        marginLeft: '20%',
-        flexDirection: 'row-reverse',
-    },
-    timelineItemCenter: {
-        justifyContent: 'center',
-        marginLeft: 'auto',
-        marginRight: 'auto',
-        maxWidth: '60%',
-    },
-    eventTime: {
+    eventTimePill: {
         fontWeight: 700,
-        color: 'var(--accent-color)',
+        color: 'white',
         minWidth: '40px',
+        textAlign: 'center',
+        fontSize: '12px',
+        background: 'var(--accent-color)',
+        borderRadius: '999px',
+        padding: '4px 8px',
     },
-    eventIcon: {
-        fontSize: '20px',
+    eventIconBubble: {
+        fontSize: '18px',
+        width: '32px',
+        height: '32px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '999px',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid var(--border-color)',
+        flexShrink: 0,
+    },
+    eventContentWrap: {
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px',
     },
     eventText: {
         flex: 1,
+        fontSize: '14px',
+        lineHeight: 1.35,
+    },
+    eventMetaTag: {
+        fontSize: '11px',
+        color: 'var(--text-secondary)',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '999px',
+        padding: '4px 8px',
+        whiteSpace: 'nowrap',
     },
     noEvents: {
         color: 'var(--text-secondary)',
