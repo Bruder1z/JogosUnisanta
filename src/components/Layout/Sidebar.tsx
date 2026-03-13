@@ -27,7 +27,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
         { name: 'Futebol Society', icon: '⚽' },
         { name: 'Basquete 3x3', icon: '🏀' },
         { name: 'Vôlei', icon: '🏐' },
-        { name: 'Handebol', icon: '🤾' },
+        { name: 'Handebol', icon: '🤾' }
     ];
 
     const handleSelectSport = (sport: string) => {
@@ -50,7 +50,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
 
     return (
         <>
-            {/* Backdrop overlay no mobile */}
             <div
                 className={`sidebar-backdrop${isOpen ? ' active' : ''}`}
                 onClick={close}
@@ -69,7 +68,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 overflowY: 'auto',
                 zIndex: 40
             }}>
-                {/* Navegação principal - visível apenas no mobile */}
                 <div className="sidebar-mobile-nav">
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '10px', letterSpacing: '0.05em' }}>NAVEGAÇÃO</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -182,15 +180,11 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     <Link to="/transmissao" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                         <span style={{ fontSize: '16px' }}>📺</span> Transmissão
                     </Link>
-                    <Link to="/controle-partida" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
-                        <span style={{ fontSize: '16px' }}>⚽</span> Controle de Partida
-                    </Link>
                     {user?.role === 'superadmin' && (
                         <Link to="/controle-partida" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                             <span style={{ fontSize: '16px' }}>⚽</span> Controle de Partida
                         </Link>
                     )}
-
                     <Link
                         to="/calendario"
                         onClick={close}
@@ -198,15 +192,28 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                         style={{
                             padding: '10px 20px',
                             fontSize: '13px',
-                {/* Old calendar modal removed */}
+                            color: 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}
                     >
-                        <Download size={20} />
-                        BAIXAR TABELA OFICIAL (PDF)
-                    </a>
+                        <Calendar size={16} />
+                        Calendário dos Jogos
+                    </Link>
+
+                    <Link to="/simulador" onClick={close} style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--accent-color)', textDecoration: 'none', fontWeight: 600 }}>⚡ Simulador</Link>
                 </div>
-            </div>
-                )}
-        </aside >
+
+                <style>{`
+                    .sidebar-link:hover {
+                        background: var(--bg-hover);
+                        color: var(--text-primary) !important;
+                    }
+                `}</style>
+            </aside>
         </>
     );
 };
