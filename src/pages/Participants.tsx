@@ -92,7 +92,7 @@ const Participants: FC = () => {
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
             <Sidebar onShowRanking={() => setShowRanking(true)} />
-            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: '40px' }}>
+            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
                         <div>
@@ -248,13 +248,16 @@ const Participants: FC = () => {
                                                     width: '48px',
                                                     height: '48px',
                                                     borderRadius: '12px',
-                                                    background: 'var(--bg-hover)',
+                                                    background: 'rgba(255,255,255,0.08)',
+                                                    backdropFilter: 'blur(8px)',
+                                                    border: '1px solid rgba(255,255,255,0.12)',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    color: 'var(--accent-color)',
-                                                    fontSize: '24px'
+                                                    fontSize: '20px',
+                                                    fontWeight: 800,
+                                                    color: 'var(--accent-color)'
                                                 }}>
-                                                    {icon}
+                                                    {name[0]}
                                                 </div>
                                             </div>
                                         ) : (
@@ -262,14 +265,17 @@ const Participants: FC = () => {
                                                 width: '48px',
                                                 height: '48px',
                                                 borderRadius: '12px',
-                                                background: 'var(--bg-hover)',
+                                                background: 'rgba(255,255,255,0.08)',
+                                                backdropFilter: 'blur(8px)',
+                                                border: '1px solid rgba(255,255,255,0.12)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                color: 'var(--accent-color)',
-                                                fontSize: '24px'
+                                                fontSize: '20px',
+                                                fontWeight: 800,
+                                                color: 'var(--accent-color)'
                                             }}>
-                                                {icon}
+                                                {name[0]}
                                             </div>
                                         )}
                                         <div>

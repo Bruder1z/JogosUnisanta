@@ -38,6 +38,13 @@ const Home: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const sportParam = params.get('sport');
         const modalitiesParam = params.get('modalities');
+        const viewParam = params.get('view');
+
+        if (viewParam === 'admin' && user?.role === 'superadmin') {
+            setActiveView('admin');
+            navigate(location.pathname, { replace: true });
+            return;
+        }
 
         if (sportParam) {
             setSelectedSport(decodeURIComponent(sportParam));
@@ -49,7 +56,7 @@ const Home: React.FC = () => {
             // Remove params from URL after reading
             navigate(location.pathname, { replace: true });
         }
-    }, [location.search, navigate, location.pathname]);
+    }, [location.search, navigate, location.pathname, user]);
 
     const filteredMatches = matches.filter(m => {
         const sportMatch = !selectedSport || m.sport === selectedSport;
@@ -84,7 +91,7 @@ const Home: React.FC = () => {
         <div style={{ minHeight: '100vh' }}>
             <Header />
             {!user && (
-                <div style={{ position: 'fixed', top: '12px', right: '24px', zIndex: 1100 }}>
+                <div className="home-fixed-login" style={{ position: 'fixed', top: '12px', right: '24px', zIndex: 1100 }}>
                     <button
                         onClick={() => setShowLogin(true)}
                         style={{
@@ -113,7 +120,7 @@ const Home: React.FC = () => {
             <main style={{
                 marginLeft: 'var(--sidebar-width)',
                 marginTop: 'var(--header-height)',
-                padding: '30px',
+                padding: 'var(--main-padding)',
             }}>
                 {user?.role === 'superadmin' && (
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
@@ -151,36 +158,37 @@ const Home: React.FC = () => {
                 {activeView === 'admin' && user?.role === 'superadmin' ? (
                     <AdminDashboard />
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '30px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'var(--home-grid-cols)', gap: '30px' }}>
                         {/* Left Column: Matches */}
                         <section>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="home-filter-bar">
+                                <div className="home-filter-top">
                                     <h1 style={{ fontSize: '24px', fontWeight: 800 }}>
                                         {selectedSport ? selectedSport : 'Jogos de Hoje'}
                                     </h1>
                                     {selectedSport && (
                                         <button
                                             onClick={() => setSelectedSport(null)}
-                                            style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                                            style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
                                         >
-                                            Ver todos os jogos
+                                            Ver todos
                                         </button>
                                     )}
-                                    <div style={{ position: 'relative' }}>
+                                    <div style={{ position: 'relative', marginLeft: 'auto' }}>
                                         <button
                                             onClick={() => setShowDateDropdown(!showDateDropdown)}
                                             style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '8px',
+                                                gap: '6px',
                                                 background: 'var(--bg-card)',
-                                                padding: '6px 12px',
+                                                padding: '6px 10px',
                                                 borderRadius: '8px',
                                                 fontSize: '13px',
                                                 color: 'var(--text-secondary)',
                                                 border: '1px solid var(--border-color)',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap'
                                             }}
                                         >
                                             <Calendar size={14} />
@@ -199,7 +207,7 @@ const Home: React.FC = () => {
                                                 <div style={{
                                                     position: 'absolute',
                                                     top: '100%',
-                                                    left: 0,
+                                                    right: 0,
                                                     marginTop: '4px',
                                                     background: 'var(--bg-card)',
                                                     border: '1px solid var(--border-color)',
@@ -238,7 +246,7 @@ const Home: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                <div className="home-cat-filter">
                                     {(['Todos', 'Masculino', 'Feminino'] as const).map((cat) => (
                                         <button
                                             key={cat}

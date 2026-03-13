@@ -9,6 +9,7 @@ import Simulator from './pages/Simulator';
 import MatchControl from './pages/MatchControl';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './components/context/DataContext';
+import { SidebarProvider } from './context/SidebarContext';
 import Login from './pages/Login';
 
 const AppContent = () => {
@@ -35,9 +36,11 @@ function App() {
   return (
     <Router>
       <DataProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        <SidebarProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </SidebarProvider>
       </DataProvider>
     </Router>
   );

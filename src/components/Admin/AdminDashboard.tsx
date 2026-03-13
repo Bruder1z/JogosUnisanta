@@ -10,7 +10,11 @@ import {
     MapPin,
     Calendar,
     Save,
-    Trash2
+    Trash2,
+    Edit3,
+    Check,
+    Award,
+    Plus
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -29,11 +33,43 @@ const AdminDashboard: React.FC = () => {
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     // DataContext
-    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete, customEmblems, addCustomEmblem, matches, addMatch, updateMatch, deleteMatch } = useData();
+    const { 
+        courses: coursesList, 
+        addCourse, 
+        removeCourse, 
+        athletes: athletesList, 
+        addAthlete, 
+        removeAthlete, 
+        customEmblems, 
+        addCustomEmblem, 
+        matches, 
+        addMatch, 
+        updateMatch, 
+        deleteMatch, 
+        ranking, 
+        updateRankingPoints,
+        featuredAthletes,
+        addFeaturedAthlete,
+        removeFeaturedAthlete
+    } = useData();
+
+    // Ranking edit state: course -> pending points value
+    const [editingCourse, setEditingCourse] = useState<string | null>(null);
+    const [editValue, setEditValue] = useState<number>(0);
 
     // Form and Data States
     const [newCourseForm, setNewCourseForm] = useState({ name: '', university: '', emblem: '' });
     const [newAthleteForm, setNewAthleteForm] = useState({ name: '', university: '', course: '', sport: '' });
+
+    const [isAddingFeatured, setIsAddingFeatured] = useState(false);
+    const [newFeatured, setNewFeatured] = useState({
+        athleteId: '',
+        name: '',
+        institution: '',
+        course: '',
+        sport: '',
+        reason: ''
+    });
 
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
@@ -182,18 +218,18 @@ const AdminDashboard: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: '20px' }}>
+        <div className="admin-dashboard-root" style={{ padding: '20px' }}>
             <div style={{ marginBottom: '30px' }}>
-                <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px' }}>Painel de Controle Super Admin</h1>
+                <h1 className="admin-page-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px' }}>Painel de Controle Super Admin</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>Gerencie os Jogos Unisanta, equipes e resultados.</p>
             </div>
 
             {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
+            <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
                 {stats.map(stat => (
                     <div
                         key={stat.label}
-                        className="premium-card"
+                        className="premium-card admin-stat-card"
                         onClick={() => setSelectedStat(stat)}
                         style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', transition: 'transform 0.2s' }}
                         onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
@@ -220,17 +256,20 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Main Admin Area */}
-            <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '30px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="admin-main-grid" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '30px' }}>
+                <div className="admin-tabs-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
                         { id: 'overview', label: 'Visão Geral', icon: <Layout size={18} /> },
                         { id: 'matches', label: 'Gerenciar Partidas', icon: <Clock size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
+                        { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
+                        { id: 'featured', label: 'Melhores Atletas', icon: <Award size={18} /> },
                         { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
                     ].map(tab => (
                         <button
                             key={tab.id}
+                            className="admin-tab-button"
                             onClick={() => setActiveTab(tab.id)}
                             style={{
                                 display: 'flex',
@@ -275,13 +314,14 @@ const AdminDashboard: React.FC = () => {
                     ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                     {activeTab === 'overview' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewMatchOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -305,7 +345,7 @@ const AdminDashboard: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
+                            <div className="admin-filter-row" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
                                 <button
                                     onClick={() => setFilter('all')}
                                     style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', background: filter === 'all' ? 'var(--accent-color)' : 'var(--bg-hover)', color: filter === 'all' ? 'white' : 'var(--text-secondary)' }}
@@ -326,8 +366,8 @@ const AdminDashboard: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div style={{ padding: '0', overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                     <thead>
                                         <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
                                             <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
@@ -340,12 +380,12 @@ const AdminDashboard: React.FC = () => {
                                         {filteredMatches.map(match => (
                                             <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} {match.scoreA} x {match.scoreB} {match.teamB.course}</div>
+                                                    <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} {match.scoreA} x {match.scoreB} {match.teamB.course}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
                                                 </td>
                                                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <span style={{
+                                                    <span className="admin-status-badge" style={{
                                                         padding: '4px 8px',
                                                         borderRadius: '4px',
                                                         fontSize: '11px',
@@ -356,7 +396,7 @@ const AdminDashboard: React.FC = () => {
                                                         {match.status.toUpperCase()}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '16px 20px' }}>
+                                                <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
                                                     <button
                                                         onClick={() => handleToggleStatus(match.id)}
                                                         style={{ color: 'var(--accent-color)', fontWeight: 600, marginRight: '15px', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.2s' }}
@@ -396,12 +436,12 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'matches' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                 <Clock size={24} color="var(--accent-color)" />
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Todas as Partidas</h2>
                             </div>
-                            <div style={{ padding: '0', overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                     <thead>
                                         <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
                                             <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
@@ -413,11 +453,11 @@ const AdminDashboard: React.FC = () => {
                                         {matches.map(match => (
                                             <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                 <td style={{ padding: '16px 20px' }}>
-                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} x {match.teamB.course}</div>
+                                                    <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} x {match.teamB.course}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
                                                 </td>
                                                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
-                                                <td style={{ padding: '16px 20px' }}>
+                                                <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
                                                     <button
                                                         onClick={() => showNotification("Editar Horário em desenvolvimento...")}
                                                         style={{ color: 'var(--text-primary)', fontWeight: 600, marginRight: '15px', background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -441,12 +481,13 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'teams' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <Users size={24} color="var(--accent-color)" />
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Equipes & Cursos Inscritos</h2>
                                 </div>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewCourseOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -541,12 +582,13 @@ const AdminDashboard: React.FC = () => {
 
                     {activeTab === 'athletes' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <Users size={24} color="var(--accent-color)" />
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Atletas</h2>
                                 </div>
                                 <button
+                                    className="admin-primary-action"
                                     onClick={() => setIsNewAthleteOpen(true)}
                                     style={{
                                         background: 'var(--accent-color)',
@@ -640,9 +682,310 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'ranking' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <Trophy size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Classificação Geral</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Edite os pontos para atualizar o ranking público em tempo real</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '60px' }}>POS</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600 }}>ATLÉTICA / CURSO</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '140px', textAlign: 'center' }}>PONTOS</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '100px', textAlign: 'center' }}>AÇÃO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ranking.map((entry) => {
+                                            const courseName = entry.course.split(' - ')[0];
+                                            const institution = entry.course.split(' - ')[1];
+                                            const courseIcon = getCourseIcon(courseName);
+                                            const emblemUrl = customEmblems[entry.course] || (entry.course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[entry.course]}` : null);
+                                            const isEditing = editingCourse === entry.course;
+                                            const isTop3 = entry.rank <= 3;
+                                            const highlightColor = entry.rank === 1 ? '#FFD700' : entry.rank === 2 ? '#C0C0C0' : entry.rank === 3 ? '#CD7F32' : null;
+
+                                            return (
+                                                <tr key={entry.course} style={{
+                                                    borderBottom: '1px solid var(--border-color)',
+                                                    background: isTop3 ? `linear-gradient(90deg, ${highlightColor}12 0%, transparent 100%)` : 'transparent'
+                                                }}>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{
+                                                            width: '30px',
+                                                            height: '30px',
+                                                            borderRadius: '8px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            fontSize: '13px',
+                                                            fontWeight: 800,
+                                                            background: highlightColor || 'var(--bg-hover)',
+                                                            color: isTop3 ? '#000' : 'var(--text-secondary)'
+                                                        }}>
+                                                            {entry.rank}º
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            {emblemUrl ? (
+                                                                <img
+                                                                    src={emblemUrl}
+                                                                    alt={courseName}
+                                                                    style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '6px' }}
+                                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                                />
+                                                            ) : (
+                                                                <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                                                                    {courseIcon}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>{courseName}</div>
+                                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{institution}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        {isEditing ? (
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={editValue}
+                                                                onChange={e => setEditValue(Math.max(0, Number(e.target.value)))}
+                                                                autoFocus
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') {
+                                                                        updateRankingPoints(entry.course, editValue);
+                                                                        setEditingCourse(null);
+                                                                        showNotification(`Pontos de ${courseName} atualizados para ${editValue}!`);
+                                                                    }
+                                                                    if (e.key === 'Escape') setEditingCourse(null);
+                                                                }}
+                                                                style={{
+                                                                    width: '80px',
+                                                                    padding: '8px 10px',
+                                                                    background: '#2a2a2a',
+                                                                    border: '2px solid var(--accent-color)',
+                                                                    borderRadius: '6px',
+                                                                    color: '#fff',
+                                                                    textAlign: 'center',
+                                                                    fontSize: '16px',
+                                                                    fontWeight: 800,
+                                                                    outline: 'none'
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <span style={{ fontSize: '16px', fontWeight: 800, color: isTop3 ? (highlightColor as string) : 'var(--text-primary)' }}>
+                                                                {entry.points}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        {isEditing ? (
+                                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        updateRankingPoints(entry.course, editValue);
+                                                                        setEditingCourse(null);
+                                                                        showNotification(`Pontos de ${courseName} atualizados para ${editValue}!`);
+                                                                    }}
+                                                                    style={{
+                                                                        background: 'var(--accent-color)',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        padding: '6px 12px',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: 700,
+                                                                        transition: 'background 0.2s'
+                                                                    }}
+                                                                    onMouseOver={e => e.currentTarget.style.background = '#c10510'}
+                                                                    onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
+                                                                >
+                                                                    <Check size={14} /> Salvar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditingCourse(null)}
+                                                                    style={{
+                                                                        background: 'var(--bg-hover)',
+                                                                        color: 'var(--text-secondary)',
+                                                                        border: '1px solid var(--border-color)',
+                                                                        padding: '6px 10px',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: 600
+                                                                    }}
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingCourse(entry.course);
+                                                                    setEditValue(entry.points);
+                                                                }}
+                                                                style={{
+                                                                    background: 'transparent',
+                                                                    border: '1px solid var(--border-color)',
+                                                                    color: 'var(--text-secondary)',
+                                                                    padding: '6px 12px',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '5px',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: 600,
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseOver={e => {
+                                                                    e.currentTarget.style.color = 'var(--accent-color)';
+                                                                    e.currentTarget.style.borderColor = 'var(--accent-color)';
+                                                                    e.currentTarget.style.background = 'rgba(227, 6, 19, 0.1)';
+                                                                }}
+                                                                onMouseOut={e => {
+                                                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                                                    e.currentTarget.style.background = 'transparent';
+                                                                }}
+                                                            >
+                                                                <Edit3 size={13} /> Editar
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total: {ranking.length} cursos</span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Clique em "Editar" para alterar os pontos</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'featured' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <Award size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Atletas em Destaque</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Gerencie os atletas que aparecem na página de Melhores Atletas</p>
+                                    </div>
+                                </div>
+                                <button
+                                    className="admin-primary-action"
+                                    onClick={() => setIsAddingFeatured(true)}
+                                    style={{
+                                        background: 'var(--accent-color)',
+                                        color: 'white',
+                                        padding: '8px 16px',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        border: 'none',
+                                        transition: 'background 0.2s'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    Adicionar Melhor Atleta
+                                </button>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                {featuredAthletes.length === 0 ? (
+                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        Nenhum atleta destaque cadastrado.
+                                    </div>
+                                ) : (
+                                    <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                        <thead>
+                                            <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>ATLETA</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>CURSO / INSTITUIÇÃO</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>MODALIDADE</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>MOTIVO</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600, width: '100px', textAlign: 'center' }}>AÇÃO</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {featuredAthletes.map((fAthlete) => (
+                                                <tr key={fAthlete.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-color)',
+                                                                fontSize: '11px', fontWeight: 800, border: '1px solid var(--accent-color)'
+                                                            }}>
+                                                                {fAthlete.name.split(' ').map(n => n[0]).join('')}
+                                                            </div>
+                                                            <span style={{ fontWeight: 600 }}>{fAthlete.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ fontWeight: 600 }}>{fAthlete.course}</div>
+                                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{fAthlete.institution}</div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <span style={{ padding: '4px 10px', background: 'var(--bg-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 600 }}>
+                                                            {fAthlete.sport}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{fAthlete.reason}</td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        <button
+                                                            onClick={() => {
+                                                                removeFeaturedAthlete(fAthlete.id);
+                                                                showNotification("Atleta removido dos destaques!");
+                                                            }}
+                                                            style={{
+                                                                background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                                                                padding: '8px', cursor: 'pointer'
+                                                            }}
+                                                            onMouseOver={e => e.currentTarget.style.color = '#ff4444'}
+                                                            onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'settings' && (
                         <div className="premium-card" style={{ padding: '30px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+                            <div className="admin-section-header" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
                                 <Settings size={24} color="var(--accent-color)" />
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configurações do Sistema</h2>
                             </div>
@@ -820,7 +1163,7 @@ const AdminDashboard: React.FC = () => {
                             <option value="Masculino">Masculino</option>
                             <option value="Feminino">Feminino</option>
                         </select>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="admin-form-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <input type="date" style={inputStyle} value={newMatchForm.date} onChange={e => setNewMatchForm({ ...newMatchForm, date: e.target.value })} />
                             <input type="time" style={inputStyle} value={newMatchForm.time} onChange={e => setNewMatchForm({ ...newMatchForm, time: e.target.value })} />
                         </div>
@@ -836,7 +1179,7 @@ const AdminDashboard: React.FC = () => {
                             <option value="Bloco A">Bloco A</option>
                         </select>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button onClick={handleSaveNewMatch} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Partida</button>
                             <button onClick={() => setIsNewMatchOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
@@ -876,7 +1219,7 @@ const AdminDashboard: React.FC = () => {
                             {newCourseForm.emblem && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent-color)' }}>✓ Imagem carregada com sucesso</div>}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewCourse} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Cadastro</button>
                             <button onClick={() => setIsNewCourseOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
@@ -921,9 +1264,107 @@ const AdminDashboard: React.FC = () => {
                             </select>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewAthlete} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Atleta</button>
                             <button onClick={() => setIsNewAthleteOpen(false)} style={modalButtonStyle}>Cancelar</button>
+                        </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {isAddingFeatured && (
+                <ModalOverlay onClose={() => setIsAddingFeatured(false)}>
+                    <h2 style={{ marginBottom: '16px' }}>Adicionar Melhor Atleta</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Nome do Atleta *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Gabriel Silva"
+                                style={inputStyle}
+                                value={newFeatured.name}
+                                onChange={e => setNewFeatured({ ...newFeatured, name: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Educação Física"
+                                style={inputStyle}
+                                value={newFeatured.course}
+                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Unisanta"
+                                style={inputStyle}
+                                value={newFeatured.institution}
+                                onChange={e => setNewFeatured({ ...newFeatured, institution: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade *</label>
+                            <select
+                                style={inputStyle}
+                                value={newFeatured.sport}
+                                onChange={e => setNewFeatured({ ...newFeatured, sport: e.target.value })}
+                            >
+                                <option value="">Selecione a modalidade...</option>
+                                <option value="Futsal">Futsal</option>
+                                <option value="Futebol Society">Futebol Society</option>
+                                <option value="Handebol">Handebol</option>
+                                <option value="Vôlei">Vôlei</option>
+                                <option value="Natação">Natação</option>
+                                <option value="Karatê">Karatê</option>
+                                <option value="Judô">Judô</option>
+                                <option value="Tamboréu">Tamboréu</option>
+                                <option value="Xadrez">Xadrez</option>
+                                <option value="Tênis de Mesa">Tênis de Mesa</option>
+                                <option value="Futevôlei">Futevôlei</option>
+                                <option value="Beach Tennis">Beach Tennis</option>
+                                <option value="Vôlei de Praia">Vôlei de Praia</option>
+                                <option value="Basquete 3x3">Basquete 3x3</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Motivo do Destaque *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Artilheiro, MVP, Destaque da Rodada"
+                                style={inputStyle}
+                                value={newFeatured.reason}
+                                onChange={e => setNewFeatured({ ...newFeatured, reason: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                            <button
+                                onClick={() => {
+                                    if (!newFeatured.name || !newFeatured.course || !newFeatured.institution || !newFeatured.sport || !newFeatured.reason) {
+                                        showNotification('Preencha todos os campos obrigatórios!');
+                                        return;
+                                    }
+                                    addFeaturedAthlete({
+                                        id: Date.now().toString(),
+                                        name: newFeatured.name,
+                                        institution: newFeatured.institution,
+                                        course: newFeatured.course,
+                                        sport: newFeatured.sport,
+                                        reason: newFeatured.reason
+                                    });
+                                    setIsAddingFeatured(false);
+                                    setNewFeatured({ athleteId: '', name: '', institution: '', course: '', sport: '', reason: '' });
+                                    showNotification('Atleta destaque salvo com sucesso!');
+                                }}
+                                style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}
+                            >
+                                Salvar Atleta
+                            </button>
+                            <button onClick={() => setIsAddingFeatured(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
                     </div>
                 </ModalOverlay>
@@ -934,7 +1375,7 @@ const AdminDashboard: React.FC = () => {
                     <h2 style={{ marginBottom: '8px' }}>Atualizar Placar</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px' }}>{selectedMatch.timeA} vs {selectedMatch.timeB}</p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', background: 'var(--bg-hover)', padding: '20px', borderRadius: '8px' }}>
+                    <div className="admin-score-grid" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', background: 'var(--bg-hover)', padding: '20px', borderRadius: '8px' }}>
                         <div style={{ textAlign: 'center', flex: 1 }}>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedMatch.timeA}</div>
                             <input type="number" value={scoreForm.scoreA} onChange={e => setScoreForm({ ...scoreForm, scoreA: Number(e.target.value) })} style={{ ...inputStyle, textAlign: 'center', fontSize: '24px', padding: '10px' }} />
@@ -946,7 +1387,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                    <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                         <button onClick={handleUpdatePlacar} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Placar</button>
                         <button onClick={() => setIsScoreOpen(false)} style={modalButtonStyle}>Cancelar</button>
                     </div>
@@ -966,7 +1407,7 @@ const AdminDashboard: React.FC = () => {
 const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, backdropFilter: 'blur(5px)' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={onClose} />
-        <div className="premium-card" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
+        <div className="premium-card modal-content-wide" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
             {children}
         </div>
     </div>
