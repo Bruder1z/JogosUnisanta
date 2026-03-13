@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '../components/Navigation/Header';
-import Sidebar from '../components/Layout/Sidebar';
+import Sidebar from '../components/Layout/Sidebar.tsx';
 import MatchCard from '../components/Match/MatchCard';
 import MatchModal from '../components/Match/MatchModal';
 import ModalitiesModal from '../components/Modals/ModalitiesModal';
@@ -110,7 +110,7 @@ const Home: React.FC = () => {
 
             <Sidebar
                 onShowModalities={() => setShowModalities(true)}
-                onSelectSport={(sport) => {
+                onSelectSport={(sport: string) => {
                     setSelectedSport(sport);
                     setSelectedCategory('Todos');
                 }}
@@ -379,7 +379,7 @@ const Home: React.FC = () => {
             {showModalities && (
                 <ModalitiesModal
                     onClose={() => setShowModalities(false)}
-                    onSelectSport={(sport) => {
+                    onSelectSport={(sport: string) => {
                         setSelectedSport(sport);
                         setSelectedCategory('Todos');
                     }}
