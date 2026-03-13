@@ -4,11 +4,9 @@ import {
     Settings,
     PlusCircle,
     Trophy,
-    BookOpen,
-    Clock,
     Layout,
-    MapPin,
-    Calendar,
+    BookOpen,
+    Timer,
     Save,
     Trash2,
     Edit3,
@@ -260,7 +258,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="admin-tabs-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
                         { id: 'overview', label: 'Visão Geral', icon: <Layout size={18} /> },
-                        { id: 'matches', label: 'Gerenciar Partidas', icon: <Clock size={18} /> },
+                        { id: 'match-control', label: 'Controle de Partida', icon: <Timer size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
@@ -315,6 +313,14 @@ const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                    {activeTab === 'match-control' && (
+                        <div className="premium-card" style={{ padding: '40px', textAlign: 'center' }}>
+                            <Timer size={48} color="var(--accent-color)" style={{ marginBottom: '20px', opacity: 0.5 }} />
+                            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '10px' }}>Controle de Partida</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>Em breve: Migração de toda a lógica de cronologia e controle de placares para esta área restrita.</p>
+                        </div>
+                    )}
 
                     {activeTab === 'overview' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -434,50 +440,6 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'matches' && (
-                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                <Clock size={24} color="var(--accent-color)" />
-                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Todas as Partidas</h2>
-                            </div>
-                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
-                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                                    <thead>
-                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
-                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>PARTIDA</th>
-                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>MODALIDADE</th>
-                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>AÇÕES (AGENDAMENTO)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {matches.map(match => (
-                                            <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                <td style={{ padding: '16px 20px' }}>
-                                                    <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} x {match.teamB.course}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
-                                                </td>
-                                                <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
-                                                <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
-                                                    <button
-                                                        onClick={() => showNotification("Editar Horário em desenvolvimento...")}
-                                                        style={{ color: 'var(--text-primary)', fontWeight: 600, marginRight: '15px', background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                                    >
-                                                        <Calendar size={14} /> Horário
-                                                    </button>
-                                                    <button
-                                                        onClick={() => showNotification("Definir Local em desenvolvimento...")}
-                                                        style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'var(--bg-hover)', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                                    >
-                                                        <MapPin size={14} /> Local
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
 
                     {activeTab === 'teams' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
