@@ -328,10 +328,24 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
 
                             {/* Action Button */}
                             <a
-                                href="/docs/tabela-oficial-unisanta-2025.pdf"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download="tabela-oficial-unisanta-2025.pdf"
+                                href="/pdf/tabela-jogos-2026.pdf"
+                                download="tabela-jogos-2026.pdf"
+                                onClick={(e) => {
+                                    const target = e.currentTarget;
+                                    fetch(target.href, { method: 'HEAD' })
+                                        .then(res => {
+                                            if (!res.ok) {
+                                                e.preventDefault();
+                                                console.error('O arquivo da tabela oficial ainda não está disponível no servidor');
+                                                alert('O arquivo da tabela oficial ainda não está disponível no servidor');
+                                            }
+                                        })
+                                        .catch(() => {
+                                            e.preventDefault();
+                                            console.error('O arquivo da tabela oficial ainda não está disponível no servidor');
+                                            alert('O arquivo da tabela oficial ainda não está disponível no servidor');
+                                        });
+                                }}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
