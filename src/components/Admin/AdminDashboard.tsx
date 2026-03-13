@@ -10,7 +10,9 @@ import {
     MapPin,
     Calendar,
     Save,
-    Trash2
+    Trash2,
+    Edit3,
+    Check
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -29,7 +31,11 @@ const AdminDashboard: React.FC = () => {
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     // DataContext
-    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete, customEmblems, addCustomEmblem, matches, addMatch, updateMatch, deleteMatch } = useData();
+    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete, customEmblems, addCustomEmblem, matches, addMatch, updateMatch, deleteMatch, ranking, updateRankingPoints } = useData();
+
+    // Ranking edit state: course -> pending points value
+    const [editingCourse, setEditingCourse] = useState<string | null>(null);
+    const [editValue, setEditValue] = useState<number>(0);
 
     // Form and Data States
     const [newCourseForm, setNewCourseForm] = useState({ name: '', university: '', emblem: '' });
@@ -227,6 +233,7 @@ const AdminDashboard: React.FC = () => {
                         { id: 'matches', label: 'Gerenciar Partidas', icon: <Clock size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
+                        { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
                         { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
                     ].map(tab => (
                         <button
@@ -640,6 +647,208 @@ const AdminDashboard: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'ranking' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <Trophy size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Classificação Geral</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Edite os pontos para atualizar o ranking público em tempo real</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '60px' }}>POS</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600 }}>ATLÉTICA / CURSO</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '140px', textAlign: 'center' }}>PONTOS</th>
+                                            <th style={{ padding: '14px 16px', fontWeight: 600, width: '100px', textAlign: 'center' }}>AÇÃO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ranking.map((entry) => {
+                                            const courseName = entry.course.split(' - ')[0];
+                                            const institution = entry.course.split(' - ')[1];
+                                            const courseIcon = getCourseIcon(courseName);
+                                            const emblemUrl = customEmblems[entry.course] || (entry.course in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[entry.course]}` : null);
+                                            const isEditing = editingCourse === entry.course;
+                                            const isTop3 = entry.rank <= 3;
+                                            const highlightColor = entry.rank === 1 ? '#FFD700' : entry.rank === 2 ? '#C0C0C0' : entry.rank === 3 ? '#CD7F32' : null;
+
+                                            return (
+                                                <tr key={entry.course} style={{
+                                                    borderBottom: '1px solid var(--border-color)',
+                                                    background: isTop3 ? `linear-gradient(90deg, ${highlightColor}12 0%, transparent 100%)` : 'transparent'
+                                                }}>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{
+                                                            width: '30px',
+                                                            height: '30px',
+                                                            borderRadius: '8px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            fontSize: '13px',
+                                                            fontWeight: 800,
+                                                            background: highlightColor || 'var(--bg-hover)',
+                                                            color: isTop3 ? '#000' : 'var(--text-secondary)'
+                                                        }}>
+                                                            {entry.rank}º
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            {emblemUrl ? (
+                                                                <img
+                                                                    src={emblemUrl}
+                                                                    alt={courseName}
+                                                                    style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '6px' }}
+                                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                                />
+                                                            ) : (
+                                                                <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                                                                    {courseIcon}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>{courseName}</div>
+                                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{institution}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        {isEditing ? (
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={editValue}
+                                                                onChange={e => setEditValue(Math.max(0, Number(e.target.value)))}
+                                                                autoFocus
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') {
+                                                                        updateRankingPoints(entry.course, editValue);
+                                                                        setEditingCourse(null);
+                                                                        showNotification(`Pontos de ${courseName} atualizados para ${editValue}!`);
+                                                                    }
+                                                                    if (e.key === 'Escape') setEditingCourse(null);
+                                                                }}
+                                                                style={{
+                                                                    width: '80px',
+                                                                    padding: '8px 10px',
+                                                                    background: '#2a2a2a',
+                                                                    border: '2px solid var(--accent-color)',
+                                                                    borderRadius: '6px',
+                                                                    color: '#fff',
+                                                                    textAlign: 'center',
+                                                                    fontSize: '16px',
+                                                                    fontWeight: 800,
+                                                                    outline: 'none'
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <span style={{ fontSize: '16px', fontWeight: 800, color: isTop3 ? (highlightColor as string) : 'var(--text-primary)' }}>
+                                                                {entry.points}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        {isEditing ? (
+                                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        updateRankingPoints(entry.course, editValue);
+                                                                        setEditingCourse(null);
+                                                                        showNotification(`Pontos de ${courseName} atualizados para ${editValue}!`);
+                                                                    }}
+                                                                    style={{
+                                                                        background: 'var(--accent-color)',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        padding: '6px 12px',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: 700,
+                                                                        transition: 'background 0.2s'
+                                                                    }}
+                                                                    onMouseOver={e => e.currentTarget.style.background = '#c10510'}
+                                                                    onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
+                                                                >
+                                                                    <Check size={14} /> Salvar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditingCourse(null)}
+                                                                    style={{
+                                                                        background: 'var(--bg-hover)',
+                                                                        color: 'var(--text-secondary)',
+                                                                        border: '1px solid var(--border-color)',
+                                                                        padding: '6px 10px',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: 600
+                                                                    }}
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingCourse(entry.course);
+                                                                    setEditValue(entry.points);
+                                                                }}
+                                                                style={{
+                                                                    background: 'transparent',
+                                                                    border: '1px solid var(--border-color)',
+                                                                    color: 'var(--text-secondary)',
+                                                                    padding: '6px 12px',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '5px',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: 600,
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseOver={e => {
+                                                                    e.currentTarget.style.color = 'var(--accent-color)';
+                                                                    e.currentTarget.style.borderColor = 'var(--accent-color)';
+                                                                    e.currentTarget.style.background = 'rgba(227, 6, 19, 0.1)';
+                                                                }}
+                                                                onMouseOut={e => {
+                                                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                                                    e.currentTarget.style.background = 'transparent';
+                                                                }}
+                                                            >
+                                                                <Edit3 size={13} /> Editar
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total: {ranking.length} cursos</span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Clique em "Editar" para alterar os pontos</span>
                             </div>
                         </div>
                     )}

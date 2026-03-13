@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AVAILABLE_COURSES, mockAthletes as initialAthletes, mockMatches, type Match } from '../../data/mockData';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AVAILABLE_COURSES, mockAthletes as initialAthletes, mockMatches, mockRanking as initialRanking, type Match, type RankingEntry } from '../../data/mockData';
 
 export interface Athlete {
     id: string;
@@ -23,6 +23,8 @@ interface DataContextType {
     addMatch: (match: Match) => void;
     updateMatch: (match: Match) => void;
     deleteMatch: (id: string) => void;
+    ranking: RankingEntry[];
+    updateRankingPoints: (course: string, newPoints: number) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -70,6 +72,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return mockMatches;
     });
 
+    const [ranking, setRanking] = useState<RankingEntry[]>(() => {
+        const saved = localStorage.getItem('jg_ranking');
+        if (saved) return JSON.parse(saved);
+        return initialRanking;
+    });
+
     useEffect(() => {
         localStorage.setItem('jg_emblems', JSON.stringify(customEmblems));
     }, [customEmblems]);
@@ -77,6 +85,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         localStorage.setItem('jg_matches', JSON.stringify(matches));
     }, [matches]);
+
+    useEffect(() => {
+        localStorage.setItem('jg_ranking', JSON.stringify(ranking));
+    }, [ranking]);
 
     const addCourse = (course: string) => setCourses(prev => [course, ...prev]);
     const removeCourse = (courseToRemove: string) => {
@@ -98,12 +110,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updateMatch = (updatedMatch: Match) => setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
     const deleteMatch = (id: string) => setMatches(prev => prev.filter(m => m.id !== id));
 
+    const updateRankingPoints = useCallback((course: string, newPoints: number) => {
+        setRanking(prev => {
+            const updated = prev.map(entry =>
+                entry.course === course ? { ...entry, points: newPoints } : entry
+            );
+            // Sort: points descending, then alphabetical on tie
+            updated.sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return a.course.localeCompare(b.course);
+            });
+            // Re-assign ranks
+            return updated.map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+        });
+    }, []);
+
     return (
         <DataContext.Provider value={{
             courses, addCourse, removeCourse,
             athletes, addAthlete, removeAthlete,
             customEmblems, addCustomEmblem,
-            matches, addMatch, updateMatch, deleteMatch
+            matches, addMatch, updateMatch, deleteMatch,
+            ranking, updateRankingPoints
         }}>
             {children}
         </DataContext.Provider>

@@ -1,12 +1,14 @@
 import React from 'react';
 import { X, Trophy, Medal, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { mockRanking, COURSE_ICONS, COURSE_EMBLEMS } from '../../data/mockData';
+import { COURSE_ICONS, COURSE_EMBLEMS } from '../../data/mockData';
+import { useData } from '../context/DataContext';
 
 interface RankingModalProps {
     onClose: () => void;
 }
 
 const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
+    const { ranking } = useData();
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
             courseKey.toLowerCase().includes(teamName.toLowerCase())
@@ -109,7 +111,7 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {mockRanking.map((item, index) => {
+                            {ranking.map((item, index) => {
                                 const courseName = item.course.split(' - ')[0];
                                 const institution = item.course.split(' - ')[1];
                                 const icon = COURSE_ICONS[courseName] || '🏆';
