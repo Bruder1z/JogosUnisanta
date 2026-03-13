@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Trophy, Medal, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { COURSE_ICONS, COURSE_EMBLEMS } from '../../data/mockData';
+import { COURSE_EMBLEMS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
 
 interface RankingModalProps {
@@ -114,7 +114,7 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
                             {ranking.map((item, index) => {
                                 const courseName = item.course.split(' - ')[0];
                                 const institution = item.course.split(' - ')[1];
-                                const icon = COURSE_ICONS[courseName] || '🏆';
+                                // const icon = COURSE_ICONS[courseName] || '🏆';
 
                                 const isTop3 = index < 3;
                                 const highlightColor = index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : null;
