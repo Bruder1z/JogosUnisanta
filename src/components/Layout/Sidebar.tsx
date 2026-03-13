@@ -8,7 +8,6 @@ import {
     Calendar
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
-import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
     onShowModalities?: () => void;
@@ -20,7 +19,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
     const navigate = useNavigate();
     const location = useLocation();
     const { isOpen, close } = useSidebar();
-    const { user } = useAuth();
 
     const principalSports = [
         { name: 'Futsal', icon: '⚽' },
@@ -152,7 +150,14 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '20px' }}>
                     <button
-                        onClick={() => { onShowRanking?.(); close(); }}
+                        onClick={() => {
+                            close();
+                            if (location.pathname === '/') {
+                                onShowRanking?.();
+                            } else {
+                                navigate('/?ranking=true');
+                            }
+                        }}
                         className="sidebar-link"
                         style={{
                             padding: '10px 20px',
@@ -180,11 +185,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     <Link to="/transmissao" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                         <span style={{ fontSize: '16px' }}>📺</span> Transmissão
                     </Link>
-                    {user?.role === 'superadmin' && (
-                        <Link to="/controle-partida" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
-                            <span style={{ fontSize: '16px' }}>⚽</span> Controle de Partida
-                        </Link>
-                    )}
                     <Link
                         to="/calendario"
                         onClick={close}

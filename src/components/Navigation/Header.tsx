@@ -91,6 +91,14 @@ const Header: FC = () => {
                             textDecoration: 'none',
                             transition: 'color 0.2s'
                         }}>Notícias</Link>
+                        {user?.role === 'superadmin' && (
+                            <Link to="/controle-partida" style={{
+                                color: isActive('/controle-partida') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                textDecoration: 'none',
+                                transition: 'color 0.2s',
+                                fontWeight: 700
+                            }}>Controle de Partida</Link>
+                        )}
                     </nav>
                 </div>
 

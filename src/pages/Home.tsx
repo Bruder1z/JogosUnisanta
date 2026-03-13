@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar.tsx';
 import MatchCard from '../components/Match/MatchCard';
@@ -15,7 +15,8 @@ import { useData } from '../components/context/DataContext';
 import {
     Calendar,
     ChevronDown,
-    Award
+    Award,
+    Trophy
 } from 'lucide-react';
 
 const Home: React.FC = () => {
@@ -37,6 +38,7 @@ const Home: React.FC = () => {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const sportParam = params.get('sport');
+        const rankingParam = params.get('ranking');
         const modalitiesParam = params.get('modalities');
         const viewParam = params.get('view');
 
@@ -50,6 +52,9 @@ const Home: React.FC = () => {
             setSelectedSport(decodeURIComponent(sportParam));
             setSelectedCategory('Todos');
             // Remove params from URL after reading
+            navigate(location.pathname, { replace: true });
+        } else if (rankingParam === 'true') {
+            setShowRanking(true);
             navigate(location.pathname, { replace: true });
         } else if (modalitiesParam === 'true') {
             setShowModalities(true);
@@ -125,20 +130,6 @@ const Home: React.FC = () => {
                 {user?.role === 'superadmin' && (
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
                         <button
-                            onClick={() => setActiveView('public')}
-                            style={{
-                                padding: '10px 24px',
-                                borderRadius: '8px',
-                                fontWeight: 700,
-                                fontSize: '14px',
-                                background: activeView === 'public' ? 'var(--accent-color)' : 'var(--bg-card)',
-                                color: activeView === 'public' ? 'white' : 'var(--text-secondary)',
-                                border: '1px solid var(--border-color)'
-                            }}
-                        >
-                            VISÃO PÚBLICA
-                        </button>
-                        <button
                             onClick={() => setActiveView('admin')}
                             style={{
                                 padding: '10px 24px',
@@ -151,6 +142,20 @@ const Home: React.FC = () => {
                             }}
                         >
                             PAINEL ADMIN
+                        </button>
+                        <button
+                            onClick={() => setActiveView('public')}
+                            style={{
+                                padding: '10px 24px',
+                                borderRadius: '8px',
+                                fontWeight: 700,
+                                fontSize: '14px',
+                                background: activeView === 'public' ? 'var(--accent-color)' : 'var(--bg-card)',
+                                color: activeView === 'public' ? 'white' : 'var(--text-secondary)',
+                                border: '1px solid var(--border-color)'
+                            }}
+                        >
+                            VISÃO PÚBLICA
                         </button>
                     </div>
                 )}
@@ -340,6 +345,35 @@ const Home: React.FC = () => {
 
                         {/* Right Column: Mini Tables / Stats */}
                         <aside>
+                            {user?.role === 'superadmin' && (
+                                <div className="premium-card" style={{ padding: '20px', marginBottom: '20px', border: '1px solid var(--accent-color)', background: 'rgba(227, 6, 19, 0.05)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 800, fontSize: '14px', marginBottom: '15px' }}>
+                                        <Trophy size={18} />
+                                        CONTROLE DE PARTIDA
+                                    </div>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                                        Gerencie placares e cronologia das partidas em tempo real.
+                                    </p>
+                                    <Link 
+                                        to="/controle-partida" 
+                                        className="hover-glow"
+                                        style={{ 
+                                            display: 'block',
+                                            width: '100%',
+                                            padding: '10px',
+                                            textAlign: 'center',
+                                            background: 'var(--accent-color)',
+                                            color: 'white',
+                                            textDecoration: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: 700,
+                                            fontSize: '13px'
+                                        }}
+                                    >
+                                        ABRIR CONTROLADOR
+                                    </Link>
+                                </div>
+                            )}
                             <Countdown />
 
                             <div className="premium-card" style={{ padding: '20px' }}>

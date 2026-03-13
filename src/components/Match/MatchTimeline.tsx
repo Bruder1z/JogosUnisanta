@@ -1,40 +1,60 @@
 import { useState, useEffect, type FC } from 'react';
-import { Play, Pause, StopCircle, Clock, Plus } from 'lucide-react';
+import { Play, Pause, StopCircle, Clock, Plus, Filter, PlusCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { type Match, type MatchEvent } from '../../data/mockData';
+import { type Match, type MatchEvent, AVAILABLE_SPORTS, COURSE_EMBLEMS } from '../../data/mockData';
 
 interface MatchTimelineProps {
     matchId?: string;
 }
 
-// Mock de jogadores por time (15 jogadores por time para futsal/society)
-const TEAM_PLAYERS: Record<string, string[]> = {
-    '1': ['João Silva', 'Pedro Santos', 'Lucas Oliveira', 'Rafael Costa', 'Bruno Alves', 'Gabriel Lima', 'Matheus Rocha', 'Felipe Souza', 'Thiago Martins', 'André Ferreira', 'Carlos Dias', 'Leonardo Gomes', 'Rodrigo Pires', 'Júlio Barros', 'Diego Mendes'],
-    '2': ['Fernando Araújo', 'Paulo Ribeiro', 'Marcelo Nunes', 'Anderson Silva', 'Ricardo Lopes', 'Gustavo Moreira', 'Vinicius Castro', 'Fábio Monteiro', 'Eduardo Cardoso', 'Roberto Freitas', 'Henrique Batista', 'Daniel Ramos', 'Maurício Campos', 'José Teixeira', 'Wagner Correia'],
-    '3': ['Alexandre Pereira', 'Renato Vieira', 'Sérgio Duarte', 'Cristiano Pinto', 'Adriano Melo', 'Leandro Farias', 'Marcos Xavier', 'Alberto Cunha', 'Francisco Sales', 'Júnior Azevedo', 'Márcio Borges', 'Cláudio Castro', 'Samuel Torres', 'Rogério Miranda', 'Antônio Pacheco'],
-    '4': ['Igor Nogueira', 'Caio Barbosa', 'Renan Carvalho', 'Guilherme Rodrigues', 'Douglas Fernandes', 'Alan Machado', 'Murilo Santana', 'Éverton Soares', 'Wesley Fonseca', 'Diogo Nascimento', 'Victor Hugo', 'Kauê Moraes', 'Nathan Almeida', 'Erick Bezerra', 'Yuri Tavares']
-};
 
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
-    const { matches, updateMatch } = useData();
+    const { matches, updateMatch, athletes, addMatch, courses: coursesList } = useData();
+    
+    // Helper to get team emblem intelligently
+    const getTeamEmblem = (teamName: string) => {
+        // First try exact match in icons mapping
+        if (teamName in COURSE_EMBLEMS) {
+            return `/emblemas/${COURSE_EMBLEMS[teamName]}`;
+        }
+        // Try fuzzy match
+        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
+            courseKey.toLowerCase().includes(teamName.toLowerCase()) || 
+            teamName.toLowerCase().includes(courseKey.toLowerCase())
+        );
+        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+    };
 
-    const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+    const [activeMatchId, setActiveMatchId] = useState<string | null>(matchId || null);
     const [currentMinute, setCurrentMinute] = useState<number>(0);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [showPlayerInput, setShowPlayerInput] = useState<{ type: 'goal' | 'yellow_card' | 'red_card' | 'penalty_scored', team: 'A' | 'B' } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
+    const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
 
-    // Filtrar apenas Futsal e Futebol Society
-    const soccerMatches = matches.filter((m: Match) =>
-        m.sport === 'Futsal' || m.sport === 'Futebol Society'
-    );
+    // Filters
+    const [filterSport, setFilterSport] = useState<string>('Todos');
+    const [filterLocation, setFilterLocation] = useState<string>('Todos');
+    const [filterCategory, setFilterCategory] = useState<string>('Todos');
 
-    useEffect(() => {
-        if (matchId) {
-            const match = soccerMatches.find((m: Match) => m.id === matchId);
-            if (match) setSelectedMatch(match);
-        }
-    }, [matchId, soccerMatches]);
+    // New Match Form
+    const [newMatchForm, setNewMatchForm] = useState({
+        teamA: '', teamB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: new Date().toISOString().split('T')[0], time: '', location: ''
+    });
+
+    const locations = Array.from(new Set(matches.map(m => m.location))).filter(Boolean);
+
+    // Filter matches: Only scheduled or live
+    const filteredMatches = matches.filter((m: Match) => {
+        const matchesStatus = m.status !== 'finished';
+        const matchesSport = filterSport === 'Todos' || m.sport === filterSport;
+        const matchesLocation = filterLocation === 'Todos' || m.location === filterLocation;
+        const matchesCategory = filterCategory === 'Todos' || m.category === filterCategory;
+
+        return matchesStatus && matchesSport && matchesLocation && matchesCategory;
+    });
+
+    const selectedMatch = matches.find(m => m.id === activeMatchId) || null;
 
     useEffect(() => {
         let interval: number | null = null;
@@ -48,8 +68,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         };
     }, [isRunning]);
 
+
     const handleSelectMatch = (match: Match) => {
-        setSelectedMatch(match);
+        setActiveMatchId(match.id);
         setCurrentMinute(0);
         setIsRunning(false);
     };
@@ -87,7 +108,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         };
 
         updateMatch(updatedMatch);
-        setSelectedMatch(updatedMatch);
     };
 
     const handleStartMatch = () => {
@@ -161,7 +181,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         };
 
         updateMatch(resetMatch);
-        setSelectedMatch(resetMatch);
         setCurrentMinute(0);
         setIsRunning(false);
         setShowResetConfirm(false);
@@ -210,41 +229,326 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
     };
 
+    const handleSaveNewMatch = () => {
+        if (!newMatchForm.teamA || !newMatchForm.teamB || !newMatchForm.sport || !newMatchForm.time || !newMatchForm.location || !newMatchForm.date) {
+            alert('Preencha todos os campos!');
+            return;
+        }
+
+        if (newMatchForm.teamA === newMatchForm.teamB) {
+            alert('Uma equipe não pode enfrentar ela mesma!');
+            return;
+        }
+
+        const [nameA, universityA] = newMatchForm.teamA.split(' - ');
+        const [nameB, universityB] = newMatchForm.teamB.split(' - ');
+
+        const newMatch: any = {
+            id: crypto.randomUUID(),
+            teamA: { id: `t_${Date.now()}_A`, name: nameA, course: nameA, faculty: universityA },
+            teamB: { id: `t_${Date.now()}_B`, name: nameB, course: nameB, faculty: universityB },
+            scoreA: 0,
+            scoreB: 0,
+            sport: newMatchForm.sport,
+            category: newMatchForm.category,
+            status: 'scheduled',
+            date: newMatchForm.date,
+            time: newMatchForm.time,
+            location: newMatchForm.location,
+            events: []
+        };
+
+        addMatch(newMatch);
+        setIsNewMatchOpen(false);
+        setNewMatchForm({ teamA: '', teamB: '', sport: '', category: 'Masculino', date: new Date().toISOString().split('T')[0], time: '', location: '' });
+    };
+
     if (!selectedMatch) {
         return (
             <div style={styles.container}>
                 <div style={styles.header}>
-                    <h1 style={styles.title}>⚽ Cronologia de Partida - Futsal/Society</h1>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <h1 style={styles.title}>⚽ Controle de Partida</h1>
+                        <button
+                            onClick={() => setIsNewMatchOpen(true)}
+                            style={{
+                                background: 'var(--accent-color)',
+                                color: 'white',
+                                padding: '10px 20px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <PlusCircle size={18} /> Nova Partida
+                        </button>
+                    </div>
                 </div>
+
                 <div style={styles.content}>
-                    <h2 style={styles.subtitle}>Selecione uma partida:</h2>
+                    {/* Filters Bar */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '15px',
+                        marginBottom: '30px',
+                        background: 'rgba(255,255,255,0.03)',
+                        padding: '20px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        flexWrap: 'wrap',
+                        alignItems: 'flex-end'
+                    }}>
+                        <div style={{ width: '100%', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)' }}>
+                            <Filter size={18} />
+                            <span style={{ fontSize: '14px', fontWeight: 800 }}>FILTRAR PARTIDAS</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '8px' }}>MODALIDADE</label>
+                            <select
+                                value={filterSport}
+                                onChange={(e) => setFilterSport(e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'white', border: '1px solid var(--border-color)' }}
+                            >
+                                <option value="Todos">Todas as Modalidades</option>
+                                {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '8px' }}>LOCAL</label>
+                            <select
+                                value={filterLocation}
+                                onChange={(e) => setFilterLocation(e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'white', border: '1px solid var(--border-color)' }}
+                            >
+                                <option value="Todos">Todos os Locais</option>
+                                {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '8px' }}>GÊNERO</label>
+                            <select
+                                value={filterCategory}
+                                onChange={(e) => setFilterCategory(e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'white', border: '1px solid var(--border-color)' }}
+                            >
+                                <option value="Todos">Todos</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h2 style={styles.subtitle}>Partidas Agendadas ou Ao Vivo:</h2>
                     <div style={styles.matchList}>
-                        {soccerMatches.length === 0 ? (
-                            <p style={styles.noMatches}>Nenhuma partida de Futsal/Futebol Society disponível.</p>
+                        {filteredMatches.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
+                                <Clock size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
+                                <p>Nenhuma partida encontrada com esses filtros.</p>
+                            </div>
                         ) : (
-                            soccerMatches.map((match: Match) => (
-                                <div
-                                    key={match.id}
-                                    style={styles.matchItem}
-                                    onClick={() => handleSelectMatch(match)}
-                                >
-                                    <div style={styles.matchInfo}>
-                                        <span style={styles.sportBadge}>{match.sport}</span>
-                                        <span style={styles.categoryBadge}>{match.category}</span>
-                                    </div>
-                                    <div style={styles.matchTeams}>
-                                        <span>{match.teamA.name}</span>
-                                        <span style={styles.vs}>vs</span>
-                                        <span>{match.teamB.name}</span>
-                                    </div>
-                                    <div style={styles.matchDateTime}>
-                                        {match.date} - {match.time}
-                                    </div>
-                                </div>
-                            ))
+                                    filteredMatches.map((match: Match) => (
+                                        <div
+                                            key={match.id}
+                                            style={{
+                                                ...styles.matchItem,
+                                                borderLeft: match.status === 'live' ? '4px solid var(--live-color)' : '1px solid var(--border-color)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '12px'
+                                            }}
+                                            onClick={() => handleSelectMatch(match)}
+                                        >
+                                            <div style={{ ...styles.matchInfo, justifyContent: 'space-between', width: '100%' }}>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <span style={styles.sportBadge}>{match.sport}</span>
+                                                    {match.status === 'live' && <span style={{ ...styles.liveBadge, position: 'static', margin: 0, fontSize: '10px' }}>AO VIVO</span>}
+                                                </div>
+                                                <span style={styles.categoryBadge}>{match.category}</span>
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', padding: '10px 0' }}>
+                                                <div style={{ flex: 1, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                                                    {(() => {
+                                                        const emblem = getTeamEmblem(match.teamA.course || match.teamA.name);
+                                                        return emblem ? (
+                                                            <img src={emblem} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                                                        ) : (
+                                                            <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🛡️</div>
+                                                        );
+                                                    })()}
+                                                    <span style={{ fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>{match.teamA.name.split(' - ')[0]}</span>
+                                                </div>
+
+                                                <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                                                    {match.status === 'live' ? (
+                                                        <span style={{ color: 'var(--accent-color)', fontSize: '24px' }}>{match.scoreA} x {match.scoreB}</span>
+                                                    ) : 'VS'}
+                                                </div>
+
+                                                <div style={{ flex: 1, textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                                                    {(() => {
+                                                        const emblem = getTeamEmblem(match.teamB.course || match.teamB.name);
+                                                        return emblem ? (
+                                                            <img src={emblem} alt="" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                                                        ) : (
+                                                            <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🛡️</div>
+                                                        );
+                                                    })()}
+                                                    <span style={{ fontSize: '14px', fontWeight: 700, textAlign: 'left' }}>{match.teamB.name.split(' - ')[0]}</span>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ ...styles.matchDateTime, display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                                                <span>📍 {match.location}</span>
+                                                <span>📅 {match.date} - {match.time}</span>
+                                            </div>
+                                        </div>
+                                    ))
                         )}
                     </div>
                 </div>
+
+                {/* Modal Nova Partida */}
+                {isNewMatchOpen && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.9)',
+                        zIndex: 1000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}>
+                        <div style={{ 
+                            width: '100%', 
+                            maxWidth: '480px', 
+                            background: '#111', 
+                            borderRadius: '16px', 
+                            border: '1px solid #333',
+                            padding: '30px',
+                            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+                        }}>
+                            <h2 style={{ fontSize: '32px', fontWeight: 800, color: 'white', marginBottom: '30px' }}>Nova Partida</h2>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#888', marginBottom: '8px' }}>Equipe A *</label>
+                                    <select
+                                        value={newMatchForm.teamA}
+                                        onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })}
+                                        style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                    >
+                                        <option value="">Selecione a Equipe A</option>
+                                        {coursesList.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 800, color: '#555', margin: '-5px 0' }}>X</div>
+
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#888', marginBottom: '8px' }}>Equipe B *</label>
+                                    <select
+                                        value={newMatchForm.teamB}
+                                        onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })}
+                                        style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                    >
+                                        <option value="">Selecione a Equipe B</option>
+                                        {coursesList.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <select
+                                    value={newMatchForm.sport}
+                                    onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                >
+                                    <option value="">Selecione a Modalidade</option>
+                                    {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+
+                                <select
+                                    value={newMatchForm.category}
+                                    onChange={e => setNewMatchForm({ ...newMatchForm, category: e.target.value as any })}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                >
+                                    <option value="Masculino">Masculino</option>
+                                    <option value="Feminino">Feminino</option>
+                                </select>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                    <input
+                                        type="date"
+                                        value={newMatchForm.date}
+                                        onChange={e => setNewMatchForm({ ...newMatchForm, date: e.target.value })}
+                                        style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                    />
+                                    <input
+                                        type="time"
+                                        value={newMatchForm.time}
+                                        onChange={e => setNewMatchForm({ ...newMatchForm, time: e.target.value })}
+                                        style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                    />
+                                </div>
+
+                                <select
+                                    value={newMatchForm.location}
+                                    onChange={e => setNewMatchForm({ ...newMatchForm, location: e.target.value })}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
+                                >
+                                    <option value="">Selecione o Local</option>
+                                    {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                                    {!locations.includes(newMatchForm.location) && newMatchForm.location && <option value={newMatchForm.location}>{newMatchForm.location}</option>}
+                                    <option value="Poliesportivo">Poliesportivo</option>
+                                    <option value="Ginásio Laerte Gonçalves">Ginásio Laerte Gonçalves</option>
+                                    <option value="Centro Esportivo">Centro Esportivo</option>
+                                </select>
+
+                                <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+                                    <button
+                                        onClick={handleSaveNewMatch}
+                                        style={{
+                                            flex: 1,
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            background: 'var(--accent-color)',
+                                            color: 'white',
+                                            fontWeight: 800,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontSize: '15px'
+                                        }}
+                                    >
+                                        Salvar Partida
+                                    </button>
+                                    <button
+                                        onClick={() => setIsNewMatchOpen(false)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            background: '#222',
+                                            color: 'white',
+                                            fontWeight: 800,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontSize: '15px'
+                                        }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -257,7 +561,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         <h1 style={styles.title}>⚽ Controle de Partida</h1>
                         <button
                             style={styles.changeMatchBtn}
-                            onClick={() => setSelectedMatch(null)}
+                            onClick={() => setActiveMatchId(null)}
                         >
                             ← Trocar partida
                         </button>
@@ -466,30 +770,62 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 {showPlayerInput.team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}
                             </div>
                             <div style={styles.playerList} className="player-list">
-                                {TEAM_PLAYERS[
-                                    showPlayerInput.team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id
-                                ]?.map((player) => {
-                                    const stats = getPlayerStats(player);
-                                    return (
-                                        <button
-                                            key={player}
-                                            className={stats.canPlay ? "player-item-hover" : ""}
-                                            style={{
-                                                ...styles.playerItem,
-                                                ...(stats.canPlay ? {} : styles.playerItemDisabled)
-                                            }}
-                                            onClick={() => stats.canPlay && confirmPlayerEvent(player)}
-                                            disabled={!stats.canPlay}
-                                        >
-                                            <span style={styles.playerName}>{player}</span>
-                                            <div style={styles.playerStats}>
-                                                {stats.goals > 0 && <span style={styles.statBadge}>⚽ {stats.goals}</span>}
-                                                {stats.yellowCards > 0 && <span style={styles.statBadge}>🟨 {stats.yellowCards}</span>}
-                                                {stats.redCards > 0 && <span style={styles.statBadgeRed}>🟥 EXPULSO</span>}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                                {athletes
+                                    .filter(a => {
+                                        const team = showPlayerInput.team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+                                        
+                                        const athleteCourse = a.course.toLowerCase();
+                                        const athleteInst = a.institution.toLowerCase();
+                                        const teamCourse = (team.course || '').toLowerCase();
+                                        const teamFaculty = (team.faculty || '').toLowerCase();
+
+                                        // Especial para FEFESP / Educação Física
+                                        const isFefespMatch = (teamCourse.includes('fefesp') || teamCourse.includes('educação física')) && 
+                                                             (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp'));
+
+                                        // Match normal por curso e faculdade
+                                        const courseMatch = athleteCourse.includes(teamCourse) || teamCourse.includes(athleteCourse);
+                                        const facultyMatch = athleteInst.includes(teamFaculty) || teamFaculty.includes(athleteInst);
+
+                                        return (isFefespMatch || (courseMatch && facultyMatch)) &&
+                                               a.sports.includes(selectedMatch.sport);
+                                    })
+                                    .map((athlete) => {
+                                        const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                                        const stats = getPlayerStats(playerName);
+                                        return (
+                                            <button
+                                                key={athlete.id}
+                                                className={stats.canPlay ? "player-item-hover" : ""}
+                                                style={{
+                                                    ...styles.playerItem,
+                                                    ...(stats.canPlay ? {} : styles.playerItemDisabled)
+                                                }}
+                                                onClick={() => stats.canPlay && confirmPlayerEvent(playerName)}
+                                                disabled={!stats.canPlay}
+                                            >
+                                                <span style={styles.playerName}>{playerName}</span>
+                                                <div style={styles.playerStats}>
+                                                    {stats.goals > 0 && <span style={styles.statBadge}>⚽ {stats.goals}</span>}
+                                                    {stats.yellowCards > 0 && <span style={styles.statBadge}>🟨 {stats.yellowCards}</span>}
+                                                    {stats.redCards > 0 && <span style={styles.statBadgeRed}>🟥 EXPULSO</span>}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                {athletes.filter(a => {
+                                    const team = showPlayerInput.team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+                                    const athleteCourse = a.course.toLowerCase();
+                                    const athleteInst = a.institution.toLowerCase();
+                                    const teamCourse = (team.course || '').toLowerCase();
+                                    const teamFaculty = (team.faculty || '').toLowerCase();
+                                    return (athleteCourse === teamCourse && athleteInst.includes(teamFaculty)) &&
+                                           a.sports.includes(selectedMatch.sport);
+                                }).length === 0 && (
+                                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                                        Nenhum atleta encontrado para esta modalidade neste curso.
+                                    </div>
+                                )}
                             </div>
                             <button
                                 style={{ ...styles.modalBtn, ...styles.cancelBtn, marginTop: '16px' }}

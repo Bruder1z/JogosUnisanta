@@ -6,7 +6,6 @@ import {
     Trophy,
     Layout,
     BookOpen,
-    Timer,
     Save,
     Trash2,
     Edit3,
@@ -91,10 +90,19 @@ const AdminDashboard: React.FC = () => {
             showNotification('Preencha todos os campos!');
             return;
         }
+
+        if (newMatchForm.teamA === newMatchForm.teamB) {
+            showNotification('Uma equipe não pode enfrentar ela mesma!');
+            return;
+        }
+
+        const [nameA, universityA] = newMatchForm.teamA.split(' - ');
+        const [nameB, universityB] = newMatchForm.teamB.split(' - ');
+
         const newMatch: any = { // Using any to bypass deep Team type check since we just need simple mapping for now
-            id: 'm' + Date.now(),
-            teamA: { id: 't1', name: newMatchForm.teamA, course: newMatchForm.teamA, faculty: newMatchForm.facultyA },
-            teamB: { id: 't2', name: newMatchForm.teamB, course: newMatchForm.teamB, faculty: newMatchForm.facultyB },
+            id: crypto.randomUUID(),
+            teamA: { id: 't1', name: nameA, course: nameA, faculty: universityA },
+            teamB: { id: 't2', name: nameB, course: nameB, faculty: universityB },
             scoreA: 0,
             scoreB: 0,
             sport: newMatchForm.sport,
@@ -258,7 +266,6 @@ const AdminDashboard: React.FC = () => {
                 <div className="admin-tabs-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
                         { id: 'overview', label: 'Visão Geral', icon: <Layout size={18} /> },
-                        { id: 'match-control', label: 'Controle de Partida', icon: <Timer size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
@@ -313,14 +320,6 @@ const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                    {activeTab === 'match-control' && (
-                        <div className="premium-card" style={{ padding: '40px', textAlign: 'center' }}>
-                            <Timer size={48} color="var(--accent-color)" style={{ marginBottom: '20px', opacity: 0.5 }} />
-                            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '10px' }}>Controle de Partida</h2>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>Em breve: Migração de toda a lógica de cronologia e controle de placares para esta área restrita.</p>
-                        </div>
-                    )}
 
                     {activeTab === 'overview' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -1071,23 +1070,15 @@ const AdminDashboard: React.FC = () => {
                         {/* Equipe A */}
                         <div style={{ marginBottom: '16px' }}>
                             <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Equipe A *</label>
-                            <input type="text" placeholder="Equipe A (Ex: Engenharia)" style={inputStyle} value={newMatchForm.teamA} onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })} />
-
-                            <select style={{ ...inputStyle, marginTop: '8px' }} value={newMatchForm.facultyA} onChange={e => setNewMatchForm({ ...newMatchForm, facultyA: e.target.value })}>
-                                <option value="" disabled>Selecione a Faculdade (Opcional)</option>
-                                <option value="Unisanta">Unisanta</option>
-                                <option value="Unimes">Unimes</option>
-                                <option value="Unip">Unip</option>
-                                <option value="Unaerp">Unaerp</option>
-                                <option value="Unisantos">Unisantos</option>
-                                <option value="Esamc">Esamc</option>
-                                <option value="Federal de Cubatão">Federal de Cubatão</option>
-                                <option value="São Judas">São Judas</option>
-                                <option value="Unifesp">Unifesp</option>
-                                <option value="Unilus">Unilus</option>
-                                <option value="Unoeste">Unoeste</option>
-                                <option value="Strong">Strong</option>
-                                <option value="FPG">FPG</option>
+                            <select 
+                                style={inputStyle} 
+                                value={newMatchForm.teamA} 
+                                onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })}
+                            >
+                                <option value="">Selecione a Equipe A</option>
+                                {[...coursesList].sort().map(course => (
+                                    <option key={course} value={course}>{course}</option>
+                                ))}
                             </select>
                         </div>
 
@@ -1096,23 +1087,21 @@ const AdminDashboard: React.FC = () => {
                         {/* Equipe B */}
                         <div style={{ marginBottom: '20px' }}>
                             <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Equipe B *</label>
-                            <input type="text" placeholder="Equipe B (Ex: Fefesp)" style={inputStyle} value={newMatchForm.teamB} onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })} />
-
-                            <select style={{ ...inputStyle, marginTop: '8px' }} value={newMatchForm.facultyB} onChange={e => setNewMatchForm({ ...newMatchForm, facultyB: e.target.value })}>
-                                <option value="" disabled>Selecione a Faculdade (Opcional)</option>
-                                <option value="Unisanta">Unisanta</option>
-                                <option value="Unimes">Unimes</option>
-                                <option value="Unip">Unip</option>
-                                <option value="Unaerp">Unaerp</option>
-                                <option value="Unisantos">Unisantos</option>
-                                <option value="Esamc">Esamc</option>
-                                <option value="Federal de Cubatão">Federal de Cubatão</option>
-                                <option value="São Judas">São Judas</option>
-                                <option value="Unifesp">Unifesp</option>
-                                <option value="Unilus">Unilus</option>
-                                <option value="Unoeste">Unoeste</option>
-                                <option value="Strong">Strong</option>
-                                <option value="FPG">FPG</option>
+                            <select 
+                                style={inputStyle} 
+                                value={newMatchForm.teamB} 
+                                onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })}
+                            >
+                                <option value="">Selecione a Equipe B</option>
+                                {[...coursesList].sort().map(course => (
+                                    <option 
+                                        key={course} 
+                                        value={course}
+                                        disabled={course === newMatchForm.teamA}
+                                    >
+                                        {course}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                         <select style={inputStyle} value={newMatchForm.sport} onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}>

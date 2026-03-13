@@ -1,7 +1,8 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import { X, Clock, MapPin, Trophy, Play, CheckCircle, Pause } from 'lucide-react';
-import { type Match, type MatchEvent, mockAthletes, COURSE_EMBLEMS, mockMatches, mockTeams } from '../../data/mockData';
+import { type Match, type MatchEvent, COURSE_EMBLEMS } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../context/DataContext';
 
 interface MatchModalProps {
     match: Match;
@@ -10,7 +11,14 @@ interface MatchModalProps {
 
 const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const { user } = useAuth();
+    const { athletes, matches: allMatches, courses } = useData();
     const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
+
+    // Sync state if initialMatch changes in context
+    useEffect(() => {
+        const liveMatch = allMatches.find(m => m.id === initialMatch.id);
+        if (liveMatch) setCurrentMatch(liveMatch);
+    }, [allMatches, initialMatch.id]);
     const [votedFor, setVotedFor] = useState<string | null>(null);
     const [mvpVotedFor, setMvpVotedFor] = useState<string | null>(null);
 
@@ -22,7 +30,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     };
 
     // H2H and Form Logic
-    const h2hMatches = mockMatches.filter((m: Match) =>
+    const h2hMatches = allMatches.filter((m: Match) =>
         m.status === 'finished' && m.id !== currentMatch.id && m.sport === currentMatch.sport &&
         ((m.teamA.id === currentMatch.teamA.id && m.teamB.id === currentMatch.teamB.id) ||
             (m.teamA.id === currentMatch.teamB.id && m.teamB.id === currentMatch.teamA.id))
@@ -56,7 +64,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     }
 
     const getTeamForm = (teamId: string, sport: string) => {
-        const teamMatches = mockMatches.filter((m: Match) =>
+        const teamMatches = allMatches.filter((m: Match) =>
             m.status === 'finished' && m.id !== currentMatch.id && m.sport === sport &&
             (m.teamA.id === teamId || m.teamB.id === teamId)
         ).sort((a: Match, b: Match) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
@@ -75,11 +83,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 return { opponent, myScore, oppScore, result };
             });
         } else {
-            // Generate mock Form
+            // Generate mock Form using courses list instead of mockTeams
             const mockedForm = [];
             for (let i = 0; i < 5; i++) {
-                const randOppIdx = Math.floor(pseudoRandom(teamId + "opp" + i) * mockTeams.length);
-                const opponent = mockTeams[randOppIdx];
+                const randCourseIdx = Math.floor(pseudoRandom(teamId + "opp" + i) * courses.length);
+                const opponentName = courses[randCourseIdx] || 'Time Desconhecido';
+                const [name, faculty] = opponentName.split(' - ');
+                const opponent = { id: 'opp' + i, name: opponentName, course: name, faculty: faculty };
                 const r = pseudoRandom(teamId + "res" + i);
                 let result: 'win' | 'loss' | 'draw' = 'draw';
                 if (r < 0.45) result = 'win';
@@ -154,14 +164,24 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const eligibleSportsForMVP = ['Futsal', 'Futebol Society', 'Basquete 3x3', 'Vôlei'];
     const isEligibleForMVP = eligibleSportsForMVP.includes(currentMatch.sport) && currentMatch.status === 'finished';
 
-    const mvpCandidates = mockAthletes.filter(a =>
-        a.sports.includes(currentMatch.sport) &&
-        (
-            a.course === currentMatch.teamA.course || a.course === currentMatch.teamB.course ||
-            a.institution.toLowerCase() === currentMatch.teamA.name.toLowerCase() ||
-            a.institution.toLowerCase() === currentMatch.teamB.name.toLowerCase()
-        )
-    );
+    const mvpCandidates = athletes.filter(a => {
+        const isCorrectSport = a.sports.includes(currentMatch.sport);
+        const athleteCourse = a.course.toLowerCase();
+        const athleteInst = a.institution.toLowerCase();
+        
+        const teamACourse = currentMatch.teamA.course.toLowerCase();
+        const teamBCourse = currentMatch.teamB.course.toLowerCase();
+
+        const matchTeamA = (athleteCourse.includes(teamACourse) || teamACourse.includes(athleteCourse)) ||
+                          ((teamACourse.includes('fefesp') || teamACourse.includes('educação física')) && 
+                           (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp')));
+        
+        const matchTeamB = (athleteCourse.includes(teamBCourse) || teamBCourse.includes(athleteCourse)) ||
+                          ((teamBCourse.includes('fefesp') || teamBCourse.includes('educação física')) && 
+                           (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp')));
+
+        return isCorrectSport && (matchTeamA || matchTeamB);
+    });
 
     const getEventIcon = (type: MatchEvent['type']) => {
         switch (type) {
