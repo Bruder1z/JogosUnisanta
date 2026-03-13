@@ -248,13 +248,16 @@ const Participants: FC = () => {
                                                     width: '48px',
                                                     height: '48px',
                                                     borderRadius: '12px',
-                                                    background: 'var(--bg-hover)',
+                                                    background: 'rgba(255,255,255,0.08)',
+                                                    backdropFilter: 'blur(8px)',
+                                                    border: '1px solid rgba(255,255,255,0.12)',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    color: 'var(--accent-color)',
-                                                    fontSize: '24px'
+                                                    fontSize: '20px',
+                                                    fontWeight: 800,
+                                                    color: 'var(--accent-color)'
                                                 }}>
-                                                    {icon}
+                                                    {name[0]}
                                                 </div>
                                             </div>
                                         ) : (
@@ -262,14 +265,17 @@ const Participants: FC = () => {
                                                 width: '48px',
                                                 height: '48px',
                                                 borderRadius: '12px',
-                                                background: 'var(--bg-hover)',
+                                                background: 'rgba(255,255,255,0.08)',
+                                                backdropFilter: 'blur(8px)',
+                                                border: '1px solid rgba(255,255,255,0.12)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                color: 'var(--accent-color)',
-                                                fontSize: '24px'
+                                                fontSize: '20px',
+                                                fontWeight: 800,
+                                                color: 'var(--accent-color)'
                                             }}>
-                                                {icon}
+                                                {name[0]}
                                             </div>
                                         )}
                                         <div>

@@ -12,7 +12,9 @@ import {
     Save,
     Trash2,
     Edit3,
-    Check
+    Check,
+    Award,
+    Plus
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -31,7 +33,25 @@ const AdminDashboard: React.FC = () => {
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     // DataContext
-    const { courses: coursesList, addCourse, removeCourse, athletes: athletesList, addAthlete, removeAthlete, customEmblems, addCustomEmblem, matches, addMatch, updateMatch, deleteMatch, ranking, updateRankingPoints } = useData();
+    const { 
+        courses: coursesList, 
+        addCourse, 
+        removeCourse, 
+        athletes: athletesList, 
+        addAthlete, 
+        removeAthlete, 
+        customEmblems, 
+        addCustomEmblem, 
+        matches, 
+        addMatch, 
+        updateMatch, 
+        deleteMatch, 
+        ranking, 
+        updateRankingPoints,
+        featuredAthletes,
+        addFeaturedAthlete,
+        removeFeaturedAthlete
+    } = useData();
 
     // Ranking edit state: course -> pending points value
     const [editingCourse, setEditingCourse] = useState<string | null>(null);
@@ -40,6 +60,16 @@ const AdminDashboard: React.FC = () => {
     // Form and Data States
     const [newCourseForm, setNewCourseForm] = useState({ name: '', university: '', emblem: '' });
     const [newAthleteForm, setNewAthleteForm] = useState({ name: '', university: '', course: '', sport: '' });
+
+    const [isAddingFeatured, setIsAddingFeatured] = useState(false);
+    const [newFeatured, setNewFeatured] = useState({
+        athleteId: '',
+        name: '',
+        institution: '',
+        course: '',
+        sport: '',
+        reason: ''
+    });
 
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
@@ -234,6 +264,7 @@ const AdminDashboard: React.FC = () => {
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
+                        { id: 'featured', label: 'Melhores Atletas', icon: <Award size={18} /> },
                         { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
                     ].map(tab => (
                         <button
@@ -853,6 +884,105 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'featured' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <Award size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Atletas em Destaque</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Gerencie os atletas que aparecem na página de Melhores Atletas</p>
+                                    </div>
+                                </div>
+                                <button
+                                    className="admin-primary-action"
+                                    onClick={() => setIsAddingFeatured(true)}
+                                    style={{
+                                        background: 'var(--accent-color)',
+                                        color: 'white',
+                                        padding: '8px 16px',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        border: 'none',
+                                        transition: 'background 0.2s'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    Adicionar Melhor Atleta
+                                </button>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                {featuredAthletes.length === 0 ? (
+                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        Nenhum atleta destaque cadastrado.
+                                    </div>
+                                ) : (
+                                    <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                        <thead>
+                                            <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>ATLETA</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>CURSO / INSTITUIÇÃO</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>MODALIDADE</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600 }}>MOTIVO</th>
+                                                <th style={{ padding: '14px 16px', fontWeight: 600, width: '100px', textAlign: 'center' }}>AÇÃO</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {featuredAthletes.map((fAthlete) => (
+                                                <tr key={fAthlete.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-color)',
+                                                                fontSize: '11px', fontWeight: 800, border: '1px solid var(--accent-color)'
+                                                            }}>
+                                                                {fAthlete.name.split(' ').map(n => n[0]).join('')}
+                                                            </div>
+                                                            <span style={{ fontWeight: 600 }}>{fAthlete.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <div style={{ fontWeight: 600 }}>{fAthlete.course}</div>
+                                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{fAthlete.institution}</div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <span style={{ padding: '4px 10px', background: 'var(--bg-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 600 }}>
+                                                            {fAthlete.sport}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{fAthlete.reason}</td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                        <button
+                                                            onClick={() => {
+                                                                removeFeaturedAthlete(fAthlete.id);
+                                                                showNotification("Atleta removido dos destaques!");
+                                                            }}
+                                                            style={{
+                                                                background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                                                                padding: '8px', cursor: 'pointer'
+                                                            }}
+                                                            onMouseOver={e => e.currentTarget.style.color = '#ff4444'}
+                                                            onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'settings' && (
                         <div className="premium-card" style={{ padding: '30px' }}>
                             <div className="admin-section-header" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
@@ -1137,6 +1267,104 @@ const AdminDashboard: React.FC = () => {
                         <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewAthlete} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Atleta</button>
                             <button onClick={() => setIsNewAthleteOpen(false)} style={modalButtonStyle}>Cancelar</button>
+                        </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {isAddingFeatured && (
+                <ModalOverlay onClose={() => setIsAddingFeatured(false)}>
+                    <h2 style={{ marginBottom: '16px' }}>Adicionar Melhor Atleta</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Nome do Atleta *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Gabriel Silva"
+                                style={inputStyle}
+                                value={newFeatured.name}
+                                onChange={e => setNewFeatured({ ...newFeatured, name: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Educação Física"
+                                style={inputStyle}
+                                value={newFeatured.course}
+                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Unisanta"
+                                style={inputStyle}
+                                value={newFeatured.institution}
+                                onChange={e => setNewFeatured({ ...newFeatured, institution: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade *</label>
+                            <select
+                                style={inputStyle}
+                                value={newFeatured.sport}
+                                onChange={e => setNewFeatured({ ...newFeatured, sport: e.target.value })}
+                            >
+                                <option value="">Selecione a modalidade...</option>
+                                <option value="Futsal">Futsal</option>
+                                <option value="Futebol Society">Futebol Society</option>
+                                <option value="Handebol">Handebol</option>
+                                <option value="Vôlei">Vôlei</option>
+                                <option value="Natação">Natação</option>
+                                <option value="Karatê">Karatê</option>
+                                <option value="Judô">Judô</option>
+                                <option value="Tamboréu">Tamboréu</option>
+                                <option value="Xadrez">Xadrez</option>
+                                <option value="Tênis de Mesa">Tênis de Mesa</option>
+                                <option value="Futevôlei">Futevôlei</option>
+                                <option value="Beach Tennis">Beach Tennis</option>
+                                <option value="Vôlei de Praia">Vôlei de Praia</option>
+                                <option value="Basquete 3x3">Basquete 3x3</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Motivo do Destaque *</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Artilheiro, MVP, Destaque da Rodada"
+                                style={inputStyle}
+                                value={newFeatured.reason}
+                                onChange={e => setNewFeatured({ ...newFeatured, reason: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                            <button
+                                onClick={() => {
+                                    if (!newFeatured.name || !newFeatured.course || !newFeatured.institution || !newFeatured.sport || !newFeatured.reason) {
+                                        showNotification('Preencha todos os campos obrigatórios!');
+                                        return;
+                                    }
+                                    addFeaturedAthlete({
+                                        id: Date.now().toString(),
+                                        name: newFeatured.name,
+                                        institution: newFeatured.institution,
+                                        course: newFeatured.course,
+                                        sport: newFeatured.sport,
+                                        reason: newFeatured.reason
+                                    });
+                                    setIsAddingFeatured(false);
+                                    setNewFeatured({ athleteId: '', name: '', institution: '', course: '', sport: '', reason: '' });
+                                    showNotification('Atleta destaque salvo com sucesso!');
+                                }}
+                                style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}
+                            >
+                                Salvar Atleta
+                            </button>
+                            <button onClick={() => setIsAddingFeatured(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
                     </div>
                 </ModalOverlay>

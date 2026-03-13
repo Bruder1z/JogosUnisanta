@@ -160,27 +160,61 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
                                                     borderRadius: '8px',
                                                     padding: '4px'
                                                 }}>
-                                                    {(() => {
-                                                        const emblemUrl = getTeamEmblem(item.course);
-                                                        return emblemUrl ? (
-                                                            <img
-                                                                src={emblemUrl}
-                                                                alt={courseName}
-                                                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                                                                onError={(e) => {
-                                                                    e.currentTarget.style.display = 'none';
-                                                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                                                    if (fallback) fallback.style.display = 'block';
-                                                                }}
-                                                            />
-                                                        ) : null;
+                                                {(() => {
+                                                        const emblemUrl = item.course in COURSE_EMBLEMS
+                                                            ? `/emblemas/${COURSE_EMBLEMS[item.course]}`
+                                                            : getTeamEmblem(item.course);
+                                                        if (emblemUrl) {
+                                                            return (
+                                                                <>
+                                                                    <img
+                                                                        src={emblemUrl}
+                                                                        alt={courseName}
+                                                                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                                                        onError={(e) => {
+                                                                            e.currentTarget.style.display = 'none';
+                                                                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                                                            if (fallback) fallback.style.display = 'flex';
+                                                                        }}
+                                                                    />
+                                                                    <span style={{
+                                                                        display: 'none',
+                                                                        width: '28px',
+                                                                        height: '28px',
+                                                                        borderRadius: '8px',
+                                                                        background: 'rgba(255,255,255,0.08)',
+                                                                        backdropFilter: 'blur(8px)',
+                                                                        border: '1px solid rgba(255,255,255,0.12)',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        fontSize: '13px',
+                                                                        fontWeight: 800,
+                                                                        color: 'var(--accent-color)'
+                                                                    }}>
+                                                                        {courseName[0]}
+                                                                    </span>
+                                                                </>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <span style={{
+                                                                width: '28px',
+                                                                height: '28px',
+                                                                borderRadius: '8px',
+                                                                background: 'rgba(255,255,255,0.08)',
+                                                                backdropFilter: 'blur(8px)',
+                                                                border: '1px solid rgba(255,255,255,0.12)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontSize: '13px',
+                                                                fontWeight: 800,
+                                                                color: 'var(--accent-color)'
+                                                            }}>
+                                                                {courseName[0]}
+                                                            </span>
+                                                        );
                                                     })()}
-                                                    <span style={{
-                                                        fontSize: '20px',
-                                                        display: getTeamEmblem(item.course) ? 'none' : 'block'
-                                                    }}>
-                                                        {icon}
-                                                    </span>
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>{courseName}</div>
