@@ -28,10 +28,18 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // Carregar do localStorage ou usar os mocks iniciais
+    // Carregar do localStorage e mesclar com AVAILABLE_COURSES para novos cursos ficarem visíveis
     const [courses, setCourses] = useState<string[]>(() => {
         const saved = localStorage.getItem('jg_courses');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            const savedCourses: string[] = JSON.parse(saved);
+            // Merge: add any new courses from AVAILABLE_COURSES that aren't in saved list
+            const merged = [...savedCourses];
+            AVAILABLE_COURSES.forEach(c => {
+                if (!merged.includes(c)) merged.push(c);
+            });
+            return merged;
+        }
         return AVAILABLE_COURSES;
     });
 
