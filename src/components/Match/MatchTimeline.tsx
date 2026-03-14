@@ -398,7 +398,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const nextA = team === 'A' ? currentA + points : currentA;
         const nextB = team === 'B' ? currentB + points : currentB;
 
-        const description = `+${points} Ponto${points > 1 ? 's' : ''} para ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+        const description = `[${nextA} x ${nextB}] 🏀 +${points} Ponto${points > 1 ? 's' : ''} para ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
 
         const updatedMatch: Match = {
             ...selectedMatch,
@@ -510,7 +510,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         switch (event.type) {
             case 'goal':
                 if (isBasketball) {
-                    return `[${selectedMatch.scoreA} x ${selectedMatch.scoreB}] 🏀 ${event.description}`;
+                    return event.description; // Description now natively contains the score and emoji
                 }
                 if (isVolleyball) {
                     return event.description || `Ponto - ${teamName}`;

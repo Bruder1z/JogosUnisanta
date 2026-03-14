@@ -499,11 +499,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                     background: 'var(--bg-primary)'
                 }}>
                     {/* Timeline Body */}
-                    {currentMatch.sport !== 'Basquete 3x3' && (
-                        <div style={{
-                            padding: '20px',
-                        }}>
-                            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)' }}>Cronologia</h3>
+                    <div style={{
+                        padding: '20px',
+                    }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)' }}>Cronologia</h3>
 
                             {(() => {
                                 const matchEvents: MatchEvent[] = currentMatch.events ? [...currentMatch.events] : [];
@@ -588,7 +587,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                 );
                             })()}
                         </div>
-                    )}
 
                     {/* Match Stats / History */}
                     <div style={{
