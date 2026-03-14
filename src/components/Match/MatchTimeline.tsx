@@ -67,6 +67,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const selectedMatch = matches.find(m => m.id === activeMatchId) || null;
     const isBeachTennis = selectedMatch?.sport === 'Beach Tennis';
     const isHandebol = selectedMatch?.sport === 'Handebol';
+    const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia';
 
     const [isTieBreakMode, setIsTieBreakMode] = useState(false);
     const [beachTieBreakA, setBeachTieBreakA] = useState(0);
@@ -271,6 +272,68 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         updateMatch(updatedMatch);
     };
 
+    const handleVolleyPoint = (team: 'A' | 'B', actionType: 'Ponto' | 'ACE Marcado' | 'ACE Perdido') => {
+        if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        if (!selectedMatch.events?.some(e => e.type === 'start')) {
+            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            if (started) {
+                selectedMatch.events = started.events;
+            }
+            setIsRunning(true);
+        }
+
+        let scoringTeam = team;
+        if (actionType === 'ACE Perdido') {
+            scoringTeam = team === 'A' ? 'B' : 'A';
+        }
+
+        const scoringTeamId = scoringTeam === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+
+        const currentA = selectedMatch.scoreA;
+        const currentB = selectedMatch.scoreB;
+        const nextA = scoringTeam === 'A' ? currentA + 1 : currentA;
+        const nextB = scoringTeam === 'B' ? currentB + 1 : currentB;
+
+        let description: string = actionType;
+        if (actionType === 'ACE Perdido') {
+             description = `ACE Perdido por ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+        } else if (actionType === 'ACE Marcado') {
+             description = `ACE Marcado por ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+        } else {
+             description = `Ponto para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+        }
+
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            scoreA: nextA,
+            scoreB: nextB,
+            status: 'live',
+            events: [...(selectedMatch.events || []), { 
+                id: `evt_${Date.now()}`, 
+                type: 'goal', 
+                minute: currentMinute, 
+                teamId: scoringTeamId, 
+                description: description
+            } as MatchEvent]
+        };
+
+        const targetScore = selectedMatch.sport === 'Vôlei de Praia' ? 21 : 25;
+        if ((nextA >= targetScore || nextB >= targetScore) && Math.abs(nextA - nextB) >= 2) {
+            updatedMatch.status = 'finished';
+            updatedMatch.events = [
+                ...(updatedMatch.events || []), 
+                { id: `evt_${Date.now()+1}`, type: 'set_win', minute: currentMinute, teamId: scoringTeamId, description: `Fim de Set para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}` } as MatchEvent,
+                { id: `evt_${Date.now()+2}`, type: 'end', minute: currentMinute, description: `Fim de Jogo - Placar Final: ${nextA} x ${nextB}` } as MatchEvent
+            ];
+            updateMatch(updatedMatch);
+            setIsRunning(false);
+            return;
+        }
+
+        updateMatch(updatedMatch);
+    };
+
     const handleStartMatch = () => {
         addEvent('start');
         setIsRunning(true);
@@ -374,7 +437,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const getEventIcon = (type: MatchEvent['type']) => {
         switch (type) {
-            case 'goal': return '⚽';
+            case 'goal': return isVolleyball ? '🏐' : '⚽';
             case 'yellow_card': return '🟨';
             case 'red_card': return '🟥';
             case 'start': return '▶️';
@@ -397,6 +460,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         switch (event.type) {
             case 'goal':
+                if (isVolleyball) {
+                    return event.description || `Ponto - ${teamName}`;
+                }
                 return `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName} ${event.player ? `- ${event.player}` : ''}`;
             case 'yellow_card':
                 return `Cartão Amarelo - ${teamName} ${event.player ? `(${event.player})` : ''}`;
@@ -889,27 +955,61 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                 {!isBeachTennis && (
                     <div style={styles.eventSection}>
-                        <h3 style={styles.sectionTitle}>⚽ Gols</h3>
+                        <h3 style={styles.sectionTitle}>{isVolleyball ? '🏐 Pontos' : '⚽ Gols'}</h3>
                         <div style={styles.eventButtons} className="match-timeline-event-grid">
                             <button
                                 style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                                onClick={() => handleGoal('A')}
+                                onClick={() => isVolleyball ? handleVolleyPoint('A', 'Ponto') : handleGoal('A')}
                             >
                                 <Plus size={20} />
-                                Gol {selectedMatch.teamA.name.split(' - ')[0]}
+                                {isVolleyball ? 'Ponto' : 'Gol'} {selectedMatch.teamA.name.split(' - ')[0]}
                             </button>
                             <button
                                 style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                                onClick={() => handleGoal('B')}
+                                onClick={() => isVolleyball ? handleVolleyPoint('B', 'Ponto') : handleGoal('B')}
                             >
                                 <Plus size={20} />
-                                Gol {selectedMatch.teamB.name.split(' - ')[0]}
+                                {isVolleyball ? 'Ponto' : 'Gol'} {selectedMatch.teamB.name.split(' - ')[0]}
                             </button>
                         </div>
                     </div>
                 )}
 
-                {!isBeachTennis && (
+                {isVolleyball && (
+                    <div style={styles.eventSection}>
+                        <h3 style={styles.sectionTitle}>🏐 Saque</h3>
+                        <div style={styles.eventButtons} className="match-timeline-event-grid">
+                            <button
+                                style={{ ...styles.eventBtn, background: 'var(--success-color)', borderColor: 'var(--success-color)' }}
+                                onClick={() => handleVolleyPoint('A', 'ACE Marcado')}
+                            >
+                                ACE Marcado {selectedMatch.teamA.name.split(' - ')[0]}
+                            </button>
+                            <button
+                                style={{ ...styles.eventBtn, background: 'var(--success-color)', borderColor: 'var(--success-color)' }}
+                                onClick={() => handleVolleyPoint('B', 'ACE Marcado')}
+                            >
+                                ACE Marcado {selectedMatch.teamB.name.split(' - ')[0]}
+                            </button>
+                        </div>
+                        <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
+                            <button
+                                style={{ ...styles.eventBtn, background: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}
+                                onClick={() => handleVolleyPoint('A', 'ACE Perdido')}
+                            >
+                                ACE Perdido {selectedMatch.teamA.name.split(' - ')[0]}
+                            </button>
+                            <button
+                                style={{ ...styles.eventBtn, background: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}
+                                onClick={() => handleVolleyPoint('B', 'ACE Perdido')}
+                            >
+                                ACE Perdido {selectedMatch.teamB.name.split(' - ')[0]}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {!isBeachTennis && !isVolleyball && (
                     <>
                         <div style={styles.eventSection}>
                             <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>

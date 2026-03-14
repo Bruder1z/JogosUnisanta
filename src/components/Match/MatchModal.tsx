@@ -118,15 +118,16 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const percentA = Math.round((votesA / totalVotes) * 100);
     const percentB = Math.round((votesB / totalVotes) * 100);
 
-    const getTeamEmblem = (teamName: string) => {
-        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
-            courseKey.toLowerCase().includes(teamName.toLowerCase())
-        );
-        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+    const getTeamEmblem = (team: any) => {
+        if (team.logo) return team.logo;
+        if (team.course && team.course in COURSE_EMBLEMS) {
+            return `/emblemas/${COURSE_EMBLEMS[team.course]}`;
+        }
+        return null;
     };
 
     const TeamHeaderDisplay = ({ team }: { team: any }) => {
-        const emblemUrl = getTeamEmblem(team.name);
+        const emblemUrl = getTeamEmblem(team);
         return (
             <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{
@@ -161,7 +162,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         );
     };
 
-    const eligibleSportsForMVP = ['Futsal', 'Futebol Society', 'Basquete 3x3', 'Vôlei'];
+    const eligibleSportsForMVP = ['Futsal', 'Futebol Society', 'Basquete 3x3'];
     const isEligibleForMVP = eligibleSportsForMVP.includes(currentMatch.sport) && currentMatch.status === 'finished';
 
     const mvpCandidates = athletes.filter(a => {
@@ -184,8 +185,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     });
 
     const getEventIcon = (type: MatchEvent['type']) => {
+        const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia';
         switch (type) {
-            case 'goal': return <Trophy size={16} color="#ffd700" />;
+            case 'goal': return isVolleyball ? <div style={{ fontSize: '16px' }}>🏐</div> : <Trophy size={16} color="#ffd700" />;
             case 'set_win': return <Trophy size={16} color="#ffd700" />;
             case 'yellow_card': return <div style={{ width: 12, height: 16, background: '#ffcc00', borderRadius: 2 }} />;
             case 'red_card': return <div style={{ width: 12, height: 16, background: '#ff4444', borderRadius: 2 }} />;
@@ -548,9 +550,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                 {getEventIcon(event.type)}
                                                                 <div>
                                                                     <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                                                        {getEventLabel(event.type)} {event.score && <span style={{ color: 'var(--accent-color)', marginLeft: '8px' }}>({event.score})</span>}
+                                                                        {event.description ? event.description : getEventLabel(event.type)} {event.score && <span style={{ color: 'var(--accent-color)', marginLeft: '8px' }}>({event.score})</span>}
                                                                     </div>
-                                                                    {(event.player || event.teamId) && (
+                                                                    {(event.player || event.teamId) && !event.description && (
                                                                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                                                                             {event.player && event.player !== 'Pênalti perdido' ? `${event.player} - ` : ''}
                                                                             {event.teamId && (isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0])}
