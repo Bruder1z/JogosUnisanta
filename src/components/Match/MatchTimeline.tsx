@@ -11,18 +11,15 @@ interface MatchTimelineProps {
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const { matches, updateMatch, athletes, addMatch, courses: coursesList } = useData();
     
-    // Helper to get team emblem intelligently
+    // Helper to get team emblem with strict matching
     const getTeamEmblem = (teamName: string) => {
-        // First try exact match in icons mapping
+        // Only exact match - no fuzzy matching to avoid wrong emblems
         if (teamName in COURSE_EMBLEMS) {
             return `/emblemas/${COURSE_EMBLEMS[teamName]}`;
         }
-        // Try fuzzy match
-        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
-            courseKey.toLowerCase().includes(teamName.toLowerCase()) || 
-            teamName.toLowerCase().includes(courseKey.toLowerCase())
-        );
-        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+        // If exact match fails, return null (safer than fuzzy match)
+        console.warn(`Emblema não encontrado para curso: ${teamName}`);
+        return null;
     };
 
     const [activeMatchId, setActiveMatchId] = useState<string | null>(matchId || null);
@@ -42,7 +39,20 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         teamA: '', teamB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: new Date().toISOString().split('T')[0], time: '', location: ''
     });
 
-    const locations = Array.from(new Set(matches.map(m => m.location))).filter(Boolean);
+    // Estado para armazenar emblemas previsualizados
+    const [emblemA, setEmblemA] = useState<string | null>(null);
+    const [emblemB, setEmblemB] = useState<string | null>(null);
+
+    // Locations oficiais
+    const OFFICIAL_LOCATIONS = [
+        'Centro de Treinamento',
+        'Poliesportivo Unisanta (Bloco M)',
+        'Laerte Goncalves (Bloco D)',
+        'Arena Unisanta',
+        'Bloco A',
+        'Piscina Olimpica',
+        'Rebouças'
+    ];
 
     // Filter matches: Only scheduled or live
     const filteredMatches = matches.filter((m: Match) => {
@@ -55,6 +65,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     });
 
     const selectedMatch = matches.find(m => m.id === activeMatchId) || null;
+    const isBeachTennis = selectedMatch?.sport === 'Beach Tennis';
+    const isHandebol = selectedMatch?.sport === 'Handebol';
+
+    const [isTieBreakMode, setIsTieBreakMode] = useState(false);
+    const [beachTieBreakA, setBeachTieBreakA] = useState(0);
+    const [beachTieBreakB, setBeachTieBreakB] = useState(0);
+
+    useEffect(() => {
+        setIsTieBreakMode(false);
+        setBeachTieBreakA(0);
+        setBeachTieBreakB(0);
+    }, [selectedMatch?.id]);
 
     useEffect(() => {
         let interval: number | null = null;
@@ -144,6 +166,111 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         updateMatch(updatedMatch);
     };
 
+    const pushMatchEvent = (newEvent: Omit<MatchEvent, 'id'>) => {
+        if (!selectedMatch) return;
+        const updatedEvents = [...(selectedMatch.events || []), { ...newEvent, id: `evt_${Date.now()}` }];
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            events: updatedEvents,
+        };
+        updateMatch(updatedMatch);
+        return updatedMatch;
+    };
+
+    const handleBeachPoint = (team: 'A' | 'B') => {
+        if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        // Add start event automatically if not started yet
+        if (!selectedMatch.events?.some(e => e.type === 'start')) {
+            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            if (started) {
+                selectedMatch.events = started.events;
+            }
+            setIsRunning(true);
+        }
+
+        const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+
+        if (!isTieBreakMode) {
+            const currentA = selectedMatch.scoreA;
+            const currentB = selectedMatch.scoreB;
+            const nextA = team === 'A' ? currentA + 1 : currentA;
+            const nextB = team === 'B' ? currentB + 1 : currentB;
+
+            // at 6-6 trigger tie-break
+            if (nextA === 6 && nextB === 6) {
+                const updatedMatch: Match = {
+                    ...selectedMatch,
+                    scoreA: nextA,
+                    scoreB: nextB,
+                    status: 'live',
+                    events: [...(selectedMatch.events || []), 
+                        { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Game para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent, 
+                        { id: `evt_${Date.now()+1}`, type: 'tie_break_start', minute: currentMinute, description: 'Início de Tie-break' } as MatchEvent
+                    ]
+                };
+                updateMatch(updatedMatch);
+                setIsTieBreakMode(true);
+                setBeachTieBreakA(0);
+                setBeachTieBreakB(0);
+                return;
+            }
+
+            // normal game point
+            const updatedMatch: Match = {
+                ...selectedMatch,
+                scoreA: nextA,
+                scoreB: nextB,
+                status: 'live',
+                events: [...(selectedMatch.events || []), { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Game para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent]
+            };
+
+            // check winner of set
+            if ((nextA === 6 && nextB <= 4) || (nextB === 6 && nextA <= 4)) {
+                updatedMatch.status = 'finished';
+                updatedMatch.events = [...(updatedMatch.events || []), { id: `evt_${Date.now()+1}`, type: 'end', minute: currentMinute } as MatchEvent];
+                updateMatch(updatedMatch);
+                setIsRunning(false);
+                return;
+            }
+
+            updateMatch(updatedMatch);
+            return;
+        }
+
+        // tie-break mode
+        const nextTieA = team === 'A' ? beachTieBreakA + 1 : beachTieBreakA;
+        const nextTieB = team === 'B' ? beachTieBreakB + 1 : beachTieBreakB;
+
+        setBeachTieBreakA(nextTieA);
+        setBeachTieBreakB(nextTieB);
+
+        const updatedEvents = [...(selectedMatch.events || []), { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Ponto tie-break para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent];
+
+        if (nextTieA >= 7 || nextTieB >= 7) {
+            const finalA = team === 'A' ? 7 : 6;
+            const finalB = team === 'B' ? 7 : 6;
+            const winnerMatch: Match = {
+                ...selectedMatch,
+                scoreA: finalA,
+                scoreB: finalB,
+                status: 'finished',
+                events: [...updatedEvents, { id: `evt_${Date.now()+1}`, type: 'end', minute: currentMinute } as MatchEvent]
+            };
+            updateMatch(winnerMatch);
+            setIsRunning(false);
+            return;
+        }
+
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            events: updatedEvents,
+            status: 'live'
+        };
+
+        updateMatch(updatedMatch);
+    };
+
     const handleStartMatch = () => {
         addEvent('start');
         setIsRunning(true);
@@ -155,11 +282,36 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     const handleEndMatch = () => {
-        addEvent('end');
+        if (!selectedMatch) return;
+
+        // Criar o evento final com o placar
+        const finalEvent: MatchEvent = {
+            id: `evt_${Date.now()}`,
+            type: 'end',
+            minute: currentMinute,
+            description: `Fim de Jogo - Placar Final: ${selectedMatch.scoreA} x ${selectedMatch.scoreB}`
+        };
+
+        // Atualizar a partida com status 'finished' e adicionar o evento
+        const finishedMatch: Match = {
+            ...selectedMatch,
+            status: 'finished',
+            events: [...(selectedMatch.events || []), finalEvent]
+        };
+
+        // Persistir a mudança no banco de dados
+        updateMatch(finishedMatch);
         setIsRunning(false);
+
+        // Deselecionar a partida para voltar para a lista
+        setActiveMatchId(null);
     };
 
     const handleGoal = (team: 'A' | 'B') => {
+        if (isBeachTennis) {
+            handleBeachPoint(team);
+            return;
+        }
         setShowPlayerInput({ type: 'goal', team });
     };
 
@@ -230,6 +382,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             case 'halftime': return '⏸️';
             case 'penalty_scored': return '🎯';
             case 'penalty_missed': return '❌';
+            case 'set_win': return isBeachTennis ? '🎾☀️' : '🏅';
+            case 'tie_break_start': return '🎾';
             default: return '•';
         }
     };
@@ -243,7 +397,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         switch (event.type) {
             case 'goal':
-                return `GOL! ${teamName} ${event.player ? `- ${event.player}` : ''}`;
+                return `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName} ${event.player ? `- ${event.player}` : ''}`;
             case 'yellow_card':
                 return `Cartão Amarelo - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'red_card':
@@ -252,9 +406,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 }
                 return `Cartão Vermelho - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'penalty_scored':
-                return `Gol de Pênalti - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                return `${isHandebol ? 'TIRO DE 7 METROS' : 'Gol de Pênalti'} - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'penalty_missed':
-                return `Pênalti Perdido - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                return `${isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+            case 'set_win':
+                if (isBeachTennis) {
+                    return `Game para ${teamName}`;
+                }
+                return `Ponto para ${teamName}`;
+            case 'tie_break_start':
+                return 'Início de Tie-break';
             case 'start':
                 return 'Início da partida';
             case 'halftime':
@@ -262,7 +423,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             case 'end':
                 return 'Fim de jogo';
             default:
-                return event.type;
+                return event.description || event.type;
         }
     };
 
@@ -277,13 +438,20 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             return;
         }
 
+        // Extract name and institution from selected course (e.g., "Administração - Unisanta")
         const [nameA, universityA] = newMatchForm.teamA.split(' - ');
         const [nameB, universityB] = newMatchForm.teamB.split(' - ');
 
+        // Use emblems from state (updated on course selection)
+        if (!emblemA || !emblemB) {
+            alert('Atenção: Um ou ambos os cursos não possuem emblema configurado. Verifique o banco de dados.');
+            return;
+        }
+
         const newMatch: any = {
             id: crypto.randomUUID(),
-            teamA: { id: `t_${Date.now()}_A`, name: nameA, course: nameA, faculty: universityA },
-            teamB: { id: `t_${Date.now()}_B`, name: nameB, course: nameB, faculty: universityB },
+            teamA: { id: `t_${Date.now()}_A`, name: nameA, course: newMatchForm.teamA, faculty: universityA, logo: emblemA },
+            teamB: { id: `t_${Date.now()}_B`, name: nameB, course: newMatchForm.teamB, faculty: universityB, logo: emblemB },
             scoreA: 0,
             scoreB: 0,
             sport: newMatchForm.sport,
@@ -297,6 +465,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         addMatch(newMatch);
         setIsNewMatchOpen(false);
+        setEmblemA(null);
+        setEmblemB(null);
         setNewMatchForm({ teamA: '', teamB: '', sport: '', category: 'Masculino', date: new Date().toISOString().split('T')[0], time: '', location: '' });
     };
 
@@ -307,7 +477,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <h1 style={styles.title}>⚽ Controle de Partida</h1>
                         <button
-                            onClick={() => setIsNewMatchOpen(true)}
+                            onClick={() => {
+                                setIsNewMatchOpen(true);
+                                // Limpar cache de emblemas ao abrir formulário
+                                setEmblemA(null);
+                                setEmblemB(null);
+                            }}
                             style={{
                                 background: 'var(--accent-color)',
                                 color: 'white',
@@ -362,7 +537,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'white', border: '1px solid var(--border-color)' }}
                             >
                                 <option value="Todos">Todos os Locais</option>
-                                {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                                {OFFICIAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
                         </div>
                         <div style={{ flex: 1, minWidth: '150px' }}>
@@ -480,12 +655,21 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#888', marginBottom: '8px' }}>Equipe A *</label>
                                     <select
                                         value={newMatchForm.teamA}
-                                        onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })}
+                                        onChange={e => {
+                                            setNewMatchForm({ ...newMatchForm, teamA: e.target.value });
+                                            setEmblemA(e.target.value ? getTeamEmblem(e.target.value) : null);
+                                        }}
                                         style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
                                     >
                                         <option value="">Selecione a Equipe A</option>
                                         {coursesList.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
+                                    {emblemA && (
+                                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#888' }}>
+                                            <img src={emblemA} alt="Emblema A" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+                                            <span>Emblema carregado ✓</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 800, color: '#555', margin: '-5px 0' }}>X</div>
@@ -494,12 +678,21 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#888', marginBottom: '8px' }}>Equipe B *</label>
                                     <select
                                         value={newMatchForm.teamB}
-                                        onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })}
+                                        onChange={e => {
+                                            setNewMatchForm({ ...newMatchForm, teamB: e.target.value });
+                                            setEmblemB(e.target.value ? getTeamEmblem(e.target.value) : null);
+                                        }}
                                         style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
                                     >
                                         <option value="">Selecione a Equipe B</option>
                                         {coursesList.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
+                                    {emblemB && (
+                                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#888' }}>
+                                            <img src={emblemB} alt="Emblema B" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+                                            <span>Emblema carregado ✓</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <select
@@ -541,11 +734,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     style={{ width: '100%', padding: '14px', borderRadius: '8px', background: '#222', border: '1px solid #333', color: 'white', fontSize: '14px' }}
                                 >
                                     <option value="">Selecione o Local</option>
-                                    {locations.map(l => <option key={l} value={l}>{l}</option>)}
-                                    {!locations.includes(newMatchForm.location) && newMatchForm.location && <option value={newMatchForm.location}>{newMatchForm.location}</option>}
-                                    <option value="Poliesportivo">Poliesportivo</option>
-                                    <option value="Ginásio Laerte Gonçalves">Ginásio Laerte Gonçalves</option>
-                                    <option value="Centro Esportivo">Centro Esportivo</option>
+                                    {OFFICIAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
 
                                 <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
@@ -628,6 +817,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 AO VIVO
                             </span>
                         )}
+                        {isBeachTennis && isTieBreakMode && (
+                            <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                Tie-break: {beachTieBreakA} - {beachTieBreakB}
+                            </span>
+                        )}
                     </div>
                     <div style={styles.teamRight}>
                         <h2 style={styles.teamName} className="match-timeline-team-name">{selectedMatch.teamB.name}</h2>
@@ -638,132 +832,154 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {/* Controles do Jogo */}
                 <div style={styles.gameControls}>
                     <h3 style={styles.sectionTitle}>Controle da Partida</h3>
-                    <div style={styles.controlButtons} className="match-timeline-control-grid">
-                        <button
-                            style={{ ...styles.controlBtn, ...styles.startBtn }}
-                            onClick={handleStartMatch}
-                            disabled={isRunning || selectedMatch.events?.some(e => e.type === 'start')}
-                        >
-                            <Play size={20} />
-                            Iniciar Jogo
-                        </button>
-                        <button
-                            style={{ ...styles.controlBtn, ...styles.pauseBtn }}
-                            onClick={handleHalfTime}
-                            disabled={!isRunning}
-                        >
-                            <Pause size={20} />
-                            Intervalo
-                        </button>
-                        <button
-                            style={{ ...styles.controlBtn, ...styles.resumeBtn }}
-                            onClick={() => setIsRunning(true)}
-                            disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
-                        >
-                            <Play size={20} />
-                            Retomar
-                        </button>
-                        <button
-                            style={{ ...styles.controlBtn, ...styles.endBtn }}
-                            onClick={handleEndMatch}
-                            disabled={selectedMatch.status === 'finished'}
-                        >
-                            <StopCircle size={20} />
-                            Fim de Jogo
-                        </button>
-                    </div>
+                    {isBeachTennis ? (
+                        <div style={{ ...styles.controlButtons, gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))' }}>
+                            <button
+                                style={{ ...styles.eventBtn, ...styles.teamABtn }}
+                                onClick={() => handleBeachPoint('A')}
+                            >
+                                <Plus size={20} />
+                                + Ponto {selectedMatch.teamA.name.split(' - ')[0]}
+                            </button>
+                            <button
+                                style={{ ...styles.eventBtn, ...styles.teamBBtn }}
+                                onClick={() => handleBeachPoint('B')}
+                            >
+                                <Plus size={20} />
+                                + Ponto {selectedMatch.teamB.name.split(' - ')[0]}
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={styles.controlButtons} className="match-timeline-control-grid">
+                            <button
+                                style={{ ...styles.controlBtn, ...styles.startBtn }}
+                                onClick={handleStartMatch}
+                                disabled={isRunning || selectedMatch.events?.some(e => e.type === 'start')}
+                            >
+                                <Play size={20} />
+                                Iniciar Jogo
+                            </button>
+                            <button
+                                style={{ ...styles.controlBtn, ...styles.pauseBtn }}
+                                onClick={handleHalfTime}
+                                disabled={!isRunning}
+                            >
+                                <Pause size={20} />
+                                Intervalo
+                            </button>
+                            <button
+                                style={{ ...styles.controlBtn, ...styles.resumeBtn }}
+                                onClick={() => setIsRunning(true)}
+                                disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
+                            >
+                                <Play size={20} />
+                                Retomar
+                            </button>
+                            <button
+                                style={{ ...styles.controlBtn, ...styles.endBtn }}
+                                onClick={handleEndMatch}
+                                disabled={selectedMatch.status === 'finished'}
+                            >
+                                <StopCircle size={20} />
+                                Fim de Jogo
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                {/* Eventos - Gols */}
-                <div style={styles.eventSection}>
-                    <h3 style={styles.sectionTitle}>⚽ Gols</h3>
-                    <div style={styles.eventButtons} className="match-timeline-event-grid">
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                            onClick={() => handleGoal('A')}
-                        >
-                            <Plus size={20} />
-                            Gol {selectedMatch.teamA.name.split(' - ')[0]}
-                        </button>
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                            onClick={() => handleGoal('B')}
-                        >
-                            <Plus size={20} />
-                            Gol {selectedMatch.teamB.name.split(' - ')[0]}
-                        </button>
+                {!isBeachTennis && (
+                    <div style={styles.eventSection}>
+                        <h3 style={styles.sectionTitle}>⚽ Gols</h3>
+                        <div style={styles.eventButtons} className="match-timeline-event-grid">
+                            <button
+                                style={{ ...styles.eventBtn, ...styles.teamABtn }}
+                                onClick={() => handleGoal('A')}
+                            >
+                                <Plus size={20} />
+                                Gol {selectedMatch.teamA.name.split(' - ')[0]}
+                            </button>
+                            <button
+                                style={{ ...styles.eventBtn, ...styles.teamBBtn }}
+                                onClick={() => handleGoal('B')}
+                            >
+                                <Plus size={20} />
+                                Gol {selectedMatch.teamB.name.split(' - ')[0]}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* Eventos - Cartões */}
-                <div style={styles.eventSection}>
-                    <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
-                    <div style={styles.eventButtons} className="match-timeline-event-grid">
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.yellowBtn }}
-                            onClick={() => handleCard('yellow_card', 'A')}
-                        >
-                            🟨 {selectedMatch.teamA.name.split(' - ')[0]}
-                        </button>
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.yellowBtn }}
-                            onClick={() => handleCard('yellow_card', 'B')}
-                        >
-                            🟨 {selectedMatch.teamB.name.split(' - ')[0]}
-                        </button>
-                    </div>
-                </div>
+                {!isBeachTennis && (
+                    <>
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.yellowBtn }}
+                                    onClick={() => handleCard('yellow_card', 'A')}
+                                >
+                                    🟨 {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.yellowBtn }}
+                                    onClick={() => handleCard('yellow_card', 'B')}
+                                >
+                                    🟨 {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
 
-                <div style={styles.eventSection}>
-                    <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
-                    <div style={styles.eventButtons} className="match-timeline-event-grid">
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.redBtn }}
-                            onClick={() => handleCard('red_card', 'A')}
-                        >
-                            🟥 {selectedMatch.teamA.name.split(' - ')[0]}
-                        </button>
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.redBtn }}
-                            onClick={() => handleCard('red_card', 'B')}
-                        >
-                            🟥 {selectedMatch.teamB.name.split(' - ')[0]}
-                        </button>
-                    </div>
-                </div>
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.redBtn }}
+                                    onClick={() => handleCard('red_card', 'A')}
+                                >
+                                    🟥 {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.redBtn }}
+                                    onClick={() => handleCard('red_card', 'B')}
+                                >
+                                    🟥 {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
 
-                {/* Eventos - Pênaltis */}
-                <div style={styles.eventSection}>
-                    <h3 style={styles.sectionTitle}>🎯 Pênaltis</h3>
-                    <div style={styles.eventButtons} className="match-timeline-event-grid">
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                            onClick={() => handlePenalty('penalty_scored', 'A')}
-                        >
-                            🎯 Pênalti Marcado {selectedMatch.teamA.name.split(' - ')[0]}
-                        </button>
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                            onClick={() => handlePenalty('penalty_scored', 'B')}
-                        >
-                            🎯 Pênalti Marcado {selectedMatch.teamB.name.split(' - ')[0]}
-                        </button>
-                    </div>
-                    <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                            onClick={() => handlePenalty('penalty_missed', 'A')}
-                        >
-                            ❌ Pênalti Perdido {selectedMatch.teamA.name.split(' - ')[0]}
-                        </button>
-                        <button
-                            style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                            onClick={() => handlePenalty('penalty_missed', 'B')}
-                        >
-                            ❌ Pênalti Perdido {selectedMatch.teamB.name.split(' - ')[0]}
-                        </button>
-                    </div>
-                </div>
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🎯 {isHandebol ? 'TIRO DE 7 METROS' : 'Pênaltis'}</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                                    onClick={() => handlePenalty('penalty_scored', 'A')}
+                                >
+                                    🎯 {isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Marcado {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                                    onClick={() => handlePenalty('penalty_scored', 'B')}
+                                >
+                                    🎯 {isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Marcado {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                            <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                                    onClick={() => handlePenalty('penalty_missed', 'A')}
+                                >
+                                    ❌ {isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                                    onClick={() => handlePenalty('penalty_missed', 'B')}
+                                >
+                                    ❌ {isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* Modal de Confirmação de Reset */}
                 {showResetConfirm && (
@@ -881,31 +1097,34 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         {(!selectedMatch.events || selectedMatch.events.length === 0) ? (
                             <p style={styles.noEvents}>Nenhum evento registrado ainda.</p>
                         ) : (
-                            [...selectedMatch.events].reverse().map((event) => {
-                                const isTeamA = event.teamId === selectedMatch.teamA.id;
-                                const isTeamB = event.teamId === selectedMatch.teamB.id;
-                                const isGeneral = !event.teamId;
-                                const shortTeamName = isTeamA
-                                    ? selectedMatch.teamA.name.split(' - ')[0]
-                                    : isTeamB
-                                        ? selectedMatch.teamB.name.split(' - ')[0]
-                                        : 'Jogo';
+                            [...selectedMatch.events]
+                                .filter(e => !isBeachTennis || ['start', 'set_win', 'tie_break_start', 'end'].includes(e.type))
+                                .reverse()
+                                .map((event) => {
+                                    const isTeamA = event.teamId === selectedMatch.teamA.id;
+                                    const isTeamB = event.teamId === selectedMatch.teamB.id;
+                                    const isGeneral = !event.teamId;
+                                    const shortTeamName = isTeamA
+                                        ? selectedMatch.teamA.name.split(' - ')[0]
+                                        : isTeamB
+                                            ? selectedMatch.teamB.name.split(' - ')[0]
+                                            : 'Jogo';
 
-                                return (
-                                    <div
-                                        key={event.id}
-                                        className={`timeline-item-beauty ${isTeamA ? 'timeline-team-a' : ''} ${isTeamB ? 'timeline-team-b' : ''} ${isGeneral ? 'timeline-neutral' : ''}`}
-                                        style={styles.timelineItem}
-                                    >
-                                        <span style={styles.eventTimePill}>{event.minute}'</span>
-                                        <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
-                                        <div style={styles.eventContentWrap}>
-                                            <span style={styles.eventText}>{getEventLabel(event)}</span>
-                                            <span style={styles.eventMetaTag}>{shortTeamName}</span>
+                                    return (
+                                        <div
+                                            key={event.id}
+                                            className={`timeline-item-beauty ${isTeamA ? 'timeline-team-a' : ''} ${isTeamB ? 'timeline-team-b' : ''} ${isGeneral ? 'timeline-neutral' : ''}`}
+                                            style={styles.timelineItem}
+                                        >
+                                            <span style={styles.eventTimePill}>{event.minute}'</span>
+                                            <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
+                                            <div style={styles.eventContentWrap}>
+                                                <span style={styles.eventText}>{getEventLabel(event)}</span>
+                                                <span style={styles.eventMetaTag}>{shortTeamName}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })
+                                    );
+                                })
                         )}
                     </div>
                 </div>
