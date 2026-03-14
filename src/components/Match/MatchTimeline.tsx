@@ -139,12 +139,21 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             }
         }
 
+        let customDescription = undefined;
+        if (selectedMatch.sport === 'Futebol Society') {
+            const teamName = teamId === selectedMatch.teamA.id ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0];
+            if (type === 'goal') customDescription = `[${currentMinute}'] ⚽ GOL para ${teamName}`;
+            if (type === 'yellow_card') customDescription = `[${currentMinute}'] 🟨 Cartão para ${teamName}`;
+            if (type === 'red_card') customDescription = `[${currentMinute}'] 🟥 Cartão para ${teamName}`;
+        }
+
         const newEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
             type,
             minute: currentMinute,
             teamId,
-            player
+            player,
+            description: customDescription
         };
 
         const updatedEvents = [...existingEvents, newEvent];

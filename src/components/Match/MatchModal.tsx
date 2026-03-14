@@ -162,7 +162,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         );
     };
 
-    const eligibleSportsForMVP = ['Futsal', 'Futebol Society'];
+    const eligibleSportsForMVP = ['Futsal'];
     const isEligibleForMVP = eligibleSportsForMVP.includes(currentMatch.sport) && currentMatch.status === 'finished';
 
     const mvpCandidates = athletes.filter(a => {
