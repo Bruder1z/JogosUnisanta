@@ -150,7 +150,9 @@ export const AVAILABLE_SPORTS = [
   'Futevôlei',
   'Beach Tennis',
   'Vôlei de Praia',
-  'Basquete 3x3'
+  'Basquete 3x3',
+  'Basquetebol',
+  'Futebol X1'
 ];
 
 export const SPORT_ICONS: Record<string, string> = {
@@ -168,6 +170,8 @@ export const SPORT_ICONS: Record<string, string> = {
   'Beach Tennis': '🎾',
   'Vôlei de Praia': '🏐',
   'Basquete 3x3': '🏀',
+  'Basquetebol': '🏀',
+  'Futebol X1': '⚽',
 };
 
 export const COURSE_ICONS: Record<string, string> = {

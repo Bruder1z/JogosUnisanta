@@ -2,6 +2,7 @@ import { useState, useEffect, type FC } from 'react';
 import { Play, Pause, StopCircle, Clock, Plus, Filter, PlusCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { type Match, type MatchEvent, AVAILABLE_SPORTS, COURSE_EMBLEMS } from '../../data/mockData';
+import { useNavigate } from 'react-router-dom';
 
 interface MatchTimelineProps {
     matchId?: string;
@@ -10,6 +11,7 @@ interface MatchTimelineProps {
 
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const { matches, updateMatch, athletes, addMatch, courses: coursesList } = useData();
+    const navigate = useNavigate();
     
     // Helper to get team emblem with strict matching
     const getTeamEmblem = (teamName: string) => {
@@ -68,6 +70,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isBeachTennis = selectedMatch?.sport === 'Beach Tennis';
     const isHandebol = selectedMatch?.sport === 'Handebol';
     const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia';
+    const isBasketball = selectedMatch?.sport === 'Basquetebol' || selectedMatch?.sport === 'Basquete 3x3';
 
     const [isTieBreakMode, setIsTieBreakMode] = useState(false);
     const [beachTieBreakA, setBeachTieBreakA] = useState(0);
@@ -366,8 +369,45 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         updateMatch(finishedMatch);
         setIsRunning(false);
 
-        // Deselecionar a partida para voltar para a lista
+        // Deselecionar a partida e forçar navegação para os resultados
         setActiveMatchId(null);
+        navigate('/');
+    };
+
+    const handleBasketballPoint = (team: 'A' | 'B', points: 1 | 2 | 3) => {
+        if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        if (!selectedMatch.events?.some(e => e.type === 'start')) {
+            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            if (started) {
+                selectedMatch.events = started.events;
+            }
+            setIsRunning(true);
+        }
+
+        const scoringTeamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        const currentA = selectedMatch.scoreA;
+        const currentB = selectedMatch.scoreB;
+        const nextA = team === 'A' ? currentA + points : currentA;
+        const nextB = team === 'B' ? currentB + points : currentB;
+
+        const description = `+${points} Ponto${points > 1 ? 's' : ''} para ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            scoreA: nextA,
+            scoreB: nextB,
+            status: 'live',
+            events: [...(selectedMatch.events || []), { 
+                id: `evt_${Date.now()}`, 
+                type: 'goal', 
+                minute: currentMinute, 
+                teamId: scoringTeamId, 
+                description: description
+            } as MatchEvent]
+        };
+
+        updateMatch(updatedMatch);
     };
 
     const handleGoal = (team: 'A' | 'B') => {
@@ -437,7 +477,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const getEventIcon = (type: MatchEvent['type']) => {
         switch (type) {
-            case 'goal': return isVolleyball ? '🏐' : '⚽';
+            case 'goal': 
+                if (isBasketball) return '🏀';
+                return isVolleyball ? '🏐' : '⚽';
             case 'yellow_card': return '🟨';
             case 'red_card': return '🟥';
             case 'start': return '▶️';
@@ -460,6 +502,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         switch (event.type) {
             case 'goal':
+                if (isBasketball) {
+                    return `[${selectedMatch.scoreA} x ${selectedMatch.scoreB}] 🏀 ${event.description}`;
+                }
                 if (isVolleyball) {
                     return event.description || `Ponto - ${teamName}`;
                 }
@@ -953,7 +998,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     )}
                 </div>
 
-                {!isBeachTennis && (
+                {!isBeachTennis && !isBasketball && (
                     <div style={styles.eventSection}>
                         <h3 style={styles.sectionTitle}>{isVolleyball ? '🏐 Pontos' : '⚽ Gols'}</h3>
                         <div style={styles.eventButtons} className="match-timeline-event-grid">
@@ -1009,7 +1054,59 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     </div>
                 )}
 
-                {!isBeachTennis && !isVolleyball && (
+                {isBasketball && (
+                    <div style={styles.eventSection}>
+                        <h3 style={{ ...styles.sectionTitle, color: 'var(--accent-color)' }}>🏀 Pontuação</h3>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '15px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedMatch.teamA.name.split(' - ')[0]}</div>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                    onClick={() => handleBasketballPoint('A', 1)}
+                                >
+                                    +1 Ponto (Lance Livre)
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                    onClick={() => handleBasketballPoint('A', 2)}
+                                >
+                                    +2 Pontos (Quadra)
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                    onClick={() => handleBasketballPoint('A', 3)}
+                                >
+                                    +3 Pontos (Fora)
+                                </button>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedMatch.teamB.name.split(' - ')[0]}</div>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
+                                    onClick={() => handleBasketballPoint('B', 1)}
+                                >
+                                    +1 Ponto (Lance Livre)
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
+                                    onClick={() => handleBasketballPoint('B', 2)}
+                                >
+                                    +2 Pontos (Quadra)
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
+                                    onClick={() => handleBasketballPoint('B', 3)}
+                                >
+                                    +3 Pontos (Fora)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {!isBeachTennis && !isVolleyball && !isBasketball && (
                     <>
                         <div style={styles.eventSection}>
                             <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>

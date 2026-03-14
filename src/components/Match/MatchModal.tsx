@@ -162,7 +162,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         );
     };
 
-    const eligibleSportsForMVP = ['Futsal', 'Futebol Society', 'Basquete 3x3'];
+    const eligibleSportsForMVP = ['Futsal', 'Futebol Society'];
     const isEligibleForMVP = eligibleSportsForMVP.includes(currentMatch.sport) && currentMatch.status === 'finished';
 
     const mvpCandidates = athletes.filter(a => {
@@ -186,8 +186,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     const getEventIcon = (type: MatchEvent['type']) => {
         const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia';
+        const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
         switch (type) {
-            case 'goal': return isVolleyball ? <div style={{ fontSize: '16px' }}>🏐</div> : <Trophy size={16} color="#ffd700" />;
+            case 'goal': 
+                if (isBasketball) return <div style={{ fontSize: '16px' }}>🏀</div>;
+                return isVolleyball ? <div style={{ fontSize: '16px' }}>🏐</div> : <Trophy size={16} color="#ffd700" />;
             case 'set_win': return <Trophy size={16} color="#ffd700" />;
             case 'yellow_card': return <div style={{ width: 12, height: 16, background: '#ffcc00', borderRadius: 2 }} />;
             case 'red_card': return <div style={{ width: 12, height: 16, background: '#ff4444', borderRadius: 2 }} />;
