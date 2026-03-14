@@ -71,6 +71,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isHandebol = selectedMatch?.sport === 'Handebol';
     const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia';
     const isBasketball = selectedMatch?.sport === 'Basquetebol' || selectedMatch?.sport === 'Basquete 3x3';
+    const isBasketball3x3 = selectedMatch?.sport === 'Basquete 3x3';
 
     const [isTieBreakMode, setIsTieBreakMode] = useState(false);
     const [beachTieBreakA, setBeachTieBreakA] = useState(0);
@@ -376,6 +377,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const handleBasketballPoint = (team: 'A' | 'B', points: 1 | 2 | 3) => {
         if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        if (isBasketball3x3) {
+            if (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21) {
+                return; // sudden death already reached
+            }
+        }
 
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
             const started = pushMatchEvent({ type: 'start', minute: currentMinute });
@@ -987,7 +994,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 Retomar
                             </button>
                             <button
-                                style={{ ...styles.controlBtn, ...styles.endBtn }}
+                                style={{ 
+                                    ...styles.controlBtn, 
+                                    ...styles.endBtn,
+                                    ...(isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21) ? {
+                                        boxShadow: '0 0 15px var(--danger-color)',
+                                        animation: 'pulse 1.5s infinite'
+                                    } : {})
+                                }}
                                 onClick={handleEndMatch}
                                 disabled={selectedMatch.status === 'finished'}
                             >
@@ -1064,21 +1078,25 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 <button
                                     style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
                                     onClick={() => handleBasketballPoint('A', 1)}
+                                    disabled={isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)}
                                 >
-                                    +1 Ponto (Lance Livre)
+                                    +1 Ponto ({isBasketball3x3 ? 'Dentro da linha' : 'Lance Livre'})
                                 </button>
                                 <button
                                     style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
                                     onClick={() => handleBasketballPoint('A', 2)}
+                                    disabled={isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)}
                                 >
-                                    +2 Pontos (Quadra)
+                                    +2 Pontos ({isBasketball3x3 ? 'Fora da linha' : 'Quadra'})
                                 </button>
-                                <button
-                                    style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
-                                    onClick={() => handleBasketballPoint('A', 3)}
-                                >
-                                    +3 Pontos (Fora)
-                                </button>
+                                {!isBasketball3x3 && (
+                                    <button
+                                        style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                        onClick={() => handleBasketballPoint('A', 3)}
+                                    >
+                                        +3 Pontos (Fora)
+                                    </button>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1086,21 +1104,25 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 <button
                                     style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
                                     onClick={() => handleBasketballPoint('B', 1)}
+                                    disabled={isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)}
                                 >
-                                    +1 Ponto (Lance Livre)
+                                    +1 Ponto ({isBasketball3x3 ? 'Dentro da linha' : 'Lance Livre'})
                                 </button>
                                 <button
                                     style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
                                     onClick={() => handleBasketballPoint('B', 2)}
+                                    disabled={isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)}
                                 >
-                                    +2 Pontos (Quadra)
+                                    +2 Pontos ({isBasketball3x3 ? 'Fora da linha' : 'Quadra'})
                                 </button>
-                                <button
-                                    style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
-                                    onClick={() => handleBasketballPoint('B', 3)}
-                                >
-                                    +3 Pontos (Fora)
-                                </button>
+                                {!isBasketball3x3 && (
+                                    <button
+                                        style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
+                                        onClick={() => handleBasketballPoint('B', 3)}
+                                    >
+                                        +3 Pontos (Fora)
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -8,15 +8,21 @@ interface MatchCardProps {
 }
 
 const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
-    const getTeamEmblem = (teamName: string) => {
-        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
-            courseKey.toLowerCase().includes(teamName.toLowerCase())
-        );
-        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+    const getTeamEmblem = (team: any) => {
+        if (team.logo) return team.logo;
+        if (team.course && team.course in COURSE_EMBLEMS) {
+            return `/emblemas/${COURSE_EMBLEMS[team.course]}`;
+        }
+        
+        const strictName = team.name.split(' - ')[0];
+        if (strictName in COURSE_EMBLEMS) {
+            return `/emblemas/${COURSE_EMBLEMS[strictName]}`;
+        }
+        return null;
     };
 
     const TeamDisplay = ({ team }: { team: any }) => {
-        const emblemUrl = getTeamEmblem(team.name);
+        const emblemUrl = getTeamEmblem(team);
 
         return (
             <div style={{ flex: 1, textAlign: 'center' }}>
