@@ -78,6 +78,40 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const addEvent = (type: MatchEvent['type'], teamId?: string, player?: string) => {
         if (!selectedMatch) return;
 
+        const existingEvents = selectedMatch.events || [];
+
+        // Lógica de Cartão Amarelo -> segundo amarelo gera expulsão automática
+        if (type === 'yellow_card' && player) {
+            const currentYellowCards = existingEvents.filter(e => e.player === player && e.type === 'yellow_card').length;
+            if (currentYellowCards >= 1) {
+                // Registrar primeiro o cartão amarelo
+                const yellowEvent: MatchEvent = {
+                    id: `evt_${Date.now()}_yellow`,
+                    type: 'yellow_card',
+                    minute: currentMinute,
+                    teamId,
+                    player
+                };
+                const redEvent: MatchEvent = {
+                    id: `evt_${Date.now()}_red`,
+                    type: 'red_card',
+                    minute: currentMinute,
+                    teamId,
+                    player,
+                    description: 'Cartão Vermelho (2º Amarelo)'
+                };
+                const updatedEvents = [...existingEvents, yellowEvent, redEvent];
+
+                const updatedMatch: Match = {
+                    ...selectedMatch,
+                    events: updatedEvents,
+                    status: 'live'
+                };
+                updateMatch(updatedMatch);
+                return;
+            }
+        }
+
         const newEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
             type,
@@ -86,12 +120,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             player
         };
 
-        const updatedEvents = [...(selectedMatch.events || []), newEvent];
+        const updatedEvents = [...existingEvents, newEvent];
 
-        // Atualizar pontuação se for gol
+        // Atualizar pontuação se for gol ou pênalti marcado
         let newScoreA = selectedMatch.scoreA;
         let newScoreB = selectedMatch.scoreB;
-        if (type === 'goal') {
+        if (type === 'goal' || type === 'penalty_scored') {
             if (teamId === selectedMatch.teamA.id) {
                 newScoreA += 1;
             } else if (teamId === selectedMatch.teamB.id) {
@@ -213,9 +247,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             case 'yellow_card':
                 return `Cartão Amarelo - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'red_card':
+                if (event.description) {
+                    return `${event.description} - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                }
                 return `Cartão Vermelho - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'penalty_scored':
-                return `Pênalti Marcado - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                return `Gol de Pênalti - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'penalty_missed':
                 return `Pênalti Perdido - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'start':

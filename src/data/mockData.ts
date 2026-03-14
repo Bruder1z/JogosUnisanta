@@ -39,6 +39,7 @@ export interface MatchEvent {
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)
+  description?: string; // Texto adicional para exibir na cronologia
   score?: string; // e.g., "25-23" (optional)
 }
 
