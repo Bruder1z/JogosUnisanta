@@ -137,22 +137,22 @@ export const AVAILABLE_COURSES = [
 ];
 
 export const AVAILABLE_SPORTS = [
-  'Futsal',
-  'Futebol Society',
-  'Handebol',
-  'Vôlei',
-  'Natação',
-  'Karatê',
-  'Judô',
-  'Tamboréu',
-  'Xadrez',
-  'Tênis de Mesa',
-  'Futevôlei',
-  'Beach Tennis',
-  'Vôlei de Praia',
   'Basquete 3x3',
   'Basquetebol',
-  'Futebol X1'
+  'Beach Tennis',
+  'Futsal',
+  'Futebol Society',
+  'Futebol X1',
+  'Futevôlei',
+  'Handebol',
+  'Judô',
+  'Karatê',
+  'Natação',
+  'Tamboréu',
+  'Tênis de Mesa',
+  'Vôlei',
+  'Vôlei de Praia',
+  'Xadrez'
 ];
 
 export const SPORT_ICONS: Record<string, string> = {

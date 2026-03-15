@@ -20,7 +20,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         if (liveMatch) setCurrentMatch(liveMatch);
     }, [allMatches, initialMatch.id]);
     const [votedFor, setVotedFor] = useState<string | null>(null);
-    const [mvpVotedFor, setMvpVotedFor] = useState<string | null>(null);
 
     // Deterministic random helper
     const pseudoRandom = (seed: string) => {
@@ -162,28 +161,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         );
     };
 
-    const eligibleSportsForMVP = ['Futsal'];
-    const isEligibleForMVP = eligibleSportsForMVP.includes(currentMatch.sport) && currentMatch.status === 'finished';
-
-    const mvpCandidates = athletes.filter(a => {
-        const isCorrectSport = a.sports.includes(currentMatch.sport);
-        const athleteCourse = a.course.toLowerCase();
-        const athleteInst = a.institution.toLowerCase();
-        
-        const teamACourse = currentMatch.teamA.course.toLowerCase();
-        const teamBCourse = currentMatch.teamB.course.toLowerCase();
-
-        const matchTeamA = (athleteCourse.includes(teamACourse) || teamACourse.includes(athleteCourse)) ||
-                          ((teamACourse.includes('fefesp') || teamACourse.includes('educação física')) && 
-                           (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp')));
-        
-        const matchTeamB = (athleteCourse.includes(teamBCourse) || teamBCourse.includes(athleteCourse)) ||
-                          ((teamBCourse.includes('fefesp') || teamBCourse.includes('educação física')) && 
-                           (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp')));
-
-        return isCorrectSport && (matchTeamA || matchTeamB);
-    });
-
+    // O bloco de MVP foi removido conforme solicitação, a Cronologia preencherá o espaço.
     const getEventIcon = (type: MatchEvent['type']) => {
         const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia';
         const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
@@ -433,63 +411,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         </div>
                     )}
 
-                    {isEligibleForMVP && (
-                        <div style={{ marginTop: '20px', textAlign: 'center', background: 'var(--bg-card)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                            <h4 style={{ marginBottom: '15px', fontSize: '14px', color: 'var(--text-secondary)' }}>Destaque da Partida</h4>
-                            {mvpCandidates.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-                                    {mvpCandidates.map(candidate => (
-                                        <button
-                                            key={candidate.id}
-                                            onClick={() => user ? setMvpVotedFor(candidate.id) : undefined}
-                                            style={{
-                                                padding: '10px',
-                                                borderRadius: '8px',
-                                                border: mvpVotedFor === candidate.id ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                                background: mvpVotedFor === candidate.id ? 'rgba(227, 6, 19, 0.1)' : 'var(--bg-main)',
-                                                color: mvpVotedFor === candidate.id ? 'var(--accent-color)' : 'var(--text-primary)',
-                                                fontWeight: 600,
-                                                fontSize: '13px',
-                                                cursor: user ? 'pointer' : 'not-allowed',
-                                                transition: 'all 0.2s',
-                                                opacity: user ? 1 : 0.5,
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: '5px'
-                                            }}
-                                            disabled={!user}
-                                        >
-                                            <div style={{
-                                                width: '32px', height: '32px', borderRadius: '50%',
-                                                background: 'var(--bg-hover)', display: 'flex',
-                                                alignItems: 'center', justifyContent: 'center',
-                                                color: 'var(--accent-color)', fontSize: '12px', fontWeight: 'bold'
-                                            }}>
-                                                {candidate.firstName[0]}{candidate.lastName[0]}
-                                            </div>
-                                            <span>{candidate.firstName} {candidate.lastName}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    Nenhum jogador cadastrado nesta partida.
-                                </div>
-                            )}
 
-                            {!user && mvpCandidates.length > 0 && (
-                                <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                    Faça login para votar no destaque!
-                                </div>
-                            )}
-                            {user && mvpVotedFor && (
-                                <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent-color)', fontWeight: 600 }}>
-                                    Voto em destaque registrado!
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
 
                 {/* Scrollable Content Body */}
