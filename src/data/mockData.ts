@@ -51,6 +51,7 @@ export interface Match {
   teamB: Team;
   scoreA: number;
   scoreB: number;
+  participants?: Team[]; // Added for multi-team sports like Swimming
   status: 'live' | 'finished' | 'scheduled';
   date: string;
   time: string;

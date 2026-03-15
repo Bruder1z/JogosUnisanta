@@ -102,6 +102,19 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                         <span style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600 }}>X</span>
                         <span>{match.scoreB}</span>
                     </div>
+                    {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(match.sport) && match.status === 'live' && (
+                        <div style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '-5px' }}>
+                            {(() => {
+                                const lastSetWinEvent = [...(match.events || [])].reverse().find(e => e.type === 'set_win');
+                                const events = lastSetWinEvent 
+                                    ? match.events?.slice(match.events.indexOf(lastSetWinEvent) + 1) || [] 
+                                    : match.events || [];
+                                const ptsA = events.filter(e => e.type === 'goal' && e.teamId === match.teamA.id).length;
+                                const ptsB = events.filter(e => e.type === 'goal' && e.teamId === match.teamB.id).length;
+                                return `${ptsA} - ${ptsB} (Pt)`;
+                            })()}
+                        </div>
+                    )}
                 </div>
 
                 <TeamDisplay team={match.teamB} />

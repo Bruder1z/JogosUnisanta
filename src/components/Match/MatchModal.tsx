@@ -290,7 +290,20 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                 <span style={{ fontSize: '20px', color: 'var(--text-secondary)', fontWeight: 700 }}>X</span>
                                 <span>{currentMatch.scoreB}</span>
                             </div>
-                            {currentMatch.status === 'live' && (
+                            {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport) && currentMatch.status === 'live' && (
+                                <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '2px' }}>
+                                    {(() => {
+                                        const lastSetWinEvent = [...(currentMatch.events || [])].reverse().find(e => e.type === 'set_win');
+                                        const events = lastSetWinEvent 
+                                            ? currentMatch.events?.slice(currentMatch.events.indexOf(lastSetWinEvent) + 1) || [] 
+                                            : currentMatch.events || [];
+                                        const ptsA = events.filter(e => e.type === 'goal' && e.teamId === currentMatch.teamA.id).length;
+                                        const ptsB = events.filter(e => e.type === 'goal' && e.teamId === currentMatch.teamB.id).length;
+                                        return `${ptsA} - ${ptsB} (Pt)`;
+                                    })()}
+                                </div>
+                            )}
+                            {currentMatch.status === 'live' && !['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport) && (
                                 <div style={{
                                     fontSize: '11px',
                                     color: 'var(--live-color)',
@@ -450,7 +463,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                         }} />
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-                                            {[...matchEvents].sort((a, b) => a.minute - b.minute).map((event) => {
+                                            {[...matchEvents].sort((a, b) => (b.minute - a.minute) || (parseInt(b.id.split('_')[1] || '0') - parseInt(a.id.split('_')[1] || '0'))).map((event) => {
                                                 const isTeamA = event.teamId === currentMatch.teamA.id;
                                                 return (
                                                     <div key={event.id} style={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1, marginBottom: '25px' }}>
@@ -473,8 +486,20 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                                 {getEventIcon(event.type)}
                                                                 <div>
-                                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                                                        {event.description ? event.description : getEventLabel(event.type)} {event.score && <span style={{ color: 'var(--accent-color)', marginLeft: '8px' }}>({event.score})</span>}
+                                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        {event.description ? event.description : getEventLabel(event.type)}
+                                                                        {event.score && (
+                                                                            <span style={{ 
+                                                                                fontSize: '12px', 
+                                                                                color: 'var(--accent-color)', 
+                                                                                fontWeight: 700,
+                                                                                background: 'rgba(227, 6, 19, 0.1)',
+                                                                                padding: '2px 6px',
+                                                                                borderRadius: '4px'
+                                                                            }}>
+                                                                                {event.score}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     {(event.player || event.teamId) && !event.description && (
                                                                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
