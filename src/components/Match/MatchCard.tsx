@@ -8,6 +8,73 @@ interface MatchCardProps {
 }
 
 const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
+    const isBeachTennis = match.sport === 'Beach Tennis';
+
+    const getEventTimestamp = (eventId: string) => {
+        const raw = eventId.split('_')[1] || eventId;
+        const parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getBeachTennisSummary = () => {
+        const initial = {
+            setsA: 0,
+            setsB: 0,
+            pointsA: 0,
+            pointsB: 0,
+            setResults: [] as string[]
+        };
+
+        if (!isBeachTennis) return initial;
+
+        const events = [...(match.events || [])]
+            .sort((a, b) => (a.minute - b.minute) || (getEventTimestamp(a.id) - getEventTimestamp(b.id)));
+
+        let currentSetStartIndex = 0;
+        let currentGamePointsA = 0;
+        let currentGamePointsB = 0;
+        let setsA = 0;
+        let setsB = 0;
+        const setResults: string[] = [];
+
+        events.forEach((event, index) => {
+            if (event.type === 'goal') {
+                if (event.teamId === match.teamA.id) currentGamePointsA += 1;
+                if (event.teamId === match.teamB.id) currentGamePointsB += 1;
+                return;
+            }
+
+            if (event.type === 'set_win' && event.description?.startsWith('Game para ')) {
+                currentGamePointsA = 0;
+                currentGamePointsB = 0;
+                return;
+            }
+
+            if (event.type === 'set_win' && event.description?.startsWith('Set para ')) {
+                const segmentEvents = events.slice(currentSetStartIndex, index + 1);
+                const gamesA = segmentEvents.filter(e => e.type === 'set_win' && e.description?.startsWith('Game para ') && e.teamId === match.teamA.id).length;
+                const gamesB = segmentEvents.filter(e => e.type === 'set_win' && e.description?.startsWith('Game para ') && e.teamId === match.teamB.id).length;
+                setResults.push(`${gamesA}-${gamesB}`);
+                if (event.teamId === match.teamA.id) setsA += 1;
+                if (event.teamId === match.teamB.id) setsB += 1;
+                currentSetStartIndex = index + 1;
+                currentGamePointsA = 0;
+                currentGamePointsB = 0;
+            }
+        });
+
+        return {
+            setsA,
+            setsB,
+            pointsA: currentGamePointsA,
+            pointsB: currentGamePointsB,
+            setResults
+        };
+    };
+
+    const beachSummary = getBeachTennisSummary();
+    const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
+
     const getTeamEmblem = (team: any) => {
         if (team.logo) return team.logo;
         if (team.course && team.course in COURSE_EMBLEMS) {
@@ -98,10 +165,27 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
 
                 <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div className="match-score" style={{ fontSize: '32px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <span>{match.scoreA}</span>
+                        <span>{isBeachTennis ? beachSummary.setsA : match.scoreA}</span>
                         <span style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600 }}>X</span>
-                        <span>{match.scoreB}</span>
+                        <span>{isBeachTennis ? beachSummary.setsB : match.scoreB}</span>
                     </div>
+                    {isBeachTennis && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginTop: '-5px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 700 }}>
+                                Games: {match.scoreA} - {match.scoreB}
+                            </div>
+                            {match.status === 'live' && (
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                                    Pontos: {BEACH_POINT_LABELS[Math.min(beachSummary.pointsA, 3)]} - {BEACH_POINT_LABELS[Math.min(beachSummary.pointsB, 3)]}
+                                </div>
+                            )}
+                            {beachSummary.setResults.length > 0 && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                    Sets: {beachSummary.setResults.join(' | ')}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(match.sport) && match.status === 'live' && (
                         <div style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '-5px' }}>
                             {(() => {

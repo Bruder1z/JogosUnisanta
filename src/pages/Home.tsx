@@ -69,6 +69,9 @@ const Home: React.FC = () => {
 
         let dateMatch = true;
         if (selectedDate !== 'Todos') {
+            if (selectedDate === 'Hoje' && m.status === 'live') {
+                dateMatch = true;
+            } else {
             const targetDate = new Date();
             // Assuming local timezone for date formatting matching mock data "2026-03-04"
             if (selectedDate === 'Ontem') targetDate.setDate(targetDate.getDate() - 1);
@@ -79,6 +82,7 @@ const Home: React.FC = () => {
             const dateStr = targetDateLocal.toISOString().split('T')[0];
 
             dateMatch = m.date === dateStr;
+            }
         }
 
         return sportMatch && categoryMatch && dateMatch;

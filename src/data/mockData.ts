@@ -146,14 +146,10 @@ export const AVAILABLE_SPORTS = [
   'Futebol X1',
   'Futevôlei',
   'Handebol',
-  'Judô',
-  'Karatê',
   'Natação',
-  'Tamboréu',
   'Tênis de Mesa',
   'Vôlei',
-  'Vôlei de Praia',
-  'Xadrez'
+  'Vôlei de Praia'
 ];
 
 export const SPORT_ICONS: Record<string, string> = {

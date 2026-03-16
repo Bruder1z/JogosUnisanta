@@ -1203,10 +1203,6 @@ const AdminDashboard: React.FC = () => {
                                 <option value="Handebol">Handebol</option>
                                 <option value="Vôlei">Vôlei</option>
                                 <option value="Natação">Natação</option>
-                                <option value="Karatê">Karatê</option>
-                                <option value="Judô">Judô</option>
-                                <option value="Tamboréu">Tamboréu</option>
-                                <option value="Xadrez">Xadrez</option>
                                 <option value="Tênis de Mesa">Tênis de Mesa</option>
                                 <option value="Futevôlei">Futevôlei</option>
                                 <option value="Beach Tennis">Beach Tennis</option>
@@ -1270,10 +1266,6 @@ const AdminDashboard: React.FC = () => {
                                 <option value="Handebol">Handebol</option>
                                 <option value="Vôlei">Vôlei</option>
                                 <option value="Natação">Natação</option>
-                                <option value="Karatê">Karatê</option>
-                                <option value="Judô">Judô</option>
-                                <option value="Tamboréu">Tamboréu</option>
-                                <option value="Xadrez">Xadrez</option>
                                 <option value="Tênis de Mesa">Tênis de Mesa</option>
                                 <option value="Futevôlei">Futevôlei</option>
                                 <option value="Beach Tennis">Beach Tennis</option>

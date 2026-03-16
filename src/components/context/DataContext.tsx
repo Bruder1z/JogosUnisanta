@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AVAILABLE_COURSES, mockAthletes as initialAthletes, mockMatches, mockRanking as initialRanking, type Match, type RankingEntry } from '../../data/mockData';
 import { supabase } from '../../services/supabaseClient';
 
@@ -43,119 +43,29 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // Carregar do localStorage e mesclar com AVAILABLE_COURSES para novos cursos ficarem visíveis
-    const [courses, setCourses] = useState<string[]>(() => {
-        // Legacy names that must never appear, regardless of what's in localStorage
-        const DENY_LIST = [
-            'Odonto São Judas',
-            'Odontologia São Judas', // non-hyphen variant
-            'Odonto - São Judas',
-        ];
-
-        const saved = localStorage.getItem('jg_courses');
-        if (saved) {
-            const savedCourses: string[] = JSON.parse(saved);
-            // Start with the clean base list
-            const result = [...AVAILABLE_COURSES];
-            // Append only admin-added courses (not in the base, not denied)
-            savedCourses.forEach(c => {
-                if (!result.includes(c) && !DENY_LIST.includes(c)) {
-                    result.push(c);
-                }
-            });
-            return result;
-        }
-        return AVAILABLE_COURSES;
-    });
-
-    const [athletes, setAthletes] = useState<Athlete[]>(() => {
-        const saved = localStorage.getItem('jg_athletes');
-        if (saved) return JSON.parse(saved);
-        return initialAthletes;
-    });
-
-    // Salvar sempre que houver alteração
-    useEffect(() => {
-        localStorage.setItem('jg_courses', JSON.stringify(courses));
-    }, [courses]);
-
-    useEffect(() => {
-        localStorage.setItem('jg_athletes', JSON.stringify(athletes));
-    }, [athletes]);
-
-    const [customEmblems, setCustomEmblems] = useState<Record<string, string>>(() => {
-        const saved = localStorage.getItem('jg_emblems');
-        if (saved) return JSON.parse(saved);
-        return {};
-    });
-
-    const [matches, setMatches] = useState<Match[]>(() => {
-        const saved = localStorage.getItem('jg_matches');
-        if (saved) return JSON.parse(saved);
-        return mockMatches;
-    });
-
+    const [courses, setCourses] = useState<string[]>(AVAILABLE_COURSES);
+    const [athletes, setAthletes] = useState<Athlete[]>(initialAthletes);
+    const [customEmblems, setCustomEmblems] = useState<Record<string, string>>({});
+    const [matches, setMatches] = useState<Match[]>(mockMatches);
     const [ranking, setRanking] = useState<RankingEntry[]>(() => {
-        const RANKING_DENY_LIST = [
-            'Odonto São Judas',
-            'Odontologia São Judas',
-            'Odonto - São Judas',
-        ];
-
-        const saved = localStorage.getItem('jg_ranking');
-        if (saved) {
-            // Build a points map from saved data (admin edits), filtering denied names
-            const savedEntries: RankingEntry[] = (JSON.parse(saved) as RankingEntry[])
-                .filter(e => !RANKING_DENY_LIST.includes(e.course));
-            const savedPoints = new Map(savedEntries.map(e => [e.course, e.points]));
-
-            // Start canonical from initialRanking, applying any admin-edited points
-            const merged = initialRanking.map(e => ({
-                ...e,
-                points: savedPoints.has(e.course) ? savedPoints.get(e.course)! : e.points
-            }));
-
-            merged.sort((a, b) => {
-                if (b.points !== a.points) return b.points - a.points;
-                return a.course.localeCompare(b.course);
-            });
-            return merged.map((e, idx) => ({ ...e, rank: idx + 1 }));
-        }
-        // Fresh start: just return initialRanking sorted & ranked
         const sorted = [...initialRanking].sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
             return a.course.localeCompare(b.course);
         });
         return sorted.map((e, idx) => ({ ...e, rank: idx + 1 }));
     });
-
-    const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>(() => {
-        const saved = localStorage.getItem('jg_featured');
-        if (saved) return JSON.parse(saved);
-        return [];
-    });
-
-    useEffect(() => {
-        localStorage.setItem('jg_emblems', JSON.stringify(customEmblems));
-    }, [customEmblems]);
-
-    useEffect(() => {
-        localStorage.setItem('jg_matches', JSON.stringify(matches));
-    }, [matches]);
-
-    useEffect(() => {
-        localStorage.setItem('jg_ranking', JSON.stringify(ranking));
-    }, [ranking]);
-
-    useEffect(() => {
-        localStorage.setItem('jg_featured', JSON.stringify(featuredAthletes));
-    }, [featuredAthletes]);
+    const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const isSavingRef = useRef(false);
+
+    useEffect(() => {
+        isSavingRef.current = isSaving;
+    }, [isSaving]);
 
     // Supabase Initial Fetch
     useEffect(() => {
         const fetchData = async () => {
-            if (isSaving) return; // Não sobrescreve o estado local enquanto uma gravação está em curso
+            if (isSavingRef.current) return; // Não sobrescreve o estado local enquanto uma gravação está em curso
             try {
                 // Fetch Matches
                 const { data: matchesData, error: matchesError } = await supabase
@@ -163,7 +73,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     .select('*')
                     .order('created_at', { ascending: false });
                 
-                if (matchesData && !matchesError && !isSaving) {
+                if (matchesData && !matchesError && !isSavingRef.current) {
                     setMatches(matchesData.map((m: any) => ({
                         id: m.id,
                         teamA: { id: m.team_a_id, name: m.team_a_name, course: m.team_a_course, faculty: m.team_a_faculty },

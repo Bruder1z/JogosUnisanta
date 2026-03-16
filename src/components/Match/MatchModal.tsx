@@ -11,7 +11,7 @@ interface MatchModalProps {
 
 const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const { user } = useAuth();
-    const { athletes, matches: allMatches, courses } = useData();
+    const { matches: allMatches, courses } = useData();
     const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
 
     // Sync state if initialMatch changes in context
@@ -108,6 +108,105 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const teamAForm = getTeamForm(currentMatch.teamA.id, currentMatch.sport);
     const teamBForm = getTeamForm(currentMatch.teamB.id, currentMatch.sport);
 
+    const isBeachTennis = currentMatch.sport === 'Beach Tennis';
+    const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport);
+    const isResultBreakdownSport = isSetSport || isBeachTennis;
+
+    const getEventTimestamp = (eventId: string) => {
+        const raw = eventId.split('_')[1] || eventId;
+        const parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getSetBreakdown = () => {
+        if (!isResultBreakdownSport) return [] as Array<{ setNumber: number; winnerTeamName: string; scoreA: number; scoreB: number }>;
+
+        const events = [...(currentMatch.events || [])]
+            .sort((a, b) => (a.minute - b.minute) || (getEventTimestamp(a.id) - getEventTimestamp(b.id)));
+
+        const sets: Array<{ setNumber: number; winnerTeamName: string; scoreA: number; scoreB: number }> = [];
+        let currentSetStartIndex = 0;
+
+        events.forEach((event, index) => {
+            if (event.type !== 'set_win') return;
+
+            if (isBeachTennis && !event.description?.startsWith('Set para ')) return;
+
+            const segmentEvents = events.slice(currentSetStartIndex, index + 1);
+            let scoreA = isBeachTennis
+                ? segmentEvents.filter(e => e.type === 'set_win' && e.description?.startsWith('Game para ') && e.teamId === currentMatch.teamA.id).length
+                : segmentEvents.filter(e => e.type === 'goal' && e.teamId === currentMatch.teamA.id).length;
+            let scoreB = isBeachTennis
+                ? segmentEvents.filter(e => e.type === 'set_win' && e.description?.startsWith('Game para ') && e.teamId === currentMatch.teamB.id).length
+                : segmentEvents.filter(e => e.type === 'goal' && e.teamId === currentMatch.teamB.id).length;
+
+            // Fallback when a set is finalized without goal events in the segment.
+            if (scoreA === 0 && scoreB === 0 && event.description) {
+                const scoreFromDescription = event.description.match(/\((\d+)\s*x\s*(\d+)\)/i);
+                if (scoreFromDescription) {
+                    scoreA = Number(scoreFromDescription[1]);
+                    scoreB = Number(scoreFromDescription[2]);
+                }
+            }
+
+            const winnerTeamName = event.teamId === currentMatch.teamA.id
+                ? currentMatch.teamA.name.split(' - ')[0]
+                : event.teamId === currentMatch.teamB.id
+                    ? currentMatch.teamB.name.split(' - ')[0]
+                    : 'Set encerrado';
+
+            sets.push({
+                setNumber: sets.length + 1,
+                winnerTeamName,
+                scoreA,
+                scoreB
+            });
+
+            currentSetStartIndex = index + 1;
+        });
+
+        return sets;
+    };
+
+    const setBreakdown = getSetBreakdown();
+
+    const beachLiveState = (() => {
+        if (!isBeachTennis) {
+            return { setsA: 0, setsB: 0, pointA: 0, pointB: 0 };
+        }
+
+        const events = [...(currentMatch.events || [])]
+            .sort((a, b) => (a.minute - b.minute) || (getEventTimestamp(a.id) - getEventTimestamp(b.id)));
+
+        let pointA = 0;
+        let pointB = 0;
+        let setsA = 0;
+        let setsB = 0;
+
+        events.forEach((event) => {
+            if (event.type === 'goal') {
+                if (event.teamId === currentMatch.teamA.id) pointA += 1;
+                if (event.teamId === currentMatch.teamB.id) pointB += 1;
+            }
+
+            if (event.type === 'set_win' && event.description?.startsWith('Game para ')) {
+                pointA = 0;
+                pointB = 0;
+            }
+
+            if (event.type === 'set_win' && event.description?.startsWith('Set para ')) {
+                if (event.teamId === currentMatch.teamA.id) setsA += 1;
+                if (event.teamId === currentMatch.teamB.id) setsB += 1;
+                pointA = 0;
+                pointB = 0;
+            }
+        });
+
+        return { setsA, setsB, pointA, pointB };
+    })();
+
+    const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
+
     const seedVotesStr = currentMatch.id + "votes";
     const baseVotesA = Math.floor(pseudoRandom(seedVotesStr + "A") * 200) + 50;
     const baseVotesB = Math.floor(pseudoRandom(seedVotesStr + "B") * 200) + 50;
@@ -194,6 +293,93 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             case 'end': return 'Fim da Partida';
             default: return '';
         }
+    };
+
+    const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
+        const minuteDiff = a.minute - b.minute;
+        if (minuteDiff !== 0) return minuteDiff;
+        return getEventTimestamp(a.id) - getEventTimestamp(b.id);
+    };
+
+    const getTimelineEventsWithScore = (events: MatchEvent[]) => {
+        let regularScoreA = 0;
+        let regularScoreB = 0;
+        let setScoreA = 0;
+        let setScoreB = 0;
+        let setPointsA = 0;
+        let setPointsB = 0;
+        let beachSetsA = 0;
+        let beachSetsB = 0;
+        let beachGamesA = 0;
+        let beachGamesB = 0;
+        let beachPointsA = 0;
+        let beachPointsB = 0;
+
+        return [...events]
+            .sort(compareEventsAsc)
+            .map((event) => {
+                if (isBeachTennis) {
+                    if (event.type === 'goal') {
+                        if (event.teamId === currentMatch.teamA.id) beachPointsA += 1;
+                        if (event.teamId === currentMatch.teamB.id) beachPointsB += 1;
+                    }
+
+                    if (event.type === 'set_win' && event.description?.startsWith('Game para ')) {
+                        if (event.teamId === currentMatch.teamA.id) beachGamesA += 1;
+                        if (event.teamId === currentMatch.teamB.id) beachGamesB += 1;
+                        beachPointsA = 0;
+                        beachPointsB = 0;
+                    }
+
+                    if (event.type === 'set_win' && event.description?.startsWith('Set para ')) {
+                        if (event.teamId === currentMatch.teamA.id) beachSetsA += 1;
+                        if (event.teamId === currentMatch.teamB.id) beachSetsB += 1;
+                        beachGamesA = 0;
+                        beachGamesB = 0;
+                        beachPointsA = 0;
+                        beachPointsB = 0;
+                    }
+
+                    return {
+                        ...event,
+                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`
+                    };
+                }
+
+                if (isSetSport) {
+                    if (event.type === 'goal') {
+                        if (event.teamId === currentMatch.teamA.id) setPointsA += 1;
+                        if (event.teamId === currentMatch.teamB.id) setPointsB += 1;
+                    }
+
+                    if (event.type === 'set_win') {
+                        if (event.teamId === currentMatch.teamA.id) setScoreA += 1;
+                        if (event.teamId === currentMatch.teamB.id) setScoreB += 1;
+                        setPointsA = 0;
+                        setPointsB = 0;
+                    }
+
+                    return {
+                        ...event,
+                        timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`
+                    };
+                }
+
+                if (event.type === 'goal' || event.type === 'penalty_scored') {
+                    const increment = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3'
+                        ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
+                        : 1;
+
+                    if (event.teamId === currentMatch.teamA.id) regularScoreA += increment;
+                    if (event.teamId === currentMatch.teamB.id) regularScoreB += increment;
+                }
+
+                return {
+                    ...event,
+                    timelineScore: `${regularScoreA}x${regularScoreB}`
+                };
+            })
+            .reverse();
     };
 
     const simulateMatch = () => {
@@ -286,10 +472,20 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
                         <div style={{ padding: '0 20px', textAlign: 'center' }}>
                             <div style={{ fontSize: '36px', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '15px', color: 'var(--text-primary)' }}>
-                                <span>{currentMatch.scoreA}</span>
+                                <span>{isBeachTennis ? beachLiveState.setsA : currentMatch.scoreA}</span>
                                 <span style={{ fontSize: '20px', color: 'var(--text-secondary)', fontWeight: 700 }}>X</span>
-                                <span>{currentMatch.scoreB}</span>
+                                <span>{isBeachTennis ? beachLiveState.setsB : currentMatch.scoreB}</span>
                             </div>
+                            {isBeachTennis && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginTop: '2px' }}>
+                                    <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 700 }}>
+                                        Games: {currentMatch.scoreA} - {currentMatch.scoreB}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                                        Pontos: {BEACH_POINT_LABELS[Math.min(beachLiveState.pointA, 3)]} - {BEACH_POINT_LABELS[Math.min(beachLiveState.pointB, 3)]}
+                                    </div>
+                                </div>
+                            )}
                             {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport) && currentMatch.status === 'live' && (
                                 <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '2px' }}>
                                     {(() => {
@@ -433,6 +629,45 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                     overflowY: 'auto',
                     background: 'var(--bg-primary)'
                 }}>
+                    {isResultBreakdownSport && setBreakdown.length > 0 && (
+                        <div style={{
+                            padding: '20px',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: 'var(--bg-card)'
+                        }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px', color: 'var(--text-primary)' }}>
+                                Resultado por Sets
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {setBreakdown.map((setItem) => (
+                                    <div
+                                        key={`set-${setItem.setNumber}`}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            background: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '10px',
+                                            padding: '10px 12px'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                            Set {setItem.setNumber}
+                                        </span>
+                                        <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                            {setItem.scoreA} x {setItem.scoreB}
+                                        </span>
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-color)' }}>
+                                            {setItem.winnerTeamName}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Timeline Body */}
                     <div style={{
                         padding: '20px',
@@ -450,7 +685,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                     });
                                 }
 
-                                return matchEvents.length > 0 ? (
+                                const timelineEvents = getTimelineEventsWithScore(matchEvents);
+
+                                return timelineEvents.length > 0 ? (
                                     <div style={{ position: 'relative' }}>
                                         {/* Vertical Line */}
                                         <div style={{
@@ -463,7 +700,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                         }} />
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-                                            {[...matchEvents].sort((a, b) => (b.minute - a.minute) || (parseInt(b.id.split('_')[1] || '0') - parseInt(a.id.split('_')[1] || '0'))).map((event) => {
+                                            {timelineEvents.map((event) => {
                                                 const isTeamA = event.teamId === currentMatch.teamA.id;
                                                 return (
                                                     <div key={event.id} style={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1, marginBottom: '25px' }}>
@@ -488,19 +725,17 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                 <div>
                                                                     <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                         {event.description ? event.description : getEventLabel(event.type)}
-                                                                        {event.score && (
-                                                                            <span style={{ 
-                                                                                fontSize: '12px', 
-                                                                                color: 'var(--accent-color)', 
-                                                                                fontWeight: 700,
-                                                                                background: 'rgba(227, 6, 19, 0.1)',
-                                                                                padding: '2px 6px',
-                                                                                borderRadius: '4px'
-                                                                            }}>
-                                                                                {event.score}
-                                                                            </span>
-                                                                        )}
                                                                     </div>
+                                                                    {event.timelineScore && event.type !== 'end' && event.type !== 'start' && (
+                                                                        <div style={{
+                                                                            fontSize: '12px',
+                                                                            color: 'var(--accent-color)',
+                                                                            fontWeight: 700,
+                                                                            marginTop: '4px'
+                                                                        }}>
+                                                                            Placar no momento: {event.timelineScore}
+                                                                        </div>
+                                                                    )}
                                                                     {(event.player || event.teamId) && !event.description && (
                                                                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                                                                             {event.player && event.player !== 'Pênalti perdido' ? `${event.player} - ` : ''}

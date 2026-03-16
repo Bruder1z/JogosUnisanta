@@ -83,25 +83,73 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isBasketball3x3 = selectedMatch?.sport === 'Basquete 3x3';
     const isSwimming = selectedMatch?.sport === 'Natação';
 
-    const [isTieBreakMode, setIsTieBreakMode] = useState(false);
-    const [beachTieBreakA, setBeachTieBreakA] = useState(0);
-    const [beachTieBreakB, setBeachTieBreakB] = useState(0);
     const [swimmingRankings, setSwimmingRankings] = useState<Record<string, number>>({});
     const [athleteNames, setAthleteNames] = useState<Record<string, string>>({});
     const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
 
-    useEffect(() => {
-        setIsTieBreakMode(false);
-        setBeachTieBreakA(0);
-        setBeachTieBreakB(0);
-    }, [selectedMatch?.id]);
+    const getCurrentEventMinute = () => Math.floor(currentMinute / 60);
+    const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
+    const TIMER_TICK_MS = 1000;
+    const TIMER_INCREMENT_SECONDS = 60; // Test mode: 1 second real time = 1 game minute
+    const formatClock = (totalSeconds: number) => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    const getEventTimestamp = (eventId: string) => {
+        const raw = eventId.split('_')[1] || eventId;
+        const parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getBeachScoreState = (match: Match | null) => {
+        const initialState = {
+            gamePointsA: 0,
+            gamePointsB: 0
+        };
+
+        if (!match) return initialState;
+
+        return [...(match.events || [])]
+            .sort((a, b) => (a.minute - b.minute) || (getEventTimestamp(a.id) - getEventTimestamp(b.id)))
+            .reduce((state, event) => {
+                if (event.type === 'set_win') {
+                    return {
+                        ...state,
+                        gamePointsA: 0,
+                        gamePointsB: 0
+                    };
+                }
+
+                if (event.type !== 'goal') {
+                    return state;
+                }
+
+                return {
+                    ...state,
+                    gamePointsA: event.teamId === match.teamA.id ? state.gamePointsA + 1 : state.gamePointsA,
+                    gamePointsB: event.teamId === match.teamB.id ? state.gamePointsB + 1 : state.gamePointsB
+                };
+            }, initialState);
+    };
+
+    const beachScoreState = getBeachScoreState(selectedMatch);
+    const beachSetsState = (selectedMatch?.events || []).reduce((acc, event) => {
+        if (event.type !== 'set_win') return acc;
+        if (!event.description?.startsWith('Set para ')) return acc;
+
+        if (event.teamId === selectedMatch?.teamA.id) acc.setsA += 1;
+        if (event.teamId === selectedMatch?.teamB.id) acc.setsB += 1;
+        return acc;
+    }, { setsA: 0, setsB: 0 });
 
     useEffect(() => {
         let interval: number | null = null;
         if (isRunning) {
             interval = window.setInterval(() => {
-                setCurrentMinute(prev => prev + 1);
-            }, 1000); // 1 minuto = 60000ms
+                setCurrentMinute(prev => prev + TIMER_INCREMENT_SECONDS);
+            }, TIMER_TICK_MS);
         }
         return () => {
             if (interval) clearInterval(interval);
@@ -111,11 +159,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const handleSelectMatch = (match: Match) => {
         setActiveMatchId(match.id);
-        setCurrentMinute(0);
-        setIsRunning(false);
+        const lastMinute = (match.events || []).reduce((max, event) => Math.max(max, event.minute || 0), 0);
+        setCurrentMinute(lastMinute * 60);
+        setIsRunning(match.status === 'live');
     };
 
-    const addEvent = (type: MatchEvent['type'], teamId?: string, player?: string) => {
+    const addEvent = async (type: MatchEvent['type'], teamId?: string, player?: string) => {
         if (!selectedMatch) return;
 
         const existingEvents = selectedMatch.events || [];
@@ -124,30 +173,38 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         if (type === 'yellow_card' && player) {
             const currentYellowCards = existingEvents.filter(e => e.player === player && e.type === 'yellow_card').length;
             if (currentYellowCards >= 1) {
+                const eventBaseTs = Date.now();
                 // Registrar primeiro o cartão amarelo
                 const yellowEvent: MatchEvent = {
-                    id: `evt_${Date.now()}_yellow`,
+                    id: `evt_${eventBaseTs}_yellow`,
                     type: 'yellow_card',
-                    minute: currentMinute,
+                    minute: getCurrentEventMinute(),
                     teamId,
                     player
                 };
                 const redEvent: MatchEvent = {
-                    id: `evt_${Date.now()}_red`,
+                    id: `evt_${eventBaseTs + 1}_red`,
                     type: 'red_card',
-                    minute: currentMinute,
+                    minute: getCurrentEventMinute(),
                     teamId,
                     player,
                     description: 'Cartão Vermelho (2º Amarelo)'
                 };
-                const updatedEvents = [...existingEvents, yellowEvent, redEvent];
-
-                const updatedMatch: Match = {
+                const updatedMatchWithYellow: Match = {
                     ...selectedMatch,
-                    events: updatedEvents,
+                    events: [...existingEvents, yellowEvent],
                     status: 'live'
                 };
-                updateMatch(updatedMatch);
+
+                await updateMatch(updatedMatchWithYellow);
+
+                const updatedMatchWithRed: Match = {
+                    ...updatedMatchWithYellow,
+                    events: [...(updatedMatchWithYellow.events || []), redEvent],
+                    status: 'live'
+                };
+
+                await updateMatch(updatedMatchWithRed);
                 return;
             }
         }
@@ -155,15 +212,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         let customDescription = undefined;
         if (selectedMatch.sport === 'Futebol Society') {
             const teamName = teamId === selectedMatch.teamA.id ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0];
-            if (type === 'goal') customDescription = `[${currentMinute}'] ⚽ GOL para ${teamName}`;
-            if (type === 'yellow_card') customDescription = `[${currentMinute}'] 🟨 Cartão para ${teamName}`;
-            if (type === 'red_card') customDescription = `[${currentMinute}'] 🟥 Cartão para ${teamName}`;
+            const playerSuffix = player ? ` - ${player}` : '';
+            if (type === 'goal') customDescription = `⚽ GOL para ${teamName}${playerSuffix}`;
+            if (type === 'yellow_card') customDescription = `Cartão para ${teamName}${playerSuffix}`;
+            if (type === 'red_card') customDescription = `Cartão para ${teamName}${playerSuffix}`;
         }
 
         const newEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
             type,
-            minute: currentMinute,
+            minute: getCurrentEventMinute(),
             teamId,
             player,
             description: customDescription
@@ -190,7 +248,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             status: type === 'end' ? 'finished' : 'live'
         };
 
-        updateMatch(updatedMatch);
+        await updateMatch(updatedMatch);
     };
 
     const pushMatchEvent = (newEvent: Omit<MatchEvent, 'id'>) => {
@@ -204,12 +262,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return updatedMatch;
     };
 
-    const handleBeachPoint = (team: 'A' | 'B') => {
+    const handleBeachGameWin = (team: 'A' | 'B', pointEvent?: MatchEvent) => {
         if (!selectedMatch || selectedMatch.status === 'finished') return;
 
-        // Add start event automatically if not started yet
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
-            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            const started = pushMatchEvent({ type: 'start', minute: getCurrentEventMinute() });
             if (started) {
                 selectedMatch.events = started.events;
             }
@@ -217,81 +274,90 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
 
         const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-
-        if (!isTieBreakMode) {
-            const currentA = selectedMatch.scoreA;
-            const currentB = selectedMatch.scoreB;
-            const nextA = team === 'A' ? currentA + 1 : currentA;
-            const nextB = team === 'B' ? currentB + 1 : currentB;
-
-            // at 6-6 trigger tie-break
-            if (nextA === 6 && nextB === 6) {
-                const updatedMatch: Match = {
-                    ...selectedMatch,
-                    scoreA: nextA,
-                    scoreB: nextB,
-                    status: 'live',
-                    events: [...(selectedMatch.events || []), 
-                        { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Game para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent, 
-                        { id: `evt_${Date.now()+1}`, type: 'tie_break_start', minute: currentMinute, description: 'Início de Tie-break' } as MatchEvent
-                    ]
-                };
-                updateMatch(updatedMatch);
-                setIsTieBreakMode(true);
-                setBeachTieBreakA(0);
-                setBeachTieBreakB(0);
-                return;
-            }
-
-            // normal game point
-            const updatedMatch: Match = {
-                ...selectedMatch,
-                scoreA: nextA,
-                scoreB: nextB,
-                status: 'live',
-                events: [...(selectedMatch.events || []), { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Game para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent]
-            };
-
-            // check winner of set
-            if ((nextA === 6 && nextB <= 4) || (nextB === 6 && nextA <= 4)) {
-                updatedMatch.status = 'finished';
-                updatedMatch.events = [...(updatedMatch.events || []), { id: `evt_${Date.now()+1}`, type: 'end', minute: currentMinute } as MatchEvent];
-                updateMatch(updatedMatch);
-                setIsRunning(false);
-                return;
-            }
-
-            updateMatch(updatedMatch);
-            return;
-        }
-
-        // tie-break mode
-        const nextTieA = team === 'A' ? beachTieBreakA + 1 : beachTieBreakA;
-        const nextTieB = team === 'B' ? beachTieBreakB + 1 : beachTieBreakB;
-
-        setBeachTieBreakA(nextTieA);
-        setBeachTieBreakB(nextTieB);
-
-        const updatedEvents = [...(selectedMatch.events || []), { id: `evt_${Date.now()}`, type: 'set_win', minute: currentMinute, teamId, description: `Ponto tie-break para ${team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}` } as MatchEvent];
-
-        if (nextTieA >= 7 || nextTieB >= 7) {
-            const finalA = team === 'A' ? 7 : 6;
-            const finalB = team === 'B' ? 7 : 6;
-            const winnerMatch: Match = {
-                ...selectedMatch,
-                scoreA: finalA,
-                scoreB: finalB,
-                status: 'finished',
-                events: [...updatedEvents, { id: `evt_${Date.now()+1}`, type: 'end', minute: currentMinute } as MatchEvent]
-            };
-            updateMatch(winnerMatch);
-            setIsRunning(false);
-            return;
-        }
+        const gameWinnerName = team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name;
+        const nextGamesA = team === 'A' ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+        const nextGamesB = team === 'B' ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+        const gameWinEvent: MatchEvent = {
+            id: `evt_${Date.now()}_setwin`,
+            type: 'set_win',
+            minute: getCurrentEventMinute(),
+            teamId,
+            description: `Game para ${gameWinnerName}`
+        };
+        const baseEvents = [
+            ...(selectedMatch.events || []),
+            ...(pointEvent ? [pointEvent] : []),
+            gameWinEvent
+        ];
 
         const updatedMatch: Match = {
             ...selectedMatch,
-            events: updatedEvents,
+            scoreA: nextGamesA,
+            scoreB: nextGamesB,
+            status: 'live',
+            events: baseEvents
+        };
+
+        updateMatch(updatedMatch);
+    };
+
+    const handleBeachSetWin = (team: 'A' | 'B') => {
+        if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        if (!selectedMatch.events?.some(e => e.type === 'start')) {
+            const started = pushMatchEvent({ type: 'start', minute: getCurrentEventMinute() });
+            if (started) {
+                selectedMatch.events = started.events;
+            }
+            setIsRunning(true);
+        }
+
+        const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        const setWinnerName = team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name;
+        const setWinEvent: MatchEvent = {
+            id: `evt_${Date.now()}_set`,
+            type: 'set_win',
+            minute: getCurrentEventMinute(),
+            teamId,
+            description: `Set para ${setWinnerName}`
+        };
+
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            scoreA: 0,
+            scoreB: 0,
+            status: 'live',
+            events: [...(selectedMatch.events || []), setWinEvent]
+        };
+
+        updateMatch(updatedMatch);
+    };
+
+    const handleBeachPoint = (team: 'A' | 'B') => {
+        if (!selectedMatch || selectedMatch.status === 'finished') return;
+
+        // Add start event automatically if not started yet
+        if (!selectedMatch.events?.some(e => e.type === 'start')) {
+            const started = pushMatchEvent({ type: 'start', minute: getCurrentEventMinute() });
+            if (started) {
+                selectedMatch.events = started.events;
+            }
+            setIsRunning(true);
+        }
+
+        const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        const pointWinnerName = team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name;
+        const pointEvent: MatchEvent = {
+            id: `evt_${Date.now()}_goal`,
+            type: 'goal',
+            minute: getCurrentEventMinute(),
+            teamId,
+            description: `Ponto para ${pointWinnerName}`
+        };
+
+        const updatedMatch: Match = {
+            ...selectedMatch,
+            events: [...(selectedMatch.events || []), pointEvent],
             status: 'live'
         };
 
@@ -320,7 +386,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const setWinEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
             type: 'set_win',
-            minute: currentMinute,
+            minute: getCurrentEventMinute(),
             teamId,
             description: `Set ganho por ${teamName} (${finalPtsA} x ${finalPtsB})`,
             score: `${team === 'A' ? selectedMatch.scoreA + 1 : selectedMatch.scoreA}x${team === 'B' ? selectedMatch.scoreB + 1 : selectedMatch.scoreB}`
@@ -341,7 +407,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         if (!selectedMatch || selectedMatch.status === 'finished') return;
 
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
-            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            const started = pushMatchEvent({ type: 'start', minute: getCurrentEventMinute() });
             if (started) {
                 selectedMatch.events = started.events;
             }
@@ -387,7 +453,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             events: [...(selectedMatch.events || []), { 
                 id: `evt_${Date.now()}`, 
                 type: 'goal', 
-                minute: currentMinute, 
+                minute: getCurrentEventMinute(), 
                 teamId: scoringTeamId, 
                 description: description,
                 score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`
@@ -402,8 +468,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 updatedMatch.status = 'finished';
                 updatedMatch.events = [
                     ...(updatedMatch.events || []), 
-                    { id: `evt_${Date.now()+1}`, type: 'set_win', minute: currentMinute, teamId: scoringTeamId, description: `Fim de Jogo para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}` } as MatchEvent,
-                    { id: `evt_${Date.now()+2}`, type: 'end', minute: currentMinute, description: `Fim de Jogo - Placar Final: ${nextA} x ${nextB}` } as MatchEvent
+                    { id: `evt_${Date.now()+1}`, type: 'set_win', minute: getCurrentEventMinute(), teamId: scoringTeamId, description: `Fim de Jogo para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}` } as MatchEvent,
+                    { id: `evt_${Date.now()+2}`, type: 'end', minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${nextA} x ${nextB}` } as MatchEvent
                 ];
                 updateMatch(updatedMatch);
                 setIsRunning(false);
@@ -415,7 +481,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     const handleStartMatch = () => {
-        addEvent('start');
+        if (!selectedMatch) return;
+
+        const hasStarted = selectedMatch.events?.some(e => e.type === 'start');
+        if (!hasStarted) {
+            addEvent('start');
+        } else if (selectedMatch.status !== 'live') {
+            updateMatch({ ...selectedMatch, status: 'live' });
+        }
         setIsRunning(true);
     };
 
@@ -427,12 +500,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const handleEndMatch = () => {
         if (!selectedMatch) return;
 
+        const finalScoreLabel = isBeachTennis
+            ? `${beachSetsState.setsA} x ${beachSetsState.setsB} (sets)`
+            : `${selectedMatch.scoreA} x ${selectedMatch.scoreB}`;
+
         // Criar o evento final com o placar
         const finalEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
             type: 'end',
-            minute: currentMinute,
-            description: `Fim de Jogo - Placar Final: ${selectedMatch.scoreA} x ${selectedMatch.scoreB}`
+            minute: getCurrentEventMinute(),
+            description: `Fim de Jogo - Placar Final: ${finalScoreLabel}`
         };
 
         // Atualizar a partida com status 'finished' e adicionar o evento
@@ -461,7 +538,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
 
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
-            const started = pushMatchEvent({ type: 'start', minute: currentMinute });
+            const started = pushMatchEvent({ type: 'start', minute: getCurrentEventMinute() });
             if (started) {
                 selectedMatch.events = started.events;
             }
@@ -474,7 +551,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const nextA = team === 'A' ? currentA + points : currentA;
         const nextB = team === 'B' ? currentB + points : currentB;
 
-        const description = `[${nextA} x ${nextB}] 🏀 +${points} Ponto${points > 1 ? 's' : ''} para ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
+        const description = `[${nextA} x ${nextB}] +${points} Ponto${points > 1 ? 's' : ''} para ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
 
         const updatedMatch: Match = {
             ...selectedMatch,
@@ -484,7 +561,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             events: [...(selectedMatch.events || []), { 
                 id: `evt_${Date.now()}`, 
                 type: 'goal', 
-                minute: currentMinute, 
+                minute: getCurrentEventMinute(), 
                 teamId: scoringTeamId, 
                 description: description
             } as MatchEvent]
@@ -570,7 +647,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             case 'halftime': return '⏸️';
             case 'penalty_scored': return '🎯';
             case 'penalty_missed': return '❌';
-            case 'set_win': return isBeachTennis ? '🎾☀️' : '🏅';
+            case 'set_win': return isBeachTennis ? '🎾☀️' : '•';
             case 'tie_break_start': return '🎾';
             default: return '•';
         }
@@ -591,12 +668,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 if (isVolleyball) {
                     return event.description || `Ponto - ${teamName}`;
                 }
+                if (event.description) {
+                    return event.description;
+                }
                 return `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName} ${event.player ? `- ${event.player}` : ''}`;
             case 'yellow_card':
+                if (event.description) {
+                    return event.description;
+                }
                 return `Cartão Amarelo - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'red_card':
                 if (event.description) {
-                    return `${event.description} - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                    return event.description;
                 }
                 return `Cartão Vermelho - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'penalty_scored':
@@ -605,7 +688,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 return `${isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido - ${teamName} ${event.player ? `(${event.player})` : ''}`;
             case 'set_win':
                 if (isBeachTennis) {
-                    return `Game para ${teamName}`;
+                    return event.description || `Game para ${teamName}`;
                 }
                 return `Ponto para ${teamName}`;
             case 'tie_break_start':
@@ -620,6 +703,109 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 return event.description || event.type;
         }
     };
+
+    const compareTimelineEventsAsc = (a: MatchEvent, b: MatchEvent) => {
+        const minuteDiff = a.minute - b.minute;
+        if (minuteDiff !== 0) return minuteDiff;
+
+        const isDoubleYellowPair =
+            a.player &&
+            b.player &&
+            a.player === b.player &&
+            a.teamId === b.teamId &&
+            ((a.type === 'yellow_card' && b.type === 'red_card') || (a.type === 'red_card' && b.type === 'yellow_card'));
+
+        if (isDoubleYellowPair) {
+            return a.type === 'yellow_card' ? -1 : 1;
+        }
+
+        return getEventTimestamp(a.id) - getEventTimestamp(b.id);
+    };
+
+    const getTimelineScoreLabel = (events: MatchEvent[]) => {
+        if (!selectedMatch) return [] as Array<MatchEvent & { timelineScore: string }>;
+
+        let regularScoreA = 0;
+        let regularScoreB = 0;
+        let setScoreA = 0;
+        let setScoreB = 0;
+        let setPointsA = 0;
+        let setPointsB = 0;
+        let beachSetsA = 0;
+        let beachSetsB = 0;
+        let beachGamesA = 0;
+        let beachGamesB = 0;
+        let beachPointsA = 0;
+        let beachPointsB = 0;
+
+        return [...events]
+            .sort(compareTimelineEventsAsc)
+            .map((event) => {
+                if (isBeachTennis) {
+                    if (event.type === 'goal') {
+                        if (event.teamId === selectedMatch.teamA.id) beachPointsA += 1;
+                        if (event.teamId === selectedMatch.teamB.id) beachPointsB += 1;
+                    }
+
+                    if (event.type === 'set_win' && event.description?.startsWith('Game para ')) {
+                        if (event.teamId === selectedMatch.teamA.id) beachGamesA += 1;
+                        if (event.teamId === selectedMatch.teamB.id) beachGamesB += 1;
+                        beachPointsA = 0;
+                        beachPointsB = 0;
+                    }
+
+                    if (event.type === 'set_win' && event.description?.startsWith('Set para ')) {
+                        if (event.teamId === selectedMatch.teamA.id) beachSetsA += 1;
+                        if (event.teamId === selectedMatch.teamB.id) beachSetsB += 1;
+                        beachGamesA = 0;
+                        beachGamesB = 0;
+                        beachPointsA = 0;
+                        beachPointsB = 0;
+                    }
+
+                    return {
+                        ...event,
+                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`
+                    };
+                }
+
+                if (isSetSport) {
+                    if (event.type === 'goal') {
+                        if (event.teamId === selectedMatch.teamA.id) setPointsA += 1;
+                        if (event.teamId === selectedMatch.teamB.id) setPointsB += 1;
+                    }
+
+                    if (event.type === 'set_win') {
+                        if (event.teamId === selectedMatch.teamA.id) setScoreA += 1;
+                        if (event.teamId === selectedMatch.teamB.id) setScoreB += 1;
+                        setPointsA = 0;
+                        setPointsB = 0;
+                    }
+
+                    return {
+                        ...event,
+                        timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`
+                    };
+                }
+
+                if (event.type === 'goal' || event.type === 'penalty_scored') {
+                    const increment = isBasketball
+                        ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
+                        : 1;
+
+                    if (event.teamId === selectedMatch.teamA.id) regularScoreA += increment;
+                    if (event.teamId === selectedMatch.teamB.id) regularScoreB += increment;
+                }
+
+                return {
+                    ...event,
+                    timelineScore: `${regularScoreA}x${regularScoreB}`
+                };
+            })
+            .reverse();
+    };
+
+    const timelineEvents = selectedMatch ? getTimelineScoreLabel(selectedMatch.events || []) : [];
 
     const handleSaveNewMatch = () => {
         const isSwimming = newMatchForm.sport === 'Natação';
@@ -1127,22 +1313,27 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 </div>
                             </div>
 
-                            {!isSetSport && (
+                            {
                                 <div style={styles.timeDisplay} className="match-timeline-time-display">
                                     <Clock size={24} />
-                                    <span style={styles.minute}>{currentMinute}'</span>
+                                    <span style={styles.minute}>{formatClock(currentMinute)}</span>
                                     {isRunning && (
                                         <span style={styles.liveBadge} className="pulse-animation">
                                             AO VIVO
                                         </span>
                                     )}
-                                    {isBeachTennis && isTieBreakMode && (
+                                    {isBeachTennis && (
                                         <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                            Tie-break: {beachTieBreakA} - {beachTieBreakB}
+                                            Pontos: {BEACH_POINT_LABELS[Math.min(beachScoreState.gamePointsA, 3)]} - {BEACH_POINT_LABELS[Math.min(beachScoreState.gamePointsB, 3)]}
+                                        </span>
+                                    )}
+                                    {isBeachTennis && (
+                                        <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            Sets: {beachSetsState.setsA} - {beachSetsState.setsB}
                                         </span>
                                     )}
                                 </div>
-                            )}
+                            }
 
                             <div style={styles.teamRight}>
                                 <h2 style={styles.teamName} className="match-timeline-team-name">{selectedMatch.teamB.name}</h2>
@@ -1167,7 +1358,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                 {/* Controles do Jogo */}
                 <div style={styles.gameControls}>
-                    <h3 style={styles.sectionTitle}>{isSwimming ? 'Classificação da Prova' : 'Controle da Partida'}</h3>
+                    <h3 style={styles.sectionTitle}>{isSwimming ? 'Classificação da Prova' : '⏱️ Controle de Tempo'}</h3>
                     {isSwimming ? (
                         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
                             <button
@@ -1190,67 +1381,148 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 🏁 Definir Classificação da Prova
                             </button>
                         </div>
-                    ) : isBeachTennis ? (
-                        <div style={{ ...styles.controlButtons, gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))' }}>
-                            <button
-                                style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                                onClick={() => handleBeachPoint('A')}
-                            >
-                                <Plus size={20} />
-                                + Ponto {selectedMatch.teamA.name.split(' - ')[0]}
-                            </button>
-                            <button
-                                style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                                onClick={() => handleBeachPoint('B')}
-                            >
-                                <Plus size={20} />
-                                + Ponto {selectedMatch.teamB.name.split(' - ')[0]}
-                            </button>
-                        </div>
                     ) : (
-                        <div style={styles.controlButtons} className="match-timeline-control-grid">
-                            <button
-                                style={{ ...styles.controlBtn, ...styles.startBtn }}
-                                onClick={handleStartMatch}
-                                disabled={isRunning || selectedMatch.events?.some(e => e.type === 'start')}
-                            >
-                                <Play size={20} />
-                                Iniciar Jogo
-                            </button>
-                            <button
-                                style={{ ...styles.controlBtn, ...styles.pauseBtn }}
-                                onClick={handleHalfTime}
-                                disabled={!isRunning}
-                            >
-                                <Pause size={20} />
-                                Intervalo
-                            </button>
-                            <button
-                                style={{ ...styles.controlBtn, ...styles.resumeBtn }}
-                                onClick={() => setIsRunning(true)}
-                                disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
-                            >
-                                <Play size={20} />
-                                Retomar
-                            </button>
-                            <button
-                                style={{ 
-                                    ...styles.controlBtn, 
-                                    ...styles.endBtn,
-                                    ...(isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21) ? {
-                                        boxShadow: '0 0 15px var(--danger-color)',
-                                        animation: 'pulse 1.5s infinite'
-                                    } : {})
-                                }}
-                                onClick={handleEndMatch}
-                                disabled={selectedMatch.status === 'finished'}
-                            >
-                                <StopCircle size={20} />
-                                Fim de Jogo
-                            </button>
-                        </div>
+                        <>
+                            <div style={styles.controlButtons} className="match-timeline-control-grid">
+                                <button
+                                    style={{ ...styles.controlBtn, ...styles.startBtn }}
+                                    onClick={handleStartMatch}
+                                    disabled={isRunning || selectedMatch.status === 'finished'}
+                                >
+                                    <Play size={20} />
+                                    Iniciar Jogo
+                                </button>
+                                <button
+                                    style={{ ...styles.controlBtn, ...styles.pauseBtn }}
+                                    onClick={isBasketball ? () => setIsRunning(false) : handleHalfTime}
+                                    disabled={!isRunning}
+                                >
+                                    <Pause size={20} />
+                                    {isBasketball ? 'Pausar Tempo' : 'Intervalo'}
+                                </button>
+                                <button
+                                    style={{ ...styles.controlBtn, ...styles.resumeBtn }}
+                                    onClick={handleStartMatch}
+                                    disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
+                                >
+                                    <Play size={20} />
+                                    Retomar
+                                </button>
+                                <button
+                                    style={{
+                                        ...styles.controlBtn,
+                                        ...styles.endBtn,
+                                        ...(isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21) ? {
+                                            boxShadow: '0 0 15px var(--danger-color)',
+                                            animation: 'pulse 1.5s infinite'
+                                        } : {})
+                                    }}
+                                    onClick={handleEndMatch}
+                                    disabled={selectedMatch.status === 'finished'}
+                                >
+                                    <StopCircle size={20} />
+                                    Fim de Jogo
+                                </button>
+                            </div>
+
+                            {isBasketball && (
+                                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                                        Pausas do Basquete
+                                    </div>
+                                    <div style={{ ...styles.controlButtons, gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))' }}>
+                                        <button
+                                            style={{ ...styles.eventBtn, background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                            onClick={() => setIsRunning(false)}
+                                            disabled={!isRunning}
+                                        >
+                                            Intervalo entre Quartos
+                                        </button>
+                                        <button
+                                            style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                            onClick={() => setIsRunning(false)}
+                                            disabled={!isRunning}
+                                        >
+                                            Tempo {selectedMatch.teamA.name.split(' - ')[0]}
+                                        </button>
+                                        <button
+                                            style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
+                                            onClick={() => setIsRunning(false)}
+                                            disabled={!isRunning}
+                                        >
+                                            Tempo {selectedMatch.teamB.name.split(' - ')[0]}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </>
                     )}
                 </div>
+
+                {isBeachTennis && (
+                    <>
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🎾 Pontuação</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.teamABtn }}
+                                    onClick={() => handleBeachPoint('A')}
+                                >
+                                    <Plus size={20} />
+                                    Ponto {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, ...styles.teamBBtn }}
+                                    onClick={() => handleBeachPoint('B')}
+                                >
+                                    <Plus size={20} />
+                                    Ponto {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🏆 Games</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'var(--accent-color)', borderColor: 'var(--accent-color)' }}
+                                    onClick={() => handleBeachGameWin('A')}
+                                >
+                                    <Trophy size={18} style={{ marginRight: '8px' }} />
+                                    Game {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'var(--accent-color)', borderColor: 'var(--accent-color)' }}
+                                    onClick={() => handleBeachGameWin('B')}
+                                >
+                                    <Trophy size={18} style={{ marginRight: '8px' }} />
+                                    Game {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={styles.eventSection}>
+                            <h3 style={styles.sectionTitle}>🏅 Sets</h3>
+                            <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(16, 185, 129, 0.15)', borderColor: 'var(--success-color)', color: 'var(--success-color)' }}
+                                    onClick={() => handleBeachSetWin('A')}
+                                >
+                                    <Trophy size={18} style={{ marginRight: '8px' }} />
+                                    Set {selectedMatch.teamA.name.split(' - ')[0]}
+                                </button>
+                                <button
+                                    style={{ ...styles.eventBtn, background: 'rgba(16, 185, 129, 0.15)', borderColor: 'var(--success-color)', color: 'var(--success-color)' }}
+                                    onClick={() => handleBeachSetWin('B')}
+                                >
+                                    <Trophy size={18} style={{ marginRight: '8px' }} />
+                                    Set {selectedMatch.teamB.name.split(' - ')[0]}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {!isBeachTennis && !isBasketball && !isSwimming && (
                     <div style={styles.eventSection}>
@@ -1390,7 +1662,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     </div>
                 )}
 
-                {!isBeachTennis && !isVolleyball && !isBasketball && !isSwimming && (
+                {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && (
                     <>
                         <div style={styles.eventSection}>
                             <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
@@ -1665,7 +1937,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                         const newEvent: any = {
                                             id: `evt_${Date.now()}`,
                                             type: 'end',
-                                            minute: currentMinute,
+                                            minute: getCurrentEventMinute(),
                                             description: `Resultado Final: ${eventDescription}`
                                         };
 
@@ -1723,9 +1995,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         {(!selectedMatch.events || selectedMatch.events.length === 0) ? (
                             <p style={styles.noEvents}>Nenhum evento registrado ainda.</p>
                         ) : (
-                            [...selectedMatch.events]
-                                .filter(e => !isBeachTennis || ['start', 'set_win', 'tie_break_start', 'end'].includes(e.type))
-                                .sort((a, b) => (b.minute - a.minute) || (parseInt(b.id.split('_')[1] || '0') - parseInt(a.id.split('_')[1] || '0')))
+                            timelineEvents
                                 .map((event) => {
                                     const isTeamA = event.teamId === selectedMatch.teamA.id;
                                     const isTeamB = event.teamId === selectedMatch.teamB.id;
@@ -1746,7 +2016,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                             <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
                                             <div style={styles.eventContentWrap}>
                                                 <span style={styles.eventText}>{getEventLabel(event)}</span>
-                                                {event.score && (
+                                                {event.timelineScore && (
                                                     <span style={{ 
                                                         fontSize: '12px', 
                                                         color: 'var(--accent-color)', 
@@ -1756,7 +2026,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                                         padding: '2px 6px',
                                                         borderRadius: '4px'
                                                     }}>
-                                                        {event.score}
+                                                        {event.timelineScore}
                                                     </span>
                                                 )}
                                                 <span style={styles.eventMetaTag}>{shortTeamName}</span>
