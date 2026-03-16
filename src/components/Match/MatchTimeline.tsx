@@ -111,6 +111,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return Number.isFinite(parsed) ? parsed : 0;
     };
 
+    const normalizeSex = (value?: string) => (value || '').trim().toLowerCase();
+
+    const athleteMatchesTeamAndMatch = (athlete: typeof athletes[number], team: Match['teamA']) => {
+        if (!selectedMatch) return false;
+
+        const athleteCourse = athlete.course.toLowerCase();
+        const athleteInst = athlete.institution.toLowerCase();
+        const teamCourse = (team.course || '').toLowerCase();
+        const teamFaculty = (team.faculty || '').toLowerCase();
+
+        // Especial para FEFESP / Educação Física
+        const isFefespMatch = (teamCourse.includes('fefesp') || teamCourse.includes('educação física')) &&
+            (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp'));
+
+        // Match normal por curso e faculdade
+        const courseMatch = athleteCourse.includes(teamCourse) || teamCourse.includes(athleteCourse);
+        const facultyMatch = athleteInst.includes(teamFaculty) || teamFaculty.includes(athleteInst);
+
+        const sameTeam = isFefespMatch || (courseMatch && facultyMatch);
+        const sameSport = athlete.sports.includes(selectedMatch.sport);
+        const sameSex = normalizeSex(athlete.sex) === normalizeSex(selectedMatch.category);
+
+        return sameTeam && sameSport && sameSex;
+    };
+
     const getBeachScoreState = (match: Match | null) => {
         const initialState = {
             gamePointsA: 0,
@@ -1897,28 +1922,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             <div style={styles.modalSubtitle}>
                                 {showPlayerInput.team === 'A' ? selectedMatch.teamA.name : selectedMatch.teamB.name}
                             </div>
+                            {(() => {
+                                const team = showPlayerInput.team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+                                const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, team));
+
+                                return (
                             <div style={styles.playerList} className="player-list">
-                                {athletes
-                                    .filter(a => {
-                                        const team = showPlayerInput.team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
-                                        
-                                        const athleteCourse = a.course.toLowerCase();
-                                        const athleteInst = a.institution.toLowerCase();
-                                        const teamCourse = (team.course || '').toLowerCase();
-                                        const teamFaculty = (team.faculty || '').toLowerCase();
-
-                                        // Especial para FEFESP / Educação Física
-                                        const isFefespMatch = (teamCourse.includes('fefesp') || teamCourse.includes('educação física')) && 
-                                                             (athleteCourse.includes('fefesp') || athleteCourse.includes('educação física') || athleteInst.includes('fefesp'));
-
-                                        // Match normal por curso e faculdade
-                                        const courseMatch = athleteCourse.includes(teamCourse) || teamCourse.includes(athleteCourse);
-                                        const facultyMatch = athleteInst.includes(teamFaculty) || teamFaculty.includes(athleteInst);
-
-                                        return (isFefespMatch || (courseMatch && facultyMatch)) &&
-                                               a.sports.includes(selectedMatch.sport);
-                                    })
-                                    .map((athlete) => {
+                                {availableAthletes.map((athlete) => {
                                         const playerName = `${athlete.firstName} ${athlete.lastName}`;
                                         const stats = getPlayerStats(playerName);
                                         return (
@@ -1941,20 +1951,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                             </button>
                                         );
                                     })}
-                                {athletes.filter(a => {
-                                    const team = showPlayerInput.team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
-                                    const athleteCourse = a.course.toLowerCase();
-                                    const athleteInst = a.institution.toLowerCase();
-                                    const teamCourse = (team.course || '').toLowerCase();
-                                    const teamFaculty = (team.faculty || '').toLowerCase();
-                                    return (athleteCourse === teamCourse && athleteInst.includes(teamFaculty)) &&
-                                           a.sports.includes(selectedMatch.sport);
-                                }).length === 0 && (
+                                {availableAthletes.length === 0 && (
                                     <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
-                                        Nenhum atleta encontrado para esta modalidade neste curso.
+                                        Nenhum atleta encontrado para esta modalidade e sexo nesta equipe.
                                     </div>
                                 )}
                             </div>
+                                );
+                            })()}
                             <button
                                 style={{ ...styles.modalBtn, ...styles.cancelBtn, marginTop: '16px' }}
                                 onClick={cancelPlayerInput}

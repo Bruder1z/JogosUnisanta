@@ -18,6 +18,7 @@ export interface Athlete {
     institution: string;
     course: string;
     sports: string[];
+    sex?: 'Masculino' | 'Feminino';
 }
 
 interface DataContextType {
@@ -113,7 +114,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         lastName: a.last_name,
                         institution: a.institution,
                         course: a.course,
-                        sports: a.sports
+                        sports: a.sports,
+                        sex: a.sex
                     })));
                 }
 
@@ -161,7 +163,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             last_name: athlete.lastName,
             institution: athlete.institution,
             course: athlete.course,
-            sports: athlete.sports
+            sports: athlete.sports,
+            sex: athlete.sex
         }]);
     };
 
