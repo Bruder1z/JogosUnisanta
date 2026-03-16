@@ -35,7 +35,7 @@ export interface Athlete {
 
 export interface MatchEvent {
   id: string;
-  type: 'goal' | 'yellow_card' | 'red_card' | 'start' | 'end' | 'set_win' | 'halftime' | 'penalty_scored' | 'penalty_missed' | 'tie_break_start';
+  type: 'goal' | 'yellow_card' | 'red_card' | 'start' | 'end' | 'set_win' | 'halftime' | 'penalty_scored' | 'penalty_missed' | 'shootout_scored' | 'shootout_missed' | 'tie_break_start';
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)

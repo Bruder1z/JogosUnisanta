@@ -77,6 +77,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isBeachTennis = selectedMatch?.sport === 'Beach Tennis';
     const isHandebol = selectedMatch?.sport === 'Handebol';
     const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia';
+    const isFutebolX1 = selectedMatch?.sport === 'Futebol X1';
     const isBasketball = selectedMatch?.sport === 'Basquetebol' || selectedMatch?.sport === 'Basquete 3x3';
     const isTableTennis = selectedMatch?.sport === 'Tênis de Mesa';
     const isSetSport = isVolleyball || isTableTennis;
@@ -98,6 +99,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
     const TIMER_TICK_MS = 1000;
     const TIMER_INCREMENT_SECONDS = 300; // Test mode: 1 second real time = 5 game minutes
+    const X1_TIMER_INCREMENT = 4; // 1 real second = 4 game seconds (60s game / 15s real)
     const BASKETBALL_DECREMENT_SECONDS = 30; // Test mode: basketball countdown 30s per tick
     const formatClock = (totalSeconds: number) => {
         const minutes = Math.floor(totalSeconds / 60);
@@ -190,6 +192,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         return Math.max(0, prev - BASKETBALL_DECREMENT_SECONDS);
                     }
 
+                    if (isFutebolX1) {
+                        return prev + X1_TIMER_INCREMENT;
+                    }
+
                     return prev + TIMER_INCREMENT_SECONDS;
                 });
             }, TIMER_TICK_MS);
@@ -197,7 +203,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isRunning, isBasketball]);
+    }, [isRunning, isBasketball, isFutebolX1]);
+
 
 
     const handleSelectMatch = (match: Match) => {
@@ -224,7 +231,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             const currentYellowCards = existingEvents.filter(e => e.player === player && e.type === 'yellow_card').length;
             if (currentYellowCards >= 1) {
                 const eventBaseTs = Date.now();
-                // Registrar primeiro o cartão amarelo
                 const yellowEvent: MatchEvent = {
                     id: `evt_${eventBaseTs}_yellow`,
                     type: 'yellow_card',
@@ -240,21 +246,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     player,
                     description: 'Cartão Vermelho (2º Amarelo)'
                 };
-                const updatedMatchWithYellow: Match = {
+
+                const updatedEventsWithRed = [...existingEvents, yellowEvent, redEvent];
+
+                // Para X1, o segundo amarelo também encerra a partida
+                let finalStatus = 'live';
+                if (isFutebolX1) {
+                    finalStatus = 'finished';
+                    const opponentTeam = teamId === selectedMatch.teamA.id ? selectedMatch.teamB.name : selectedMatch.teamA.name;
+                    const endEvent: MatchEvent = {
+                        id: `evt_${eventBaseTs + 2}_end`,
+                        type: 'end',
+                        minute: getCurrentEventMinute(),
+                        description: `🟥 Fim de jogo! Atleta expulso. Vitória automática para ${opponentTeam}`
+                    };
+                    updatedEventsWithRed.push(endEvent);
+                }
+
+                const finalMatch: Match = {
                     ...selectedMatch,
-                    events: [...existingEvents, yellowEvent],
-                    status: 'live'
+                    events: updatedEventsWithRed,
+                    status: finalStatus as Match['status']
                 };
 
-                await updateMatch(updatedMatchWithYellow);
-
-                const updatedMatchWithRed: Match = {
-                    ...updatedMatchWithYellow,
-                    events: [...(updatedMatchWithYellow.events || []), redEvent],
-                    status: 'live'
-                };
-
-                await updateMatch(updatedMatchWithRed);
+                await updateMatch(finalMatch);
+                if (finalStatus === 'finished') setIsRunning(false);
                 return;
             }
         }
@@ -281,7 +297,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         // Atualizar pontuação se for gol ou pênalti marcado
         let newScoreA = selectedMatch.scoreA;
         let newScoreB = selectedMatch.scoreB;
-        if (type === 'goal' || type === 'penalty_scored') {
+        let newStatus = type === 'end' ? 'finished' : 'live';
+
+        if (type === 'goal' || type === 'penalty_scored' || type === 'shootout_scored') {
             if (teamId === selectedMatch.teamA.id) {
                 newScoreA += 1;
             } else if (teamId === selectedMatch.teamB.id) {
@@ -289,15 +307,29 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             }
         }
 
+        // Regra de Cartão Vermelho no X1 = Fim de Jogo
+        if (type === 'red_card' && isFutebolX1) {
+            newStatus = 'finished';
+            const opponentTeam = teamId === selectedMatch.teamA.id ? selectedMatch.teamB.name : selectedMatch.teamA.name;
+            const endEvent: MatchEvent = {
+                id: `evt_${Date.now()}_end`,
+                type: 'end',
+                minute: getCurrentEventMinute(),
+                description: `🟥 Fim de jogo! Atleta expulso. Vitória automática para ${opponentTeam}`
+            };
+            updatedEvents.push(endEvent);
+        }
+
         const updatedMatch: Match = {
             ...selectedMatch,
             events: updatedEvents,
             scoreA: newScoreA,
             scoreB: newScoreB,
-            status: type === 'end' ? 'finished' : 'live'
+            status: newStatus as Match['status']
         };
 
         await updateMatch(updatedMatch);
+        if (newStatus === 'finished') setIsRunning(false);
     };
 
     const pushMatchEvent = (newEvent: Omit<MatchEvent, 'id'>) => {
@@ -636,21 +668,71 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             handleBeachPoint(team);
             return;
         }
+        
+        if (isFutebolX1 && selectedMatch) {
+            const teamObj = team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+            const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+            if (availableAthletes.length > 0) {
+                const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
+                const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+                addEvent('goal', teamId, playerName);
+                return;
+            }
+        }
+
         setShowPlayerInput({ type: 'goal', team });
     };
 
     const handleCard = (type: 'yellow_card' | 'red_card', team: 'A' | 'B') => {
+        if (isFutebolX1 && selectedMatch) {
+            const teamObj = team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+            const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+            if (availableAthletes.length > 0) {
+                const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
+                const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+                addEvent(type, teamId, playerName);
+                return;
+            }
+        }
         setShowPlayerInput({ type, team });
     };
 
     const handlePenalty = (type: 'penalty_scored' | 'penalty_missed', team: 'A' | 'B') => {
         if (type === 'penalty_scored') {
+            if (isFutebolX1 && selectedMatch) {
+                const teamObj = team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+                const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+                if (availableAthletes.length > 0) {
+                    const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
+                    const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+                    addEvent(type, teamId, playerName);
+                    return;
+                }
+            }
             setShowPlayerInput({ type, team });
         } else {
             // Pênalti perdido não precisa de seleção de jogador
             const teamId = team === 'A' ? selectedMatch?.teamA.id : selectedMatch?.teamB.id;
             addEvent(type, teamId, 'Pênalti perdido');
         }
+    };
+
+    const handleShootout = (type: 'shootout_scored' | 'shootout_missed', team: 'A' | 'B') => {
+        if (!selectedMatch) return;
+        const teamId = team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        
+        if (isFutebolX1) {
+            const teamObj = team === 'A' ? selectedMatch.teamA : selectedMatch.teamB;
+            const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+            if (availableAthletes.length > 0) {
+                const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
+                addEvent(type, teamId, playerName);
+                return;
+            }
+        }
+        
+        // Em teoria Shootout é só pro X1 agora, mas mantemos o fallback
+        addEvent(type, teamId);
     };
 
     const confirmPlayerEvent = (playerName: string) => {
@@ -700,14 +782,17 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         switch (type) {
             case 'goal': 
                 if (isBasketball) return '🏀';
-                return isVolleyball ? '🏐' : '⚽';
+                if (isVolleyball) return '🏐';
+                return '⚽';
             case 'yellow_card': return '🟨';
             case 'red_card': return '🟥';
             case 'start': return '▶️';
             case 'end': return '🏁';
             case 'halftime': return '⏸️';
-            case 'penalty_scored': return '🎯';
+            case 'penalty_scored': return '⚽';
             case 'penalty_missed': return '❌';
+            case 'shootout_scored': return '⚽';
+            case 'shootout_missed': return '❌';
             case 'set_win': return isBeachTennis ? '🎾☀️' : '•';
             case 'tie_break_start': return '🎾';
             default: return '•';
@@ -770,6 +855,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     label = event.description;
                     break;
                 }
+                if (isFutebolX1) {
+                    const currentScore = (event as TimelineEvent).timelineScore || '0x0';
+                    const athleteInfo = event.player ? `${event.player} (${teamName})` : teamName;
+                    label = `⚽ GOL! Placar no momento: ${currentScore} - ${athleteInfo}`;
+                    break;
+                }
                 label = `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName}`;
                 break;
             case 'yellow_card':
@@ -791,6 +882,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 break;
             case 'penalty_missed':
                 label = `${isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido - ${teamName}`;
+                break;
+            case 'shootout_scored':
+                if (isFutebolX1) {
+                    const currentScore = (event as TimelineEvent).timelineScore || '0x0';
+                    const athleteInfo = event.player ? `${event.player} (${teamName})` : teamName;
+                    label = `⚽ GOL de Shoot-out! Placar no momento: ${currentScore} - ${athleteInfo}`;
+                    break;
+                }
+                label = `GOL de Shoot-out - ${teamName}`;
+                break;
+            case 'shootout_missed':
+                label = `❌ Shoot-out Perdido - ${teamName}`;
                 break;
             case 'set_win':
                 if (isBeachTennis) {
@@ -915,7 +1018,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     };
                 }
 
-                if (event.type === 'goal' || event.type === 'penalty_scored') {
+                if (event.type === 'goal' || event.type === 'penalty_scored' || event.type === 'shootout_scored') {
                     const increment = isBasketball
                         ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
                         : 1;
@@ -1878,6 +1981,40 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 </button>
                             </div>
                         </div>
+
+                        {isFutebolX1 && (
+                            <div style={styles.eventSection}>
+                                <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
+                                <div style={styles.eventButtons} className="match-timeline-event-grid">
+                                    <button
+                                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                                        onClick={() => handleShootout('shootout_scored', 'A')}
+                                    >
+                                        🎯 Shoot-out Marcado {selectedMatch.teamA.name.split(' - ')[0]}
+                                    </button>
+                                    <button
+                                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                                        onClick={() => handleShootout('shootout_scored', 'B')}
+                                    >
+                                        🎯 Shoot-out Marcado {selectedMatch.teamB.name.split(' - ')[0]}
+                                    </button>
+                                </div>
+                                <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
+                                    <button
+                                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                                        onClick={() => handleShootout('shootout_missed', 'A')}
+                                    >
+                                        ❌ Shoot-out Perdido {selectedMatch.teamA.name.split(' - ')[0]}
+                                    </button>
+                                    <button
+                                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                                        onClick={() => handleShootout('shootout_missed', 'B')}
+                                    >
+                                        ❌ Shoot-out Perdido {selectedMatch.teamB.name.split(' - ')[0]}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 

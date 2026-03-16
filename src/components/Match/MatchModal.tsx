@@ -267,20 +267,27 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const getEventIcon = (type: MatchEvent['type']) => {
         const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia';
         const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
+        const isSoccerSport = ['Futsal', 'Futebol Society', 'Futebol X1', 'Futevôlei'].includes(currentMatch.sport);
+        
         switch (type) {
             case 'goal': 
                 if (isBasketball) return <div style={{ fontSize: '16px' }}>🏀</div>;
-                return isVolleyball ? <div style={{ fontSize: '16px' }}>🏐</div> : <Trophy size={16} color="#ffd700" />;
+                if (isSoccerSport) return <div style={{ fontSize: '16px' }}>⚽</div>;
+                if (isVolleyball) return <div style={{ fontSize: '16px' }}>🏐</div>;
+                return <div style={{ fontSize: '16px' }}>⚽</div>;
             case 'set_win': return <Trophy size={16} color="#ffd700" />;
             case 'yellow_card': return <div style={{ width: 12, height: 16, background: '#ffcc00', borderRadius: 2 }} />;
             case 'red_card': return <div style={{ width: 12, height: 16, background: '#ff4444', borderRadius: 2 }} />;
-            case 'penalty_scored': return <div style={{ fontSize: '16px' }}>🎯</div>;
+            case 'penalty_scored': return <div style={{ fontSize: '16px' }}>⚽</div>;
             case 'penalty_missed': return <div style={{ fontSize: '16px' }}>❌</div>;
+            case 'shootout_scored': return <div style={{ fontSize: '16px' }}>⚽</div>;
+            case 'shootout_missed': return <div style={{ fontSize: '16px' }}>❌</div>;
             case 'start': return <Play size={16} color="var(--accent-color)" />;
             case 'halftime': return <Pause size={16} color="#f59e0b" />;
             case 'end': return <CheckCircle size={16} color="#44ff44" />;
             default: return null;
         }
+
     };
 
     const getEventLabel = (type: MatchEvent['type']) => {
@@ -291,6 +298,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             case 'red_card': return 'Cartão Vermelho';
             case 'penalty_scored': return 'Pênalti Marcado';
             case 'penalty_missed': return 'Pênalti Perdido';
+            case 'shootout_scored': return 'GOL de Shoot-out';
+            case 'shootout_missed': return '❌ Shoot-out Perdido';
             case 'start': return 'Início da Partida';
             case 'halftime': return 'Intervalo';
             case 'end': return 'Fim da Partida';
