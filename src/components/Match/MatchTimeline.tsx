@@ -89,10 +89,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const [athleteNames, setAthleteNames] = useState<Record<string, string>>({});
     const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
 
-    const getCurrentEventMinute = () => Math.floor(currentMinute / 60);
+    const getBasketballQuarterDurationSeconds = (match: Match | null) => {
+        if (!match) return 15 * 60;
+        return match.category === 'Feminino' ? 10 * 60 : 15 * 60;
+    };
+
+    const getCurrentEventMinute = () => (isBasketball ? currentMinute : Math.floor(currentMinute / 60));
     const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
     const TIMER_TICK_MS = 1000;
-    const TIMER_INCREMENT_SECONDS = 60; // Test mode: 1 second real time = 1 game minute
+    const TIMER_INCREMENT_SECONDS = 300; // Test mode: 1 second real time = 5 game minutes
+    const BASKETBALL_DECREMENT_SECONDS = 30; // Test mode: basketball countdown 30s per tick
     const formatClock = (totalSeconds: number) => {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
@@ -150,19 +156,36 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         let interval: number | null = null;
         if (isRunning) {
             interval = window.setInterval(() => {
-                setCurrentMinute(prev => prev + TIMER_INCREMENT_SECONDS);
+                setCurrentMinute(prev => {
+                    if (isBasketball) {
+                        if (prev <= 0) {
+                            setIsRunning(false);
+                            return 0;
+                        }
+                        return Math.max(0, prev - BASKETBALL_DECREMENT_SECONDS);
+                    }
+
+                    return prev + TIMER_INCREMENT_SECONDS;
+                });
             }, TIMER_TICK_MS);
         }
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isRunning]);
+    }, [isRunning, isBasketball]);
 
 
     const handleSelectMatch = (match: Match) => {
         setActiveMatchId(match.id);
-        const lastMinute = (match.events || []).reduce((max, event) => Math.max(max, event.minute || 0), 0);
-        setCurrentMinute(lastMinute * 60);
+        if (match.sport === 'Basquetebol' || match.sport === 'Basquete 3x3') {
+            const sortedEvents = [...(match.events || [])].sort(compareTimelineEventsAsc);
+            const lastEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
+            const quarterDurationSeconds = getBasketballQuarterDurationSeconds(match);
+            setCurrentMinute(lastEvent ? (lastEvent.minute || quarterDurationSeconds) : quarterDurationSeconds);
+        } else {
+            const lastMinute = (match.events || []).reduce((max, event) => Math.max(max, event.minute || 0), 0);
+            setCurrentMinute(lastMinute * 60);
+        }
         setIsRunning(match.status === 'live');
     };
 
@@ -214,10 +237,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         let customDescription = undefined;
         if (selectedMatch.sport === 'Futebol Society') {
             const teamName = teamId === selectedMatch.teamA.id ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0];
-            const playerSuffix = player ? ` - ${player}` : '';
-            if (type === 'goal') customDescription = `⚽ GOL para ${teamName}${playerSuffix}`;
-            if (type === 'yellow_card') customDescription = `Cartão para ${teamName}${playerSuffix}`;
-            if (type === 'red_card') customDescription = `Cartão para ${teamName}${playerSuffix}`;
+            if (type === 'goal') customDescription = `⚽ GOL para ${teamName}`;
+            if (type === 'yellow_card') customDescription = `Cartão para ${teamName}`;
+            if (type === 'red_card') customDescription = `Cartão para ${teamName}`;
         }
 
         const newEvent: MatchEvent = {
@@ -485,6 +507,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const handleStartMatch = () => {
         if (!selectedMatch) return;
 
+        if (isBasketball && currentMinute <= 0) {
+            setCurrentMinute(getBasketballQuarterDurationSeconds(selectedMatch));
+        }
+
         const hasStarted = selectedMatch.events?.some(e => e.type === 'start');
         if (!hasStarted) {
             addEvent('start');
@@ -503,7 +529,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         if (!selectedMatch || !isBasketball) return;
         addEvent('halftime');
         setIsRunning(false);
-        setCurrentMinute(0);
+        setCurrentMinute(getBasketballQuarterDurationSeconds(selectedMatch));
     };
 
     const handleEndMatch = () => {
@@ -640,7 +666,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         };
 
         updateMatch(resetMatch);
-        setCurrentMinute(0);
+        setCurrentMinute(isBasketball ? getBasketballQuarterDurationSeconds(selectedMatch) : 0);
         setIsRunning(false);
         setShowResetConfirm(false);
     };
@@ -663,6 +689,40 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
     };
 
+    const getBasketballEventData = (event: TimelineEvent) => {
+        const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
+        const totalSeconds = Math.max(0, event.minute);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const teamName = !selectedMatch
+            ? 'Faculdade'
+            : event.teamId === selectedMatch.teamA.id
+                ? selectedMatch.teamA.name.split(' - ')[0]
+                : event.teamId === selectedMatch.teamB.id
+                    ? selectedMatch.teamB.name.split(' - ')[0]
+                    : 'Faculdade';
+
+        return {
+            tempo: `${minutes}:${String(seconds).padStart(2, '0')}`,
+            pontuacaoLabel: `+${pointValue} ${pointValue > 1 ? 'pontos' : 'ponto'} para ${teamName}`,
+            placar: (event.timelineScore || '0x0').replace('x', '-')
+        };
+    };
+
+    const stripPlayerNameFromLabel = (label: string, event: MatchEvent) => {
+        if (!event.player) return label;
+
+        return label
+            .replace(` - ${event.player}`, '')
+            .replace(`(${event.player})`, '')
+            .replace(new RegExp(`\\s${event.player}$`), '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    };
+
+    const keepScoreTogether = (label: string) =>
+        label.replace(/(\d+)\s*x\s*(\d+)/g, '$1\u00A0x\u00A0$2');
+
     const getEventLabel = (event: MatchEvent) => {
         const teamName = !selectedMatch ? '' : event.teamId === selectedMatch.teamA.id
             ? selectedMatch.teamA.name
@@ -670,48 +730,68 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 ? selectedMatch.teamB.name
                 : '';
 
+        let label = '';
         switch (event.type) {
             case 'goal':
                 if (isBasketball) {
-                    return event.description; // Description now natively contains the score and emoji
+                    label = event.description || '';
+                    break;
                 }
                 if (isVolleyball) {
-                    return event.description || `Ponto - ${teamName}`;
+                    label = event.description || `Ponto - ${teamName}`;
+                    break;
                 }
                 if (event.description) {
-                    return event.description;
+                    label = event.description;
+                    break;
                 }
-                return `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName} ${event.player ? `- ${event.player}` : ''}`;
+                label = `${isHandebol ? 'GOL!' : 'GOL!'} ${teamName}`;
+                break;
             case 'yellow_card':
                 if (event.description) {
-                    return event.description;
+                    label = event.description;
+                    break;
                 }
-                return `Cartão Amarelo - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                label = `Cartão Amarelo - ${teamName}`;
+                break;
             case 'red_card':
                 if (event.description) {
-                    return event.description;
+                    label = event.description;
+                    break;
                 }
-                return `Cartão Vermelho - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                label = `Cartão Vermelho - ${teamName}`;
+                break;
             case 'penalty_scored':
-                return `${isHandebol ? 'TIRO DE 7 METROS' : 'Gol de Pênalti'} - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                label = `${isHandebol ? 'TIRO DE 7 METROS' : 'Gol de Pênalti'} - ${teamName}`;
+                break;
             case 'penalty_missed':
-                return `${isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido - ${teamName} ${event.player ? `(${event.player})` : ''}`;
+                label = `${isHandebol ? 'TIRO DE 7 METROS' : 'Pênalti'} Perdido - ${teamName}`;
+                break;
             case 'set_win':
                 if (isBeachTennis) {
-                    return event.description || `Game para ${teamName}`;
+                    label = event.description || `Game para ${teamName}`;
+                    break;
                 }
-                return `Ponto para ${teamName}`;
+                label = `Ponto para ${teamName}`;
+                break;
             case 'tie_break_start':
-                return 'Início de Tie-break';
+                label = 'Início de Tie-break';
+                break;
             case 'start':
-                return 'Início da partida';
+                label = 'Início da partida';
+                break;
             case 'halftime':
-                return 'Intervalo';
+                label = 'Intervalo';
+                break;
             case 'end':
-                return 'Fim de jogo';
+                label = 'Fim de jogo';
+                break;
             default:
-                return event.description || event.type;
+                label = event.description || event.type;
+                break;
         }
+
+        return keepScoreTogether(stripPlayerNameFromLabel(label, event));
     };
 
     const compareTimelineEventsAsc = (a: MatchEvent, b: MatchEvent) => {
@@ -1476,7 +1556,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                         <button
                                             style={{ ...styles.eventBtn, background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b', color: '#f59e0b' }}
                                             onClick={handleBasketballQuarterBreak}
-                                            disabled={!isRunning}
+                                            disabled={!isRunning && currentMinute > 0}
                                         >
                                             Intervalo entre Quartos
                                         </button>
@@ -2042,6 +2122,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     const isTeamA = event.teamId === selectedMatch.teamA.id;
                                     const isTeamB = event.teamId === selectedMatch.teamB.id;
                                     const isGeneral = !event.teamId;
+                                    const rowJustify = isGeneral ? 'center' : isTeamA ? 'flex-start' : 'flex-end';
+                                    const cardWidth = isGeneral ? '46%' : '48%';
                                     const shortTeamName = isTeamA
                                         ? selectedMatch.teamA.name.split(' - ')[0]
                                         : isTeamB
@@ -2049,29 +2131,63 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                             : 'Jogo';
 
                                     return (
-                                        <div
-                                            key={event.id}
-                                            className={`timeline-item-beauty ${isTeamA ? 'timeline-team-a' : ''} ${isTeamB ? 'timeline-team-b' : ''} ${isGeneral ? 'timeline-neutral' : ''}`}
-                                            style={styles.timelineItem}
-                                        >
-                                            {!isSetSport && <span style={styles.eventTimePill}>{event.minute}'</span>}
-                                            <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
-                                            <div style={styles.eventContentWrap}>
-                                                <span style={styles.eventText}>{getEventLabel(event)}</span>
-                                                {event.timelineScore && !isBasketball && (
-                                                    <span style={{ 
-                                                        fontSize: '12px', 
-                                                        color: 'var(--accent-color)', 
-                                                        marginLeft: '8px', 
-                                                        fontWeight: 700,
-                                                        background: 'rgba(227, 6, 19, 0.1)',
-                                                        padding: '2px 6px',
-                                                        borderRadius: '4px'
-                                                    }}>
-                                                        {event.timelineScore}
-                                                    </span>
+                                        <div key={event.id} className="timeline-row-beauty" style={{ display: 'flex', justifyContent: rowJustify, marginBottom: '6px' }}>
+                                            <div
+                                                className={`timeline-item-beauty ${isTeamA ? 'timeline-team-a' : ''} ${isTeamB ? 'timeline-team-b' : ''} ${isGeneral ? 'timeline-neutral' : ''}`}
+                                                style={{ ...styles.timelineItem, width: cardWidth }}
+                                            >
+                                                {isBasketball && event.type === 'goal' ? (
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: '100%', gap: '6px', alignItems: 'center' }}>
+                                                        {(() => {
+                                                            const data = getBasketballEventData(event);
+                                                            return (
+                                                                <>
+                                                                    {isTeamA ? (
+                                                                        <>
+                                                                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{data.tempo}</span>
+                                                                            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-color)', textAlign: 'center' }}>{data.pontuacaoLabel}</span>
+                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', textAlign: 'right' }}>
+                                                                                <span>{data.placar}</span>
+                                                                                <span style={{ width: '3px', height: '14px', borderRadius: '999px', background: '#3b82f6' }} />
+                                                                            </span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                                                <span style={{ width: '3px', height: '14px', borderRadius: '999px', background: '#ef4444' }} />
+                                                                                <span>{data.placar}</span>
+                                                                            </span>
+                                                                            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-color)', textAlign: 'center' }}>{data.pontuacaoLabel}</span>
+                                                                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right' }}>{data.tempo}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {!isSetSport && <span style={styles.eventTimePill}>{isBasketball ? formatClock(event.minute) : `${event.minute}'`}</span>}
+                                                        <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
+                                                        <div style={{ ...styles.eventContentWrap, textAlign: isTeamB ? 'right' : isGeneral ? 'center' : 'left' }}>
+                                                            <span style={styles.eventText}>{getEventLabel(event)}</span>
+                                                            {event.timelineScore && !isBasketball && (
+                                                                <span style={{ 
+                                                                    fontSize: '12px', 
+                                                                    color: 'var(--accent-color)', 
+                                                                    marginLeft: '8px', 
+                                                                    fontWeight: 700,
+                                                                    background: 'rgba(227, 6, 19, 0.1)',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '4px'
+                                                                }}>
+                                                                    {event.timelineScore}
+                                                                </span>
+                                                            )}
+                                                            <span style={styles.eventMetaTag}>{shortTeamName}</span>
+                                                        </div>
+                                                    </>
                                                 )}
-                                                <span style={styles.eventMetaTag}>{shortTeamName}</span>
                                             </div>
                                         </div>
                                     );
@@ -2126,48 +2242,48 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                     .timeline-list-beauty {
                         position: relative;
-                        padding-left: 6px;
+                        padding-left: 4px;
                     }
 
                     .timeline-list-beauty::before {
                         content: '';
                         position: absolute;
-                        left: 18px;
+                        left: 50%;
                         top: 6px;
                         bottom: 6px;
                         width: 2px;
                         background: linear-gradient(180deg, rgba(227, 6, 19, 0.55), rgba(227, 6, 19, 0.1));
+                        transform: translateX(-50%);
                     }
 
                     .timeline-item-beauty {
                         position: relative;
-                        margin-left: 10px;
-                        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+                        margin-left: 0;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
                     }
 
                     .timeline-item-beauty::before {
-                        content: '';
-                        position: absolute;
-                        left: -20px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        width: 10px;
-                        height: 10px;
-                        border-radius: 999px;
-                        border: 2px solid var(--accent-color);
-                        background: var(--bg-main);
+                        display: none;
                     }
 
                     .timeline-team-a {
-                        border-left: 3px solid #3b82f6 !important;
+                        border-left: none !important;
+                    }
+
+                    .timeline-team-a::before {
+                        display: none;
                     }
 
                     .timeline-team-b {
-                        border-left: 3px solid #ef4444 !important;
+                        border-left: none !important;
                     }
 
                     .timeline-neutral {
-                        border-left: 3px solid var(--accent-color) !important;
+                        border-left: none !important;
+                    }
+
+                    .timeline-neutral::before {
+                        display: none;
                     }
 
                     @media (max-width: 768px) {
@@ -2234,11 +2350,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         }
 
                         .timeline-item-beauty {
-                            margin-left: 8px;
+                            width: 94% !important;
                         }
 
                         .timeline-list-beauty::before {
-                            left: 16px;
+                            left: 50%;
                         }
                     }
 
@@ -2270,7 +2386,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         }
 
                         .timeline-item-beauty {
-                            margin-left: 4px;
+                            width: 96% !important;
                         }
 
                         .timeline-item-beauty::before {
@@ -2278,7 +2394,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         }
 
                         .timeline-list-beauty::before {
-                            left: 12px;
+                            left: 50%;
                         }
                     }
                 `}</style>
@@ -2666,13 +2782,13 @@ const styles: Record<string, React.CSSProperties> = {
     timelineList: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '8px',
     },
     timelineItem: {
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        padding: '12px 14px',
+        gap: '8px',
+        padding: '8px 10px',
         backgroundColor: 'var(--bg-main)',
         borderRadius: 'var(--border-radius)',
         border: '1px solid var(--border-color)',

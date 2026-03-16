@@ -298,6 +298,37 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         }
     };
 
+    const getSafeEventDescription = (event: MatchEvent) => {
+        const baseLabel = event.description ? event.description : getEventLabel(event.type);
+        const keepScoreTogether = (text: string) => text.replace(/(\d+)\s*x\s*(\d+)/g, '$1\u00A0x\u00A0$2');
+        if (!event.player) return keepScoreTogether(baseLabel);
+
+        return keepScoreTogether(baseLabel
+            .replace(` - ${event.player}`, '')
+            .replace(`(${event.player})`, '')
+            .replace(new RegExp(`\\s${event.player}$`), '')
+            .replace(/\s{2,}/g, ' ')
+            .trim());
+    };
+
+    const getBasketballEventData = (event: TimelineEvent) => {
+        const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
+        const totalSeconds = Math.max(0, event.minute);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const teamName = event.teamId === currentMatch.teamA.id
+            ? currentMatch.teamA.name.split(' - ')[0]
+            : event.teamId === currentMatch.teamB.id
+                ? currentMatch.teamB.name.split(' - ')[0]
+                : 'Faculdade';
+
+        return {
+            tempo: `${minutes}:${String(seconds).padStart(2, '0')}`,
+            pontuacaoLabel: `+${pointValue} ${pointValue > 1 ? 'pontos' : 'ponto'} para ${teamName}`,
+            placar: (event.timelineScore || '0x0').replace('x', '-')
+        };
+    };
+
     const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
         const timestampA = getEventTimestamp(a.id);
         const timestampB = getEventTimestamp(b.id);
@@ -727,68 +758,103 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                         {/* Vertical Line */}
                                         <div style={{
                                             position: 'absolute',
-                                            left: '9px',
+                                            left: '50%',
                                             top: '10px',
                                             bottom: '10px',
                                             width: '2px',
-                                            background: 'var(--border-color)'
+                                            background: 'var(--border-color)',
+                                            transform: 'translateX(-50%)'
                                         }} />
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                             {timelineEvents.map((event) => {
                                                 const isTeamA = event.teamId === currentMatch.teamA.id;
+                                                const isTeamB = event.teamId === currentMatch.teamB.id;
+                                                const isGeneral = !event.teamId;
+                                                const rowJustify = isGeneral ? 'center' : isTeamA ? 'flex-start' : 'flex-end';
+                                                const cardWidth = isGeneral ? '56%' : '48%';
                                                 return (
-                                                    <div key={event.id} style={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1, marginBottom: '25px' }}>
+                                                    <div key={event.id} style={{ display: 'flex', justifyContent: rowJustify, position: 'relative', zIndex: 1 }}>
                                                         <div style={{
-                                                            width: '20px',
-                                                            height: '20px',
-                                                            borderRadius: '50%',
-                                                            background: 'var(--bg-hover)',
-                                                            border: '2px solid var(--border-color)',
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            marginRight: '20px',
-                                                            zIndex: 2
+                                                            position: 'relative',
+                                                            marginBottom: '6px',
+                                                            width: cardWidth,
+                                                            padding: '8px 10px',
+                                                            borderRadius: '10px',
+                                                            background: 'var(--bg-main)',
+                                                            border: '1px solid var(--border-color)',
+                                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
                                                         }}>
-                                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-color)' }} />
-                                                        </div>
-
-                                                        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                {getEventIcon(event.type)}
-                                                                <div>
-                                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                        {event.description ? event.description : getEventLabel(event.type)}
+                                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                {isBasketball && event.type === 'goal' ? (
+                                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: '100%', gap: '6px', alignItems: 'center' }}>
+                                                                        {(() => {
+                                                                            const data = getBasketballEventData(event);
+                                                                            return (
+                                                                                <>
+                                                                                    {isTeamA ? (
+                                                                                        <>
+                                                                                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{data.tempo}</span>
+                                                                                            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-color)', textAlign: 'center' }}>{data.pontuacaoLabel}</span>
+                                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', textAlign: 'right' }}>
+                                                                                                <span>{data.placar}</span>
+                                                                                                <span style={{ width: '3px', height: '14px', borderRadius: '999px', background: '#3b82f6' }} />
+                                                                                            </span>
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                                                                <span style={{ width: '3px', height: '14px', borderRadius: '999px', background: '#ef4444' }} />
+                                                                                                <span>{data.placar}</span>
+                                                                                            </span>
+                                                                                            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-color)', textAlign: 'center' }}>{data.pontuacaoLabel}</span>
+                                                                                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right' }}>{data.tempo}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </>
+                                                                            );
+                                                                        })()}
                                                                     </div>
-                                                                    {event.timelineScore && event.type !== 'end' && event.type !== 'start' && !isBasketball && (
-                                                                        <div style={{
-                                                                            fontSize: '12px',
+                                                                ) : (
+                                                                    <>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: isTeamB ? 'right' : isGeneral ? 'center' : 'left' }}>
+                                                                            {getEventIcon(event.type)}
+                                                                            <div>
+                                                                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                    {getSafeEventDescription(event)}
+                                                                                </div>
+                                                                                {event.timelineScore && event.type !== 'end' && event.type !== 'start' && !isBasketball && (
+                                                                                    <div style={{
+                                                                                        fontSize: '12px',
+                                                                                        color: 'var(--accent-color)',
+                                                                                        fontWeight: 700,
+                                                                                        marginTop: '4px'
+                                                                                    }}>
+                                                                                        Placar no momento: {event.timelineScore}
+                                                                                    </div>
+                                                                                )}
+                                                                                {event.teamId && !event.description && (
+                                                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                                                        {event.teamId && (isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0])}
+                                                                                        {event.type === 'set_win' ? ' venceu o set' : ''}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            fontWeight: 700, 
                                                                             color: 'var(--accent-color)',
-                                                                            fontWeight: 700,
-                                                                            marginTop: '4px'
+                                                                            marginLeft: '12px',
+                                                                            minWidth: '40px',
+                                                                            textAlign: 'right'
                                                                         }}>
-                                                                            Placar no momento: {event.timelineScore}
+                                                                            {isBasketball ? `${Math.floor(event.minute / 60)}:${String(event.minute % 60).padStart(2, '0')}` : `${event.minute}'`}
                                                                         </div>
-                                                                    )}
-                                                                    {(event.player || event.teamId) && !event.description && (
-                                                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                                            {event.player && event.player !== 'Pênalti perdido' ? `${event.player} - ` : ''}
-                                                                            {event.teamId && (isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0])}
-                                                                            {event.type === 'set_win' ? ' venceu o set' : ''}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <div style={{ 
-                                                                fontSize: '14px', 
-                                                                fontWeight: 700, 
-                                                                color: 'var(--accent-color)',
-                                                                marginLeft: '12px',
-                                                                minWidth: '40px',
-                                                                textAlign: 'right'
-                                                            }}>
-                                                                {event.minute}'
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
