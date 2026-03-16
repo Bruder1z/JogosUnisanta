@@ -110,7 +110,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     const isBeachTennis = currentMatch.sport === 'Beach Tennis';
     const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport);
+    const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
     const isResultBreakdownSport = isSetSport || isBeachTennis;
+
+    type TimelineEvent = MatchEvent & { timelineScore: string; timelineQuarter?: string };
 
     const getEventTimestamp = (eventId: string) => {
         const raw = eventId.split('_')[1] || eventId;
@@ -296,6 +299,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     };
 
     const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
+        const timestampA = getEventTimestamp(a.id);
+        const timestampB = getEventTimestamp(b.id);
+
+        if (timestampA !== 0 || timestampB !== 0) {
+            const timestampDiff = timestampA - timestampB;
+            if (timestampDiff !== 0) return timestampDiff;
+        }
+
         const minuteDiff = a.minute - b.minute;
         if (minuteDiff !== 0) return minuteDiff;
         return getEventTimestamp(a.id) - getEventTimestamp(b.id);
@@ -314,10 +325,12 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         let beachGamesB = 0;
         let beachPointsA = 0;
         let beachPointsB = 0;
+        let basketballQuarter = 1;
 
         return [...events]
             .sort(compareEventsAsc)
             .map((event) => {
+            const timelineQuarter = isBasketball ? `Q${basketballQuarter}` : undefined;
                 if (isBeachTennis) {
                     if (event.type === 'goal') {
                         if (event.teamId === currentMatch.teamA.id) beachPointsA += 1;
@@ -342,7 +355,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
                     return {
                         ...event,
-                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`
+                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
+                        timelineQuarter
                     };
                 }
 
@@ -361,7 +375,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
                     return {
                         ...event,
-                        timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`
+                        timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`,
+                        timelineQuarter
                     };
                 }
 
@@ -374,12 +389,32 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                     if (event.teamId === currentMatch.teamB.id) regularScoreB += increment;
                 }
 
+                const mappedEvent: TimelineEvent = {
+                    ...event,
+                    timelineScore: `${regularScoreA}x${regularScoreB}`,
+                    timelineQuarter
+                };
+
+                if (isBasketball && event.type === 'halftime') {
+                    basketballQuarter += 1;
+                }
+
+                return mappedEvent;
+            })
+            .reverse()
+            .map((event) => {
+                if (!isBasketball) return event;
+
+                const descriptionHasQuarter = event.description?.includes('[Q');
+                if (event.type !== 'goal' || !event.description || descriptionHasQuarter || !event.timelineQuarter) {
+                    return event;
+                }
+
                 return {
                     ...event,
-                    timelineScore: `${regularScoreA}x${regularScoreB}`
+                    description: `[${event.timelineQuarter}] ${event.description}`
                 };
-            })
-            .reverse();
+            });
     };
 
     const simulateMatch = () => {
@@ -726,7 +761,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                     <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                         {event.description ? event.description : getEventLabel(event.type)}
                                                                     </div>
-                                                                    {event.timelineScore && event.type !== 'end' && event.type !== 'start' && (
+                                                                    {event.timelineScore && event.type !== 'end' && event.type !== 'start' && !isBasketball && (
                                                                         <div style={{
                                                                             fontSize: '12px',
                                                                             color: 'var(--accent-color)',
