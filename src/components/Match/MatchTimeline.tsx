@@ -64,7 +64,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [newMatchForm, setNewMatchForm] = useState({
     teamA: "",
     teamB: "",
-    swimmingTeams: Array(10).fill(""),
+    swimmingTeams: Array(8).fill(""),
     sport: "",
     category: "Masculino" as "Masculino" | "Feminino",
     date: new Date().toISOString().split("T")[0],
@@ -1480,7 +1480,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const storedSwimmingParticipants = getStoredSwimmingParticipants();
   const swimmingEntries = isSwimming ? getSwimmingEntries() : [];
-  const maxSwimmingRank = Math.max(10, swimmingEntries.length);
+  const maxSwimmingRank = swimmingEntries.length > 0 ? swimmingEntries.length : 8;
 
   const handleSaveNewMatch = () => {
     const isSwimming = newMatchForm.sport === "Natação";
@@ -2092,12 +2092,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   </label>
                   <select
                     value={newMatchForm.sport}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const selectedSport = e.target.value;
                       setNewMatchForm({
                         ...newMatchForm,
-                        sport: e.target.value,
-                      })
-                    }
+                        sport: selectedSport,
+                        ...(selectedSport === "Natação" ? { location: "Piscina Olimpica" } : {})
+                      });
+                    }}
                     style={{
                       width: "100%",
                       padding: "14px",
@@ -2133,7 +2135,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         color: "#888",
                       }}
                     >
-                      Cursos Participantes (Até 10) *
+                      Cursos Participantes (Até 8) *
                     </label>
                     <div
                       style={{
@@ -3591,12 +3593,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         ))}
                       </select>
                     </div>
-                    <input
-                      placeholder="Atleta da equipe"
+                    <select
                       value={
                         athleteNames[entry.id] !== undefined
                           ? athleteNames[entry.id]
-                          : entry.defaultName
+                          : entry.defaultName || ""
                       }
                       onChange={(e) =>
                         setAthleteNames((prev) => ({
@@ -3613,7 +3614,19 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         fontSize: "13px",
                         width: "100%",
                       }}
-                    />
+                    >
+                      <option value="">Selecione o atleta...</option>
+                      {athletes
+                        .filter((a) => athleteMatchesTeamAndMatch(a, entry.participant))
+                        .map((a, idx) => {
+                          const fullName = `${a.firstName} ${a.lastName}`;
+                          return (
+                            <option key={idx} value={fullName}>
+                              {fullName}
+                            </option>
+                          );
+                        })}
+                    </select>
                     <input
                       placeholder="Tempo (ex: 00:58.32)"
                       value={swimmingTimes[entry.id] || ""}
