@@ -1,7 +1,6 @@
 import { type FC, useState, useEffect } from 'react';
 import { X, Clock, MapPin, Trophy, Play, CheckCircle, Pause } from 'lucide-react';
 import { type Match, type MatchEvent, COURSE_EMBLEMS } from '../../data/mockData';
-import { useAuth } from '../../context/AuthContext';
 import { useData } from '../context/DataContext';
 
 interface MatchModalProps {
@@ -10,8 +9,7 @@ interface MatchModalProps {
 }
 
 const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
-    const { user } = useAuth();
-    const { matches: allMatches, courses } = useData();
+    const { matches: allMatches } = useData();
     const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
 
     // Sync state if initialMatch changes in context
@@ -19,15 +17,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         const liveMatch = allMatches.find(m => m.id === initialMatch.id);
         if (liveMatch) setCurrentMatch(liveMatch);
     }, [allMatches, initialMatch.id]);
-    const [votedFor, setVotedFor] = useState<string | null>(null);
-
-    // Deterministic random helper
-    const pseudoRandom = (seed: string) => {
-        let h = 0;
-        for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
-        return Math.abs(h) / 2147483648;
-    };
-
     const normalizeText = (value?: string) => (value || '').trim().toLowerCase();
 
     const teamIdentityMatches = (teamRef: Match['teamA'], teamCandidate: Match['teamA']) => {
@@ -217,15 +206,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     })();
 
     const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
-
-    const seedVotesStr = currentMatch.id + "votes";
-    const baseVotesA = Math.floor(pseudoRandom(seedVotesStr + "A") * 200) + 50;
-    const baseVotesB = Math.floor(pseudoRandom(seedVotesStr + "B") * 200) + 50;
-    const votesA = baseVotesA + (votedFor === currentMatch.teamA.id ? 1 : 0);
-    const votesB = baseVotesB + (votedFor === currentMatch.teamB.id ? 1 : 0);
-    const totalVotes = votesA + votesB;
-    const percentA = Math.round((votesA / totalVotes) * 100);
-    const percentB = Math.round((votesB / totalVotes) * 100);
 
     const getTeamEmblem = (team: any) => {
         if (team.logo) return team.logo;
@@ -512,34 +492,35 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             });
     };
 
-    const simulateMatch = () => {
-        const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport.includes('Vôlei');
-        const scoreA = isVolleyball ? 2 : Math.floor(Math.random() * 5);
-        const scoreB = isVolleyball ? (Math.random() > 0.5 ? 1 : 0) : Math.floor(Math.random() * 5);
-
-        const newEvents: MatchEvent[] = [{ id: `start-${Date.now()}`, type: 'start', minute: 0 }];
-
-        let currentMin = 5;
-        for (let i = 0; i < scoreA; i++) {
-            currentMin += Math.floor(Math.random() * 10) + 1;
-            newEvents.push({ id: `goalA-${i}`, type: isVolleyball ? 'set_win' : 'goal', minute: currentMin, teamId: currentMatch.teamA.id, player: `Jogador ${i + 1} A` });
-        }
-        currentMin = 5;
-        for (let i = 0; i < scoreB; i++) {
-            currentMin += Math.floor(Math.random() * 10) + 1;
-            newEvents.push({ id: `goalB-${i}`, type: isVolleyball ? 'set_win' : 'goal', minute: currentMin, teamId: currentMatch.teamB.id, player: `Jogador ${i + 1} B` });
-        }
-
-        newEvents.push({ id: `end-${Date.now()}`, type: 'end', minute: 90 });
-
-        setCurrentMatch(prev => ({
-            ...prev,
-            status: 'finished',
-            scoreA,
-            scoreB,
-            events: newEvents
-        }));
-    };
+            // Codigo mantido em comentario conforme solicitado pelo usuario.
+            // const simulateMatch = () => {
+            //     const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport.includes('Vôlei');
+            //     const scoreA = isVolleyball ? 2 : Math.floor(Math.random() * 5);
+            //     const scoreB = isVolleyball ? (Math.random() > 0.5 ? 1 : 0) : Math.floor(Math.random() * 5);
+            //
+            //     const newEvents: MatchEvent[] = [{ id: `start-${Date.now()}`, type: 'start', minute: 0 }];
+            //
+            //     let currentMin = 5;
+            //     for (let i = 0; i < scoreA; i++) {
+            //         currentMin += Math.floor(Math.random() * 10) + 1;
+            //         newEvents.push({ id: `goalA-${i}`, type: isVolleyball ? 'set_win' : 'goal', minute: currentMin, teamId: currentMatch.teamA.id, player: `Jogador ${i + 1} A` });
+            //     }
+            //     currentMin = 5;
+            //     for (let i = 0; i < scoreB; i++) {
+            //         currentMin += Math.floor(Math.random() * 10) + 1;
+            //         newEvents.push({ id: `goalB-${i}`, type: isVolleyball ? 'set_win' : 'goal', minute: currentMin, teamId: currentMatch.teamB.id, player: `Jogador ${i + 1} B` });
+            //     }
+            //
+            //     newEvents.push({ id: `end-${Date.now()}`, type: 'end', minute: 90 });
+            //
+            //     setCurrentMatch(prev => ({
+            //         ...prev,
+            //         status: 'finished',
+            //         scoreA,
+            //         scoreB,
+            //         events: newEvents
+            //     }));
+            // };
 
     return (
         <div style={{
@@ -666,6 +647,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         </div>
                     </div>
 
+                    {/*
                     {currentMatch.status === 'scheduled' && (
                         <div style={{ marginTop: '20px', textAlign: 'center', background: 'var(--bg-card)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                             <h4 style={{ marginBottom: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>Quem vai vencer?</h4>
@@ -720,7 +702,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                 </div>
                             )}
 
-                            {/* Simulate Button (Admin or any for testing) */}
                             <div style={{ marginTop: '20px' }}>
                                 <button
                                     onClick={simulateMatch}
@@ -749,6 +730,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                             )}
                         </div>
                     )}
+                    */}
 
 
                 </div>
