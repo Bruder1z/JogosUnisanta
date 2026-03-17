@@ -28,88 +28,95 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return Math.abs(h) / 2147483648;
     };
 
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase();
+
+    const teamIdentityMatches = (teamRef: Match['teamA'], teamCandidate: Match['teamA']) => {
+        if (teamRef.id && teamCandidate.id && teamRef.id === teamCandidate.id) return true;
+
+        const refCourse = normalizeText(teamRef.course);
+        const candCourse = normalizeText(teamCandidate.course);
+        const refFaculty = normalizeText(teamRef.faculty);
+        const candFaculty = normalizeText(teamCandidate.faculty);
+        const refName = normalizeText(teamRef.name);
+        const candName = normalizeText(teamCandidate.name);
+
+        if (refCourse && candCourse && refCourse === candCourse) {
+            if (!refFaculty || !candFaculty) return true;
+            return refFaculty === candFaculty;
+        }
+
+        if (refName && candName && refName === candName) {
+            if (!refFaculty || !candFaculty) return true;
+            return refFaculty === candFaculty;
+        }
+
+        return false;
+    };
+
+    const matchHasTeam = (m: Match, teamRef: Match['teamA']) =>
+        teamIdentityMatches(teamRef, m.teamA) || teamIdentityMatches(teamRef, m.teamB);
+
     // H2H and Form Logic
-    const h2hMatches = allMatches.filter((m: Match) =>
-        m.status === 'finished' && m.id !== currentMatch.id && m.sport === currentMatch.sport &&
-        ((m.teamA.id === currentMatch.teamA.id && m.teamB.id === currentMatch.teamB.id) ||
-            (m.teamA.id === currentMatch.teamB.id && m.teamB.id === currentMatch.teamA.id))
-    );
+    const h2hMatches = allMatches.filter((m: Match) => {
+        if (m.status !== 'finished' || m.id === currentMatch.id) return false;
+        if (m.sport !== currentMatch.sport || m.category !== currentMatch.category) return false;
+
+        const hasTeamA = matchHasTeam(m, currentMatch.teamA);
+        const hasTeamB = matchHasTeam(m, currentMatch.teamB);
+        return hasTeamA && hasTeamB;
+    });
 
     let teamAWins = 0;
     let teamBWins = 0;
     let draws = 0;
 
-    if (h2hMatches.length > 0) {
-        h2hMatches.forEach((m: Match) => {
-            const isTeamAHome = m.teamA.id === currentMatch.teamA.id;
-            if (m.scoreA > m.scoreB) {
-                if (isTeamAHome) teamAWins++; else teamBWins++;
-            } else if (m.scoreB > m.scoreA) {
-                if (isTeamAHome) teamBWins++; else teamAWins++;
-            } else {
-                draws++;
-            }
-        });
-    } else {
-        // Generate mock H2H
-        const seedStr = currentMatch.teamA.id < currentMatch.teamB.id ? currentMatch.teamA.id + currentMatch.teamB.id : currentMatch.teamB.id + currentMatch.teamA.id;
-        const totalMockGames = Math.floor(pseudoRandom(seedStr + "total") * 10);
-        for (let i = 0; i < totalMockGames; i++) {
-            const rand = pseudoRandom(seedStr + i);
-            if (rand < 0.4) teamAWins++;
-            else if (rand < 0.8) teamBWins++;
-            else draws++;
-        }
-    }
+    h2hMatches.forEach((m: Match) => {
+        const isCurrentTeamAInSlotA = teamIdentityMatches(currentMatch.teamA, m.teamA);
+        const isCurrentTeamAInSlotB = teamIdentityMatches(currentMatch.teamA, m.teamB);
 
-    const getTeamForm = (teamId: string, sport: string) => {
+        if (!isCurrentTeamAInSlotA && !isCurrentTeamAInSlotB) return;
+
+        const myScore = isCurrentTeamAInSlotA ? m.scoreA : m.scoreB;
+        const oppScore = isCurrentTeamAInSlotA ? m.scoreB : m.scoreA;
+
+        if (myScore > oppScore) teamAWins++;
+        else if (myScore < oppScore) teamBWins++;
+        else draws++;
+    });
+
+    const getTeamForm = (teamRef: Match['teamA'], sport: string) => {
         const teamMatches = allMatches.filter((m: Match) =>
-            m.status === 'finished' && m.id !== currentMatch.id && m.sport === sport &&
-            (m.teamA.id === teamId || m.teamB.id === teamId)
-        ).sort((a: Match, b: Match) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+            m.status === 'finished' &&
+            m.id !== currentMatch.id &&
+            m.sport === sport &&
+            m.category === currentMatch.category &&
+            matchHasTeam(m, teamRef)
+        ).sort((a: Match, b: Match) => {
+            const dateA = new Date(`${a.date}T${a.time || '00:00'}`).getTime();
+            const dateB = new Date(`${b.date}T${b.time || '00:00'}`).getTime();
+            return dateB - dateA;
+        }).slice(0, 5);
 
-        if (teamMatches.length > 0) {
-            return teamMatches.map((m: Match) => {
-                const isHome = m.teamA.id === teamId;
-                const opponent = isHome ? m.teamB : m.teamA;
-                const myScore = isHome ? m.scoreA : m.scoreB;
-                const oppScore = isHome ? m.scoreB : m.scoreA;
+        return teamMatches.map((m: Match) => {
+            const isSlotA = teamIdentityMatches(teamRef, m.teamA);
+            const opponent = isSlotA ? m.teamB : m.teamA;
+            const myScore = isSlotA ? m.scoreA : m.scoreB;
+            const oppScore = isSlotA ? m.scoreB : m.scoreA;
 
-                let result: 'win' | 'loss' | 'draw' = 'draw';
-                if (myScore > oppScore) result = 'win';
-                if (myScore < oppScore) result = 'loss';
+            let result: 'win' | 'loss' | 'draw' = 'draw';
+            if (myScore > oppScore) result = 'win';
+            if (myScore < oppScore) result = 'loss';
 
-                return { opponent, myScore, oppScore, result };
-            });
-        } else {
-            // Generate mock Form using courses list instead of mockTeams
-            const mockedForm = [];
-            for (let i = 0; i < 5; i++) {
-                const randCourseIdx = Math.floor(pseudoRandom(teamId + "opp" + i) * courses.length);
-                const opponentName = courses[randCourseIdx] || 'Time Desconhecido';
-                const [name, faculty] = opponentName.split(' - ');
-                const opponent = { id: 'opp' + i, name: opponentName, course: name, faculty: faculty };
-                const r = pseudoRandom(teamId + "res" + i);
-                let result: 'win' | 'loss' | 'draw' = 'draw';
-                if (r < 0.45) result = 'win';
-                else if (r < 0.9) result = 'loss';
-
-                let myScore = 0, oppScore = 0;
-                if (result === 'win') { myScore = Math.floor(pseudoRandom(teamId + "s1" + i) * 4) + 1; oppScore = Math.floor(pseudoRandom(teamId + "s2" + i) * myScore); }
-                else if (result === 'loss') { oppScore = Math.floor(pseudoRandom(teamId + "s1" + i) * 4) + 1; myScore = Math.floor(pseudoRandom(teamId + "s2" + i) * oppScore); }
-                else { myScore = Math.floor(pseudoRandom(teamId + "s1" + i) * 3); oppScore = myScore; }
-
-                mockedForm.push({ opponent, myScore, oppScore, result });
-            }
-            return mockedForm;
-        }
+            return { opponent, myScore, oppScore, result };
+        });
     };
 
-    const teamAForm = getTeamForm(currentMatch.teamA.id, currentMatch.sport);
-    const teamBForm = getTeamForm(currentMatch.teamB.id, currentMatch.sport);
+    const teamAForm = getTeamForm(currentMatch.teamA, currentMatch.sport);
+    const teamBForm = getTeamForm(currentMatch.teamB, currentMatch.sport);
 
     const isBeachTennis = currentMatch.sport === 'Beach Tennis';
     const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(currentMatch.sport);
+    const isVolleyballFamilySport = ['Vôlei', 'Vôlei de Praia', 'Futevôlei'].includes(currentMatch.sport);
     const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
     const hideTimelineMinute = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei', 'Beach Tennis'].includes(currentMatch.sport);
     const isResultBreakdownSport = isSetSport || isBeachTennis;
@@ -294,7 +301,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     const getEventLabel = (type: MatchEvent['type']) => {
         switch (type) {
-            case 'goal': return 'GOL!';
+            case 'goal': return isVolleyballFamilySport ? 'PONTO!' : 'GOL!';
             case 'set_win': return 'Fim do Set';
             case 'yellow_card': return 'Cartão Amarelo';
             case 'red_card': return 'Cartão Vermelho';
@@ -340,7 +347,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 : 'Jogo';
 
         if (event.type === 'goal') {
-            if (isBeachTennis) {
+            if (isBeachTennis || isVolleyballFamilySport) {
                 return `Ponto para ${teamName}`;
             }
             return event.player ? `GOL! ${event.player}` : `GOL! ${teamName}`;

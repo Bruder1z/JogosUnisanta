@@ -491,7 +491,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         updateMatch(updatedMatch);
     };
 
-    const handleVolleyPoint = (team: 'A' | 'B', actionType: 'Ponto' | 'ACE Marcado') => {
+    const handleVolleyPoint = (team: 'A' | 'B') => {
         if (!selectedMatch || selectedMatch.status === 'finished') return;
 
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
@@ -511,12 +511,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const nextA = scoringTeam === 'A' ? currentA + 1 : currentA;
         const nextB = scoringTeam === 'B' ? currentB + 1 : currentB;
 
-        let description: string = actionType;
-           if (actionType === 'ACE Marcado') {
-             description = `ACE Marcado por ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
-        } else {
-             description = `Ponto para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
-        }
+           const description = `Ponto para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
 
         // Calculate current set points for the snapshot
         const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find(e => e.type === 'set_win');
@@ -1623,6 +1618,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 </div>
                             ) : (
                                 <div style={styles.timeDisplay} className="match-timeline-time-display">
+                                    {selectedMatch.status === 'live' && (
+                                        <span style={styles.liveBadge} className="pulse-animation">
+                                            AO VIVO
+                                        </span>
+                                    )}
                                     {isBeachTennis ? (
                                         <>
                                             <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -1845,14 +1845,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         <div style={styles.eventButtons} className="match-timeline-event-grid">
                             <button
                                 style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                                onClick={() => isSetSport ? handleVolleyPoint('A', 'Ponto') : handleGoal('A')}
+                                    onClick={() => isSetSport ? handleVolleyPoint('A') : handleGoal('A')}
                             >
                                 <Plus size={20} />
                                 {isSetSport ? 'Ponto' : 'Gol'} {selectedMatch.teamA.name.split(' - ')[0]}
                             </button>
                             <button
                                 style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                                onClick={() => isSetSport ? handleVolleyPoint('B', 'Ponto') : handleGoal('B')}
+                                    onClick={() => isSetSport ? handleVolleyPoint('B') : handleGoal('B')}
                             >
                                 <Plus size={20} />
                                 {isSetSport ? 'Ponto' : 'Gol'} {selectedMatch.teamB.name.split(' - ')[0]}
@@ -1878,26 +1878,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             >
                                 <Trophy size={18} style={{ marginRight: '8px' }} />
                                 Set Ganho {selectedMatch.teamB.name.split(' - ')[0]}
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {isVolleyball && (
-                    <div style={styles.eventSection}>
-                        <h3 style={styles.sectionTitle}>🏐 Saque</h3>
-                        <div style={styles.eventButtons} className="match-timeline-event-grid">
-                            <button
-                                style={{ ...styles.eventBtn, background: 'var(--success-color)', borderColor: 'var(--success-color)' }}
-                                onClick={() => handleVolleyPoint('A', 'ACE Marcado')}
-                            >
-                                ACE Marcado {selectedMatch.teamA.name.split(' - ')[0]}
-                            </button>
-                            <button
-                                style={{ ...styles.eventBtn, background: 'var(--success-color)', borderColor: 'var(--success-color)' }}
-                                onClick={() => handleVolleyPoint('B', 'ACE Marcado')}
-                            >
-                                ACE Marcado {selectedMatch.teamB.name.split(' - ')[0]}
                             </button>
                         </div>
                     </div>
