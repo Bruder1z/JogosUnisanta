@@ -78,6 +78,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isHandebol = selectedMatch?.sport === 'Handebol';
     const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia' || selectedMatch?.sport === 'Futevôlei';
     const isFutebolX1 = selectedMatch?.sport === 'Futebol X1';
+    const isFutsal = selectedMatch?.sport === 'Futsal';
+    const isFutebolSociety = selectedMatch?.sport === 'Futebol Society';
     const isBasketball = selectedMatch?.sport === 'Basquetebol' || selectedMatch?.sport === 'Basquete 3x3';
     const isTableTennis = selectedMatch?.sport === 'Tênis de Mesa';
     const isSetSport = isVolleyball || isTableTennis;
@@ -115,6 +117,28 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     const normalizeSex = (value?: string) => (value || '').trim().toLowerCase();
+    const normalizeSport = (value?: string) => (value || '').trim().toLowerCase();
+
+    const toSportList = (sports: unknown): string[] => {
+        if (Array.isArray(sports)) {
+            return sports.map((sport) => String(sport).trim()).filter(Boolean);
+        }
+
+        if (typeof sports === 'string') {
+            return sports
+                .split(',')
+                .map((sport) => sport.trim())
+                .filter(Boolean);
+        }
+
+        return [];
+    };
+
+    const athleteHasSport = (athlete: typeof athletes[number], sport: string) => {
+        const targetSport = normalizeSport(sport);
+        return toSportList((athlete as { sports?: unknown }).sports)
+            .some((athleteSport) => normalizeSport(athleteSport) === targetSport);
+    };
 
     const athleteMatchesTeamAndMatch = (athlete: typeof athletes[number], team: Match['teamA']) => {
         if (!selectedMatch) return false;
@@ -133,7 +157,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const facultyMatch = athleteInst.includes(teamFaculty) || teamFaculty.includes(athleteInst);
 
         const sameTeam = isFefespMatch || (courseMatch && facultyMatch);
-        const sameSport = athlete.sports.includes(selectedMatch.sport);
+        const sameSport = athleteHasSport(athlete, selectedMatch.sport);
         const sameSex = normalizeSex(athlete.sex) === normalizeSex(selectedMatch.category);
 
         return sameTeam && sameSport && sameSex;
@@ -285,9 +309,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         let customDescription = undefined;
         if (selectedMatch.sport === 'Futebol Society') {
             const teamName = teamId === selectedMatch.teamA.id ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0];
-            if (type === 'goal') customDescription = `⚽ GOL para ${teamName}`;
-            if (type === 'yellow_card') customDescription = `Cartão para ${teamName}`;
-            if (type === 'red_card') customDescription = `Cartão para ${teamName}`;
+            if (type === 'goal') customDescription = player ? `⚽ GOL! ${player}` : `⚽ GOL para ${teamName}`;
+            if (type === 'yellow_card') customDescription = player ? `Cartão Amarelo - ${player}` : `Cartão para ${teamName}`;
+            if (type === 'red_card') customDescription = player ? `Cartão Vermelho - ${player}` : `Cartão para ${teamName}`;
+            if (type === 'penalty_scored') customDescription = player ? `Pênalti convertido! ${player}` : 'Pênalti convertido!';
+        }
+
+        if (selectedMatch.sport === 'Futsal') {
+            const teamName = teamId === selectedMatch.teamA.id ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0];
+            if (type === 'goal') customDescription = player ? `⚽ GOL! ${player}` : `⚽ GOL para ${teamName}`;
+            if (type === 'yellow_card') customDescription = player ? `Cartão Amarelo - ${player}` : `Cartão Amarelo - ${teamName}`;
+            if (type === 'red_card') customDescription = player ? `Cartão Vermelho - ${player}` : `Cartão Vermelho - ${teamName}`;
+            if (type === 'penalty_scored') customDescription = player ? `Pênalti convertido! ${player}` : `Pênalti convertido!`;
         }
 
         const newEvent: MatchEvent = {
@@ -842,6 +875,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const stripPlayerNameFromLabel = (label: string, event: MatchEvent) => {
         if (!event.player) return label;
         if (isHandebol && event.type === 'goal') return label;
+        if (isFutebolX1) return label;
+        if (isFutsal) return label;
+        if (isFutebolSociety) return label;
 
         return label
             .replace(` - ${event.player}`, '')
@@ -879,6 +915,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     label = event.description || `Ponto - ${teamName}`;
                     break;
                 }
+                if (isFutebolSociety && event.player) {
+                    label = `GOL! ${event.player}`;
+                    break;
+                }
+                if (isFutsal && event.player) {
+                    label = `GOL! ${event.player}`;
+                    break;
+                }
                 if (event.description) {
                     label = event.description;
                     break;
@@ -896,11 +940,35 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     label = event.description;
                     break;
                 }
+                if (isFutebolSociety && event.player) {
+                    label = `Cartão Amarelo - ${event.player} (${teamName})`;
+                    break;
+                }
+                if (isFutsal && event.player) {
+                    label = `Cartão Amarelo - ${event.player} (${teamName})`;
+                    break;
+                }
+                if (isFutebolX1 && event.player) {
+                    label = `Cartão Amarelo - ${event.player} (${teamName})`;
+                    break;
+                }
                 label = `Cartão Amarelo - ${teamName}`;
                 break;
             case 'red_card':
                 if (event.description) {
                     label = event.description;
+                    break;
+                }
+                if (isFutebolSociety && event.player) {
+                    label = `Cartão Vermelho - ${event.player} (${teamName})`;
+                    break;
+                }
+                if (isFutsal && event.player) {
+                    label = `Cartão Vermelho - ${event.player} (${teamName})`;
+                    break;
+                }
+                if (isFutebolX1 && event.player) {
+                    label = `Cartão Vermelho - ${event.player} (${teamName})`;
                     break;
                 }
                 label = `Cartão Vermelho - ${teamName}`;

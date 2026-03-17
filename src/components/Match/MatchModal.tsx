@@ -104,6 +104,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const teamBForm = getTeamForm(currentMatch.teamB, currentMatch.sport);
 
     const isBeachTennis = currentMatch.sport === 'Beach Tennis';
+    const isFutsal = currentMatch.sport === 'Futsal';
+    const isFutebolSociety = currentMatch.sport === 'Futebol Society';
     const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(currentMatch.sport);
     const isVolleyballFamilySport = ['Vôlei', 'Vôlei de Praia', 'Futevôlei'].includes(currentMatch.sport);
     const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
@@ -330,7 +332,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             if (isBeachTennis || isVolleyballFamilySport) {
                 return `Ponto para ${teamName}`;
             }
-            return event.player ? `GOL! ${event.player}` : `GOL! ${teamName}`;
+            if (event.player) {
+                return `GOL! ${event.player}`;
+            }
+            if ((isFutsal || isFutebolSociety) && event.description) {
+                return stripLeadingEmoji(event.description);
+            }
+            return `GOL! ${teamName}`;
         }
 
         if (event.type === 'penalty_scored') {
@@ -405,7 +413,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return [...events]
             .sort(compareEventsAsc)
             .map((event) => {
-            const timelineQuarter = isBasketball ? `Q${basketballQuarter}` : undefined;
+                const timelineQuarter = isBasketball ? `Q${basketballQuarter}` : undefined;
                 if (isBeachTennis) {
                     if (event.type === 'goal') {
                         if (event.teamId === currentMatch.teamA.id) beachPointsA += 1;
@@ -455,7 +463,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                     };
                 }
 
-                if (event.type === 'goal' || event.type === 'penalty_scored') {
+                if (event.type === 'goal' || event.type === 'penalty_scored' || event.type === 'shootout_scored') {
                     const increment = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3'
                         ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
                         : 1;
