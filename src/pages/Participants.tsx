@@ -83,9 +83,11 @@ const Participants: FC = () => {
             // Extract core institution name (e.g., Unisanta, Unisantos)
             const parts = a.institution.split(' - ');
             const core = parts.length > 1 ? parts[parts.length - 1] : parts[0];
-            institutions.add(core);
+            // Normalize variation (case-insensitive ESAMC -> Esamc)
+            const normalizedCore = core.replace(/ESAMC/gi, 'Esamc');
+            institutions.add(normalizedCore);
         });
-        return Array.from(institutions).sort();
+        return Array.from(institutions).sort((a, b) => a.localeCompare(b));
     }, [athletes]);
 
     return (

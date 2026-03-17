@@ -58,6 +58,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const isSavingRef = useRef(false);
+    
+    // Normalization helper for institutions (specifically ESAMC)
+    const normalizeInstitution = useCallback((name: string) => {
+        if (!name) return name;
+        // Specifically handle ESAMC variations case-insensitively
+        const normalized = name.replace(/ESAMC/gi, 'Esamc');
+        return normalized;
+    }, []);
 
     useEffect(() => {
         isSavingRef.current = isSaving;
@@ -96,7 +104,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     .from('courses')
                     .select('*');
                 if (coursesData && !coursesError) {
-                    const formattedCourses = coursesData.map(c => `${c.name} - ${c.university}`);
+                    const formattedCourses = coursesData.map(c => normalizeInstitution(`${c.name} - ${c.university}`));
                     setCourses(prev => {
                         const merged = [...new Set([...prev, ...formattedCourses])];
                         return merged;
@@ -112,7 +120,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         id: a.id,
                         firstName: a.first_name,
                         lastName: a.last_name,
-                        institution: a.institution,
+                        institution: normalizeInstitution(a.institution),
                         course: a.course,
                         sports: a.sports,
                         sex: a.sex

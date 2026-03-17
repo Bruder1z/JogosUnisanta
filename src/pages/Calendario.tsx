@@ -89,10 +89,14 @@ const Calendario: FC = () => {
                         </div>
 
                         <a
-                            href="/docs/tabela-oficial-unisanta-2025.pdf"
+                            href="/pdf/tabela-jogos-2026.pdf"
                             target="_blank"
                             rel="noopener noreferrer"
-                            download="tabela-oficial-unisanta-2025.pdf"
+                            download="tabela-jogos-2026.pdf"
+                            onClick={() => {
+                                console.log('Iniciando download da tabela oficial...');
+                                console.log('Caminho tentado: /pdf/tabela-jogos-2026.pdf');
+                            }}
                             style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
