@@ -76,13 +76,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const selectedMatch = matches.find(m => m.id === activeMatchId) || null;
     const isBeachTennis = selectedMatch?.sport === 'Beach Tennis';
     const isHandebol = selectedMatch?.sport === 'Handebol';
-    const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia';
+    const isVolleyball = selectedMatch?.sport === 'Vôlei' || selectedMatch?.sport === 'Vôlei de Praia' || selectedMatch?.sport === 'Futevôlei';
     const isFutebolX1 = selectedMatch?.sport === 'Futebol X1';
     const isBasketball = selectedMatch?.sport === 'Basquetebol' || selectedMatch?.sport === 'Basquete 3x3';
     const isTableTennis = selectedMatch?.sport === 'Tênis de Mesa';
     const isSetSport = isVolleyball || isTableTennis;
     const isBasketball3x3 = selectedMatch?.sport === 'Basquete 3x3';
     const isSwimming = selectedMatch?.sport === 'Natação';
+    const isNoTimerSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei', 'Beach Tennis'].includes(selectedMatch?.sport || '');
 
     type TimelineEvent = MatchEvent & { timelineScore: string; timelineQuarter?: string };
 
@@ -95,12 +96,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return match.category === 'Feminino' ? 10 * 60 : 15 * 60;
     };
 
-    const getCurrentEventMinute = () => (isBasketball ? currentMinute : Math.floor(currentMinute / 60));
+    const getCurrentEventMinute = () => currentMinute;
     const BEACH_POINT_LABELS = ['0', '15', '30', '40'];
     const TIMER_TICK_MS = 1000;
-    const TIMER_INCREMENT_SECONDS = 300; // Test mode: 1 second real time = 5 game minutes
-    const X1_TIMER_INCREMENT = 4; // 1 real second = 4 game seconds (60s game / 15s real)
-    const BASKETBALL_DECREMENT_SECONDS = 30; // Test mode: basketball countdown 30s per tick
+    const TIMER_INCREMENT_SECONDS = 1;
+    const X1_TIMER_INCREMENT = 1;
+    const BASKETBALL_DECREMENT_SECONDS = 1;
     const formatClock = (totalSeconds: number) => {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
@@ -181,7 +182,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     useEffect(() => {
         let interval: number | null = null;
-        if (isRunning) {
+        if (isRunning && !isNoTimerSport) {
             interval = window.setInterval(() => {
                 setCurrentMinute(prev => {
                     if (isBasketball) {
@@ -203,12 +204,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isRunning, isBasketball, isFutebolX1]);
+    }, [isRunning, isBasketball, isFutebolX1, isNoTimerSport]);
 
 
 
     const handleSelectMatch = (match: Match) => {
         setActiveMatchId(match.id);
+        if (['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(match.sport)) {
+            setCurrentMinute(0);
+            setIsRunning(false);
+            return;
+        }
+
         if (match.sport === 'Basquetebol' || match.sport === 'Basquete 3x3') {
             const sortedEvents = [...(match.events || [])].sort(compareTimelineEventsAsc);
             const lastEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
@@ -460,9 +467,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const ptsA = relevantEvents.filter(e => e.type === 'goal' && e.teamId === selectedMatch.teamA.id).length;
         const ptsB = relevantEvents.filter(e => e.type === 'goal' && e.teamId === selectedMatch.teamB.id).length;
 
-        // Final score including the one just won
-        const finalPtsA = team === 'A' ? ptsA + 1 : ptsA;
-        const finalPtsB = team === 'B' ? ptsB + 1 : ptsB;
+        // Preserve the current set points exactly as recorded by goal events.
+        const finalPtsA = ptsA;
+        const finalPtsB = ptsB;
 
         const setWinEvent: MatchEvent = {
             id: `evt_${Date.now()}`,
@@ -484,7 +491,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         updateMatch(updatedMatch);
     };
 
-    const handleVolleyPoint = (team: 'A' | 'B', actionType: 'Ponto' | 'ACE Marcado' | 'ACE Perdido') => {
+    const handleVolleyPoint = (team: 'A' | 'B', actionType: 'Ponto' | 'ACE Marcado') => {
         if (!selectedMatch || selectedMatch.status === 'finished') return;
 
         if (!selectedMatch.events?.some(e => e.type === 'start')) {
@@ -492,13 +499,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             if (started) {
                 selectedMatch.events = started.events;
             }
-            setIsRunning(true);
+            if (!isNoTimerSport) setIsRunning(true);
         }
 
-        let scoringTeam = team;
-        if (actionType === 'ACE Perdido') {
-            scoringTeam = team === 'A' ? 'B' : 'A';
-        }
+        const scoringTeam = team;
 
         const scoringTeamId = scoringTeam === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id;
 
@@ -508,9 +512,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const nextB = scoringTeam === 'B' ? currentB + 1 : currentB;
 
         let description: string = actionType;
-        if (actionType === 'ACE Perdido') {
-             description = `ACE Perdido por ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
-        } else if (actionType === 'ACE Marcado') {
+           if (actionType === 'ACE Marcado') {
              description = `ACE Marcado por ${team === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
         } else {
              description = `Ponto para ${scoringTeam === 'A' ? selectedMatch.teamA.name.split(' - ')[0] : selectedMatch.teamB.name.split(' - ')[0]}`;
@@ -574,7 +576,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         } else if (selectedMatch.status !== 'live') {
             updateMatch({ ...selectedMatch, status: 'live' });
         }
-        setIsRunning(true);
+        setIsRunning(!isNoTimerSport);
     };
 
     const handleHalfTime = () => {
@@ -587,6 +589,29 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         addEvent('halftime');
         setIsRunning(false);
         setCurrentMinute(getBasketballQuarterDurationSeconds(selectedMatch));
+    };
+
+    const handleBasketballTimeout = (team: 'A' | 'B') => {
+        if (!selectedMatch || !isBasketball) return;
+
+        const teamName = team === 'A'
+            ? selectedMatch.teamA.name.split(' - ')[0]
+            : selectedMatch.teamB.name.split(' - ')[0];
+
+        const timeoutEvent: MatchEvent = {
+            id: `evt_${Date.now()}`,
+            type: 'halftime',
+            minute: getCurrentEventMinute(),
+            teamId: team === 'A' ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+            description: `Tempo técnico - ${teamName}`
+        };
+
+        updateMatch({
+            ...selectedMatch,
+            events: [...(selectedMatch.events || []), timeoutEvent]
+        });
+
+        setIsRunning(false);
     };
 
     const handleEndMatch = () => {
@@ -821,6 +846,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const stripPlayerNameFromLabel = (label: string, event: MatchEvent) => {
         if (!event.player) return label;
+        if (isHandebol && event.type === 'goal') return label;
 
         return label
             .replace(` - ${event.player}`, '')
@@ -845,6 +871,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             case 'goal':
                 if (isBasketball) {
                     label = event.description || '';
+                    break;
+                }
+                if (isHandebol) {
+                    const teamShortName = teamName.split(' - ')[0] || teamName;
+                    label = event.player
+                        ? `GOL! ${teamShortName} - ${event.player}`
+                        : `GOL! ${teamShortName}`;
                     break;
                 }
                 if (isVolleyball) {
@@ -909,7 +942,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 label = 'Início da partida';
                 break;
             case 'halftime':
-                label = 'Intervalo';
+                label = event.description || 'Intervalo';
                 break;
             case 'end':
                 label = 'Fim de jogo';
@@ -993,7 +1026,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                     return {
                         ...event,
-                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
+                        timelineScore: `Game ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
                         timelineQuarter
                     };
                 }
@@ -1336,22 +1369,27 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         background: 'rgba(0,0,0,0.9)',
                         zIndex: 1000,
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
                         justifyContent: 'center',
-                        padding: '20px'
-                    }}>
+                        padding: '8px',
+                        overflowY: 'auto'
+                    }} className="new-match-overlay">
                         <div style={{ 
                             width: '100%', 
-                            maxWidth: '480px', 
+                            maxWidth: '440px', 
                             background: '#111', 
                             borderRadius: '16px', 
                             border: '1px solid #333',
-                            padding: '30px',
-                            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
-                        }}>
-                            <h2 style={{ fontSize: '32px', fontWeight: 800, color: 'white', marginBottom: '30px' }}>Nova Partida</h2>
+                            padding: '16px',
+                            boxSizing: 'border-box',
+                            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                            margin: 'auto 0',
+                            maxHeight: 'calc(100dvh - 16px)',
+                            overflowY: 'auto'
+                        }} className="new-match-modal custom-scrollbar">
+                            <h2 style={{ fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 800, color: 'white', marginBottom: '16px', lineHeight: 1.15 }}>Nova Partida</h2>
                             
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="new-match-form">
                                 <div>
                                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#888', marginBottom: '8px' }}>Modalidade *</label>
                                     <select
@@ -1442,7 +1480,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     <option value="Feminino">Feminino</option>
                                 </select>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="new-match-two-cols">
                                     <input
                                         type="date"
                                         value={newMatchForm.date}
@@ -1466,7 +1504,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     {OFFICIAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
 
-                                <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }} className="new-match-actions">
                                     <button
                                         onClick={handleSaveNewMatch}
                                         style={{
@@ -1563,7 +1601,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 </div>
                             </div>
 
-                            {
+                            {!isNoTimerSport ? (
                                 <div style={styles.timeDisplay} className="match-timeline-time-display">
                                     <Clock size={24} />
                                     <span style={styles.minute}>{formatClock(currentMinute)}</span>
@@ -1583,7 +1621,30 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                         </span>
                                     )}
                                 </div>
-                            }
+                            ) : (
+                                <div style={styles.timeDisplay} className="match-timeline-time-display">
+                                    {isBeachTennis ? (
+                                        <>
+                                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                                                Beach Tennis
+                                            </span>
+                                            <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                Pontos: {BEACH_POINT_LABELS[Math.min(beachScoreState.gamePointsA, 3)]} - {BEACH_POINT_LABELS[Math.min(beachScoreState.gamePointsB, 3)]}
+                                            </span>
+                                            <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                Games: {selectedMatch.scoreA} - {selectedMatch.scoreB}
+                                            </span>
+                                            <span style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                Sets: {beachSetsState.setsA} - {beachSetsState.setsB}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                                            Sem cronômetro
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             <div style={styles.teamRight}>
                                 <h2 style={styles.teamName} className="match-timeline-team-name">{selectedMatch.teamB.name}</h2>
@@ -1608,7 +1669,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                 {/* Controles do Jogo */}
                 <div style={styles.gameControls}>
-                    <h3 style={styles.sectionTitle}>{isSwimming ? 'Classificação da Prova' : '⏱️ Controle de Tempo'}</h3>
+                    <h3 style={styles.sectionTitle} className="match-timeline-section-title">{isSwimming ? 'Classificação da Prova' : 'Controle da Partida'}</h3>
                     {isSwimming ? (
                         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
                             <button
@@ -1637,27 +1698,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 <button
                                     style={{ ...styles.controlBtn, ...styles.startBtn }}
                                     onClick={handleStartMatch}
-                                    disabled={isRunning || selectedMatch.status === 'finished'}
+                                    disabled={(isNoTimerSport ? selectedMatch.status === 'live' : isRunning) || selectedMatch.status === 'finished'}
                                 >
                                     <Play size={20} />
                                     Iniciar Jogo
                                 </button>
-                                <button
-                                    style={{ ...styles.controlBtn, ...styles.pauseBtn }}
-                                    onClick={isBasketball ? () => setIsRunning(false) : handleHalfTime}
-                                    disabled={!isRunning}
-                                >
-                                    <Pause size={20} />
-                                    {isBasketball ? 'Pausar Tempo' : 'Intervalo'}
-                                </button>
-                                <button
-                                    style={{ ...styles.controlBtn, ...styles.resumeBtn }}
-                                    onClick={handleStartMatch}
-                                    disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
-                                >
-                                    <Play size={20} />
-                                    Retomar
-                                </button>
+                                {!isNoTimerSport && (
+                                    <button
+                                        style={{ ...styles.controlBtn, ...styles.pauseBtn }}
+                                        onClick={isBasketball ? () => setIsRunning(false) : handleHalfTime}
+                                        disabled={!isRunning}
+                                    >
+                                        <Pause size={20} />
+                                        {isBasketball ? 'Pausar Tempo' : 'Intervalo'}
+                                    </button>
+                                )}
+                                {!isNoTimerSport && (
+                                    <button
+                                        style={{ ...styles.controlBtn, ...styles.resumeBtn }}
+                                        onClick={handleStartMatch}
+                                        disabled={isRunning || !selectedMatch.events?.some(e => e.type === 'start')}
+                                    >
+                                        <Play size={20} />
+                                        Retomar
+                                    </button>
+                                )}
                                 <button
                                     style={{
                                         ...styles.controlBtn,
@@ -1675,7 +1740,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 </button>
                             </div>
 
-                            {isBasketball && (
+                            {isBasketball && !isNoTimerSport && (
                                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
                                         Pausas do Basquete
@@ -1690,14 +1755,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                         </button>
                                         <button
                                             style={{ ...styles.eventBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: '#3b82f6', color: '#3b82f6' }}
-                                            onClick={() => setIsRunning(false)}
+                                            onClick={() => handleBasketballTimeout('A')}
                                             disabled={!isRunning}
                                         >
                                             Tempo {selectedMatch.teamA.name.split(' - ')[0]}
                                         </button>
                                         <button
                                             style={{ ...styles.eventBtn, background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#ef4444' }}
-                                            onClick={() => setIsRunning(false)}
+                                            onClick={() => handleBasketballTimeout('B')}
                                             disabled={!isRunning}
                                         >
                                             Tempo {selectedMatch.teamB.name.split(' - ')[0]}
@@ -1833,20 +1898,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 onClick={() => handleVolleyPoint('B', 'ACE Marcado')}
                             >
                                 ACE Marcado {selectedMatch.teamB.name.split(' - ')[0]}
-                            </button>
-                        </div>
-                        <div style={{ ...styles.eventButtons, marginTop: '12px' }} className="match-timeline-event-grid">
-                            <button
-                                style={{ ...styles.eventBtn, background: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}
-                                onClick={() => handleVolleyPoint('A', 'ACE Perdido')}
-                            >
-                                ACE Perdido {selectedMatch.teamA.name.split(' - ')[0]}
-                            </button>
-                            <button
-                                style={{ ...styles.eventBtn, background: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}
-                                onClick={() => handleVolleyPoint('B', 'ACE Perdido')}
-                            >
-                                ACE Perdido {selectedMatch.teamB.name.split(' - ')[0]}
                             </button>
                         </div>
                     </div>
@@ -2308,7 +2359,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        {!isSetSport && <span style={styles.eventTimePill}>{isBasketball ? formatClock(event.minute) : `${event.minute}'`}</span>}
+                                                        {!isSetSport && !isNoTimerSport && <span style={styles.eventTimePill}>{formatClock(event.minute)}</span>}
                                                         <span style={styles.eventIconBubble}>{getEventIcon(event.type)}</span>
                                                         <div style={{ ...styles.eventContentWrap, textAlign: isTeamB ? 'right' : isGeneral ? 'center' : 'left' }}>
                                                             <span style={styles.eventText}>{getEventLabel(event)}</span>
@@ -2325,7 +2376,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                                                     {event.timelineScore}
                                                                 </span>
                                                             )}
-                                                            <span style={styles.eventMetaTag}>{shortTeamName}</span>
+                                                            {event.teamId && !isBasketball && <span style={styles.eventMetaTag}>{shortTeamName}</span>}
                                                         </div>
                                                     </>
                                                 )}
@@ -2427,6 +2478,57 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         display: none;
                     }
 
+                    .match-timeline-section-title {
+                        display: block;
+                        color: var(--text-primary);
+                        line-height: 1.25;
+                        word-break: break-word;
+                    }
+
+                    @media (max-height: 860px) {
+                        .new-match-modal {
+                            max-height: calc(100vh - 10px) !important;
+                            padding: 14px !important;
+                        }
+
+                        .new-match-form {
+                            gap: 12px !important;
+                        }
+
+                        .new-match-modal h2 {
+                            font-size: 24px !important;
+                            margin-bottom: 12px !important;
+                        }
+                    }
+
+                    @media (max-height: 760px) {
+                        .new-match-overlay {
+                            padding: 4px !important;
+                        }
+
+                        .new-match-modal {
+                            max-height: calc(100vh - 8px) !important;
+                            border-radius: 12px !important;
+                            padding: 12px !important;
+                        }
+
+                        .new-match-two-cols {
+                            grid-template-columns: 1fr !important;
+                        }
+
+                        .new-match-actions {
+                            flex-direction: column !important;
+                        }
+
+                        .new-match-modal button,
+                        .new-match-modal select,
+                        .new-match-modal input {
+                            padding-top: 10px !important;
+                            padding-bottom: 10px !important;
+                            font-size: 13px !important;
+                        }
+                    }
+
                     @media (max-width: 768px) {
                         .match-timeline-root {
                             padding: 12px !important;
@@ -2463,6 +2565,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     }
 
                     @media (max-width: 480px) {
+                        .match-timeline-section-title {
+                            display: block !important;
+                            font-size: 1rem !important;
+                            margin-bottom: 12px !important;
+                        }
+
                         .match-timeline-scoreboard {
                             display: grid !important;
                             grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

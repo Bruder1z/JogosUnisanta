@@ -186,7 +186,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                             )}
                         </div>
                     )}
-                    {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(match.sport) && match.status === 'live' && (
+                    {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(match.sport) && match.status === 'live' && (
                         <div style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '-5px' }}>
                             {(() => {
                                 const lastSetWinEvent = [...(match.events || [])].reverse().find(e => e.type === 'set_win');

@@ -8,6 +8,7 @@ import {
     Calendar
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
     onShowModalities?: () => void;
@@ -16,6 +17,7 @@ interface SidebarProps {
 }
 
 const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRanking }) => {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const { isOpen, close } = useSidebar();
@@ -69,15 +71,23 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 <div className="sidebar-mobile-nav">
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '10px', letterSpacing: '0.05em' }}>NAVEGAÇÃO</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <Link to="/" onClick={close} className="sidebar-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                            <span style={{ fontSize: '16px' }}>🏠</span> Resultados
+                        <Link to="/" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                            <span style={{ fontSize: '16px' }}>🏠</span>
+                            <span className="sidebar-mobile-nav-label">Resultados</span>
                         </Link>
-                        <Link to="/participantes" onClick={close} className="sidebar-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                            <span style={{ fontSize: '16px' }}>👥</span> Participantes
+                        <Link to="/participantes" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                            <span style={{ fontSize: '16px' }}>👥</span>
+                            <span className="sidebar-mobile-nav-label">Participantes</span>
                         </Link>
-                        <Link to="/noticias" onClick={close} className="sidebar-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                            <span style={{ fontSize: '16px' }}>📰</span> Notícias
+                        <Link to="/noticias" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                            <span style={{ fontSize: '16px' }}>📰</span>
+                            <span className="sidebar-mobile-nav-label">Notícias</span>
                         </Link>
+                        {user?.role === 'superadmin' && (
+                            <Link to="/controle-partida" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--accent-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s', fontWeight: 700 }}>
+                                <span className="sidebar-mobile-nav-label">Controle de Partida</span>
+                            </Link>
+                        )}
                     </div>
                 </div>
 

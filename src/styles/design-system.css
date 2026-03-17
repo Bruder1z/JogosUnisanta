@@ -178,6 +178,21 @@ button {
   .sidebar-mobile-nav {
     display: block;
   }
+
+  .sidebar-mobile-nav-link {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    white-space: nowrap;
+  }
+
+  .sidebar-mobile-nav-label {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* =========================================

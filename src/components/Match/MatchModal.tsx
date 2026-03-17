@@ -109,8 +109,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const teamBForm = getTeamForm(currentMatch.teamB.id, currentMatch.sport);
 
     const isBeachTennis = currentMatch.sport === 'Beach Tennis';
-    const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport);
+    const isSetSport = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(currentMatch.sport);
     const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
+    const hideTimelineMinute = ['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei', 'Beach Tennis'].includes(currentMatch.sport);
     const isResultBreakdownSport = isSetSport || isBeachTennis;
 
     type TimelineEvent = MatchEvent & { timelineScore: string; timelineQuarter?: string };
@@ -265,13 +266,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     // O bloco de MVP foi removido conforme solicitação, a Cronologia preencherá o espaço.
     const getEventIcon = (type: MatchEvent['type']) => {
-        const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia';
+        const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport === 'Vôlei de Praia' || currentMatch.sport === 'Futevôlei';
         const isBasketball = currentMatch.sport === 'Basquetebol' || currentMatch.sport === 'Basquete 3x3';
-        const isSoccerSport = ['Futsal', 'Futebol Society', 'Futebol X1', 'Futevôlei'].includes(currentMatch.sport);
+        const isSoccerSport = ['Futsal', 'Futebol Society', 'Futebol X1'].includes(currentMatch.sport);
         
         switch (type) {
             case 'goal': 
                 if (isBasketball) return <div style={{ fontSize: '16px' }}>🏀</div>;
+                if (isBeachTennis) return <div style={{ fontSize: '16px' }}>🎾</div>;
                 if (isSoccerSport) return <div style={{ fontSize: '16px' }}>⚽</div>;
                 if (isVolleyball) return <div style={{ fontSize: '16px' }}>🏐</div>;
                 return <div style={{ fontSize: '16px' }}>⚽</div>;
@@ -310,6 +312,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const getSafeEventDescription = (event: MatchEvent) => {
         const baseLabel = event.description ? event.description : getEventLabel(event.type);
         const keepScoreTogether = (text: string) => text.replace(/(\d+)\s*x\s*(\d+)/g, '$1\u00A0x\u00A0$2');
+
+        if (currentMatch.sport === 'Handebol' && event.type === 'goal') {
+            const withPlayer = event.player && !baseLabel.includes(event.player)
+                ? `${baseLabel} - ${event.player}`
+                : baseLabel;
+            return keepScoreTogether(withPlayer);
+        }
+
         if (!event.player) return keepScoreTogether(baseLabel);
 
         return keepScoreTogether(baseLabel
@@ -318,6 +328,37 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             .replace(new RegExp(`\\s${event.player}$`), '')
             .replace(/\s{2,}/g, ' ')
             .trim());
+    };
+
+    const stripLeadingEmoji = (text: string) => text.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+
+    const getTimelinePrimaryText = (event: MatchEvent) => {
+        const teamName = event.teamId === currentMatch.teamA.id
+            ? currentMatch.teamA.name.split(' - ')[0]
+            : event.teamId === currentMatch.teamB.id
+                ? currentMatch.teamB.name.split(' - ')[0]
+                : 'Jogo';
+
+        if (event.type === 'goal') {
+            if (isBeachTennis) {
+                return `Ponto para ${teamName}`;
+            }
+            return event.player ? `GOL! ${event.player}` : `GOL! ${teamName}`;
+        }
+
+        if (event.type === 'penalty_scored') {
+            return event.player ? `Pênalti convertido! ${event.player}` : 'Pênalti convertido!';
+        }
+
+        if (event.type === 'yellow_card') {
+            return event.player ? `Cartão Amarelo - ${event.player}` : 'Cartão Amarelo';
+        }
+
+        if (event.type === 'red_card') {
+            return event.player ? `Cartão Vermelho - ${event.player}` : 'Cartão Vermelho';
+        }
+
+        return stripLeadingEmoji(getSafeEventDescription(event));
     };
 
     const getBasketballEventData = (event: TimelineEvent) => {
@@ -336,6 +377,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             pontuacaoLabel: `+${pointValue} ${pointValue > 1 ? 'pontos' : 'ponto'} para ${teamName}`,
             placar: (event.timelineScore || '0x0').replace('x', '-')
         };
+    };
+
+    const formatEventClock = (value: number) => {
+        const totalSeconds = Math.max(0, value);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
     const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
@@ -395,7 +443,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
                     return {
                         ...event,
-                        timelineScore: `Sets ${beachSetsA}x${beachSetsB} | Games ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
+                        timelineScore: `Game ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
                         timelineQuarter
                     };
                 }
@@ -561,7 +609,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                     </div>
                                 </div>
                             )}
-                            {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport) && currentMatch.status === 'live' && (
+                            {['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(currentMatch.sport) && currentMatch.status === 'live' && (
                                 <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 700, marginTop: '2px' }}>
                                     {(() => {
                                         const lastSetWinEvent = [...(currentMatch.events || [])].reverse().find(e => e.type === 'set_win');
@@ -574,7 +622,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                     })()}
                                 </div>
                             )}
-                            {currentMatch.status === 'live' && !['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa'].includes(currentMatch.sport) && (
+                            {currentMatch.status === 'live' && !['Vôlei', 'Vôlei de Praia', 'Tênis de Mesa', 'Futevôlei'].includes(currentMatch.sport) && (
                                 <div style={{
                                     fontSize: '11px',
                                     color: 'var(--live-color)',
@@ -782,6 +830,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                 const isGeneral = !event.teamId;
                                                 const rowJustify = isGeneral ? 'center' : isTeamA ? 'flex-start' : 'flex-end';
                                                 const cardWidth = isGeneral ? '56%' : '48%';
+                                                const teamLabel = isTeamA
+                                                    ? currentMatch.teamA.name.split(' - ')[0]
+                                                    : isTeamB
+                                                        ? currentMatch.teamB.name.split(' - ')[0]
+                                                        : 'Jogo';
                                                 return (
                                                     <div key={event.id} style={{ display: 'flex', justifyContent: rowJustify, position: 'relative', zIndex: 1 }}>
                                                         <div style={{
@@ -796,7 +849,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                             border: '1px solid var(--border-color)',
                                                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
                                                         }}>
-                                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: isTeamB ? 'row-reverse' : 'row' }}>
                                                                 {isBasketball && event.type === 'goal' ? (
                                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: '100%', gap: '6px', alignItems: 'center' }}>
                                                                         {(() => {
@@ -828,11 +881,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                     </div>
                                                                 ) : (
                                                                     <>
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: isTeamB ? 'right' : isGeneral ? 'center' : 'left' }}>
-                                                                            {getEventIcon(event.type)}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: isTeamB ? 'right' : isGeneral ? 'center' : 'left', flexDirection: isTeamB ? 'row-reverse' : 'row' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px' }}>
+                                                                                {getEventIcon(event.type)}
+                                                                            </div>
                                                                             <div>
-                                                                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                                    {getSafeEventDescription(event)}
+                                                                                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isTeamB ? 'flex-end' : isGeneral ? 'center' : 'flex-start' }}>
+                                                                                    {getTimelinePrimaryText(event)}
                                                                                 </div>
                                                                                 {event.timelineScore && event.type !== 'end' && event.type !== 'start' && !isBasketball && (
                                                                                     <div style={{
@@ -844,24 +899,27 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                                                                                         Placar no momento: {event.timelineScore}
                                                                                     </div>
                                                                                 )}
-                                                                                {event.teamId && !event.description && (
+                                                                                {event.teamId && !isBeachTennis && !isBasketball && (
                                                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                                                        {event.teamId && (isTeamA ? currentMatch.teamA.name.split(' - ')[0] : currentMatch.teamB.name.split(' - ')[0])}
+                                                                                        {teamLabel}
                                                                                         {event.type === 'set_win' ? ' venceu o set' : ''}
                                                                                     </div>
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                        <div style={{ 
-                                                                            fontSize: '14px', 
-                                                                            fontWeight: 700, 
-                                                                            color: 'var(--accent-color)',
-                                                                            marginLeft: '12px',
-                                                                            minWidth: '40px',
-                                                                            textAlign: 'right'
-                                                                        }}>
-                                                                            {isBasketball ? `${Math.floor(event.minute / 60)}:${String(event.minute % 60).padStart(2, '0')}` : `${event.minute}'`}
-                                                                        </div>
+                                                                        {!hideTimelineMinute && (
+                                                                            <div style={{ 
+                                                                                fontSize: '14px', 
+                                                                                fontWeight: 700, 
+                                                                                color: 'var(--accent-color)',
+                                                                                marginLeft: isTeamB ? '0' : '12px',
+                                                                                marginRight: isTeamB ? '12px' : '0',
+                                                                                minWidth: '40px',
+                                                                                textAlign: isTeamB ? 'left' : 'right'
+                                                                            }}>
+                                                                                {formatEventClock(event.minute)}
+                                                                            </div>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                             </div>
