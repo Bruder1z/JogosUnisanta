@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Users,
     Settings,
@@ -317,6 +318,36 @@ const AdminDashboard: React.FC = () => {
                             {tab.label}
                         </button>
                     ))}
+
+                    <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+                        <div className="premium-card" style={{ padding: '20px', border: '1px solid var(--accent-color)', background: 'rgba(227, 6, 19, 0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 800, fontSize: '14px', marginBottom: '15px' }}>
+                                <Trophy size={18} />
+                                CONTROLE DE PARTIDA
+                            </div>
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                                Gerencie placares e cronologia das partidas em tempo real.
+                            </p>
+                            <Link 
+                                to="/controle-partida" 
+                                className="hover-glow"
+                                style={{ 
+                                    display: 'block',
+                                    width: '100%',
+                                    padding: '10px',
+                                    textAlign: 'center',
+                                    background: 'var(--accent-color)',
+                                    color: 'white',
+                                    textDecoration: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '13px'
+                                }}
+                            >
+                                ABRIR CONTROLADOR
+                            </Link>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
