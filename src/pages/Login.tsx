@@ -29,21 +29,22 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                 setError('Por favor, selecione seu curso e esporte de preferência.');
                 return;
             }
-            const success = await register({
+            const registerData = {
                 email: formData.email,
                 name: formData.name,
                 surname: formData.surname,
                 preferredCourse: formData.preferredCourse,
-                preferredSport: formData.preferredSport,
+                favoriteTeam: '',
                 password: formData.password
-            } as any);
+            };
+            const success = await register(registerData);
             if (success) onClose();
         } else {
             const success = await login(formData.email, formData.password);
             if (success) {
                 onClose();
             } else {
-                setError('Credenciais inválidas. Use @123123 como senha.');
+                setError('Credenciais inválidas.');
             }
         }
     };

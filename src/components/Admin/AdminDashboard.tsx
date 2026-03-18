@@ -724,7 +724,7 @@ const AdminDashboard: React.FC = () => {
                                                             background: highlightColor || 'var(--bg-hover)',
                                                             color: isTop3 ? '#000' : 'var(--text-secondary)'
                                                         }}>
-                                                            {entry.rank}º
+                                                            {ranking.findIndex(e => e.course === entry.course) + 1}
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: '12px 16px' }}>

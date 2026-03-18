@@ -145,7 +145,7 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
                                                 boxShadow: isTop3 ? `0 0 15px ${highlightColor}40` : 'none',
                                                 border: isTop3 ? `1px solid ${highlightColor}` : 'none'
                                             }}>
-                                                {item.rank}º
+                                                {index + 1}º
                                             </div>
                                         </td>
                                         <td style={{ padding: '15px 20px' }}>

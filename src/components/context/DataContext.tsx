@@ -175,8 +175,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         // Fetch Ranking
         const { data: rankingData, error: rankingError } = await supabase
           .from("ranking")
-          .select("*")
-          .order("rank", { ascending: true });
+          .select("*");
         if (rankingData && !rankingError) {
           setRanking(rankingData);
         }

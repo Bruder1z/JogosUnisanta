@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { type User, mockUsers } from '../data/mockData';
+import { type User } from '../data/mockData';
+import { supabase } from '../services/supabaseClient';
+import bcrypt from 'bcryptjs';
 
 interface AuthContextType {
     user: User | null;
     login: (email: string, password: string) => Promise<boolean>;
-    register: (userData: Omit<User, 'id' | 'role'>) => Promise<boolean>;
+    register: (userData: RegisterUser) => Promise<boolean>;
     logout: () => void;
     updateUser: (updates: Partial<User>) => Promise<boolean>;
     isLoading: boolean;
@@ -12,6 +14,8 @@ interface AuthContextType {
     openLoginModal: () => void;
     closeLoginModal: () => void;
 }
+
+export type RegisterUser = Omit<User, 'id' | 'role'> & { password: string };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -29,46 +33,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = async (email: string, password: string): Promise<boolean> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Check local storage for registered users first
-                const registeredUsersRaw = localStorage.getItem('jogos_unisanta_registered_users');
-                const registeredUsers: User[] = registeredUsersRaw ? JSON.parse(registeredUsersRaw) : [];
-
-                const allUsers = [...mockUsers, ...registeredUsers];
-                const foundUser = allUsers.find(u => u.email === email && password === '@123123');
-
-                if (foundUser) {
-                    setUser(foundUser);
-                    localStorage.setItem('jogos_unisanta_user', JSON.stringify(foundUser));
-                    resolve(true);
-                } else {
-                    resolve(false);
-                }
-            }, 500);
-        });
+        // Busca usuário no banco
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+        if (error || !data) return false;
+        // Compara senha usando bcrypt
+        if (!data.password) return false;
+        const isValid = await bcrypt.compare(password, data.password);
+        if (isValid) {
+            setUser(data);
+            localStorage.setItem('jogos_unisanta_user', JSON.stringify(data));
+            return true;
+        }
+        return false;
     };
 
-    const register = async (userData: Omit<User, 'id' | 'role'>): Promise<boolean> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const registeredUsersRaw = localStorage.getItem('jogos_unisanta_registered_users');
-                const registeredUsers: User[] = registeredUsersRaw ? JSON.parse(registeredUsersRaw) : [];
-
-                const newUser: User = {
-                    ...userData,
-                    id: Math.random().toString(36).substr(2, 9),
-                    role: 'cliente'
-                };
-
-                const updatedUsers = [...registeredUsers, newUser];
-                localStorage.setItem('jogos_unisanta_registered_users', JSON.stringify(updatedUsers));
-
-                setUser(newUser);
-                localStorage.setItem('jogos_unisanta_user', JSON.stringify(newUser));
-                resolve(true);
-            }, 500);
-        });
+    const register = async (userData: RegisterUser): Promise<boolean> => {
+        // Gera hash da senha
+        const hash = await bcrypt.hash(userData.password, 10);
+        const { data, error } = await supabase.from('users').insert([
+            {
+                email: userData.email,
+                name: userData.name,
+                surname: userData.surname,
+                preferredcourse: userData.preferredCourse,
+                favoriteteam: userData.favoriteTeam,
+                password: hash,
+                role: 'cliente',
+            },
+        ]).select('*').single();
+        if (error || !data) return false;
+        setUser(data);
+        localStorage.setItem('jogos_unisanta_user', JSON.stringify(data));
+        return true;
     };
 
     const logout = () => {
@@ -77,25 +77,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const updateUser = async (updates: Partial<User>): Promise<boolean> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                if (!user) return resolve(false);
-
-                const updatedUser = { ...user, ...updates };
-                setUser(updatedUser);
-                localStorage.setItem('jogos_unisanta_user', JSON.stringify(updatedUser));
-
-                // Also update in registered users list if exists
-                const registeredUsersRaw = localStorage.getItem('jogos_unisanta_registered_users');
-                if (registeredUsersRaw) {
-                    const registeredUsers: User[] = JSON.parse(registeredUsersRaw);
-                    const updatedList = registeredUsers.map(u => u.id === user.id ? updatedUser : u);
-                    localStorage.setItem('jogos_unisanta_registered_users', JSON.stringify(updatedList));
-                }
-
-                resolve(true);
-            }, 300);
-        });
+        if (!user) return false;
+        const { error } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('email', user.email);
+        if (!error) {
+            setUser({ ...user, ...updates });
+            return true;
+        }
+        return false;
     };
 
     const openLoginModal = () => setIsLoginModalOpen(true);
