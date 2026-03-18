@@ -2,8 +2,10 @@ import { type FC, useState, useMemo, useEffect } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
+import ModalRegras from '../components/Modals/ModalRegras';
+import SummaryPanel from '../components/Modals/SummaryPanel';
 import { mockMatches, COURSE_EMBLEMS, type Match } from '../data/mockData';
-import { CheckCircle, RotateCcw, Calendar, Trophy, Info, MapPin, Clock } from 'lucide-react';
+import { CheckCircle, RotateCcw, Calendar, Trophy, Info, MapPin, Clock, Zap } from 'lucide-react';
 
 interface Prediction {
     matchId: string;
@@ -27,9 +29,11 @@ interface ToastData {
 
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
+    const [aberto, setAberto] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
     const [activeTab, setActiveTab] = useState<'palpitar' | 'competicoes'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
+    const [predictionsFinalized, setPredictionsFinalized] = useState(false);
 
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
@@ -79,11 +83,21 @@ const Simulator: FC = () => {
 
     const savePredictions = () => {
         localStorage.setItem(LS_KEY, JSON.stringify(predictions));
+        setPredictionsFinalized(true);
+        showToast({
+            message: 'Todos os palpites foram salvos!',
+            teamA: 'BOLÃO',
+            scoreA: filledCount,
+            teamB: 'SALVO',
+            scoreB: 1,
+        });
+        setTimeout(() => setPredictionsFinalized(false), 3000);
     };
 
     const resetPredictions = () => {
         setPredictions({});
         localStorage.removeItem(LS_KEY);
+        setPredictionsFinalized(false);
     };
 
     const showToast = (data: Omit<ToastData, 'id'>) => {
@@ -94,13 +108,39 @@ const Simulator: FC = () => {
 
     const filledCount = Object.values(predictions).filter(p => p.scoreA !== '' && p.scoreB !== '').length;
 
-    // ── helpers ──────────────────────────────────────────────
-    const formatMatchDate = (dateStr: string, timeStr: string) => {
-        const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-        const [, month, day] = dateStr.split('-').map(Number);
-        return `${day} de ${months[month - 1]}. ${timeStr}`;
-    };
+    // Calculate scoring stats
+    const scoringStats = useMemo(() => {
+        let totalPoints = 0;
+        let exactScores = 0;
+        let winners = 0;
 
+        mockMatches.forEach(match => {
+            const pred = predictions[match.id];
+            if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
+                const predScoreA = Number(pred.scoreA);
+                const predScoreB = Number(pred.scoreB);
+
+                // Check if it's an exact score match
+                if (match.status === 'finished' && predScoreA === match.scoreA && predScoreB === match.scoreB) {
+                    exactScores++;
+                    totalPoints += 3;
+                }
+                // Check if winner is correct (even if exact score is wrong)
+                else if (match.status === 'finished') {
+                    const predWinner = predScoreA > predScoreB ? 'A' : predScoreB > predScoreA ? 'B' : 'draw';
+                    const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
+                    if (predWinner === actualWinner) {
+                        winners++;
+                        totalPoints += 1;
+                    }
+                }
+            }
+        });
+
+        return { totalPoints, exactScores, winners };
+    }, [predictions]);
+
+    // ── helpers ──────────────────────────────────────────────
     const hoursUntil = (dateStr: string, timeStr: string): number => {
         const [h, m] = timeStr.split(':').map(Number);
         const target = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
@@ -135,52 +175,7 @@ const Simulator: FC = () => {
     };
 
     // +/- stepper control
-    const ScoreStepper = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => {
-        const num = value === '' ? 0 : Number(value);
-        const btnStyle: React.CSSProperties = {
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.06)',
-            color: 'white',
-            fontSize: '18px',
-            fontWeight: 700,
-            lineHeight: 1,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.15s',
-            flexShrink: 0,
-        };
-        return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                    style={btnStyle}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                    onClick={() => updatePrediction(matchId, field, String(Math.max(0, num - 1)))}
-                >&lt;</button>
-                <span style={{
-                    minWidth: '36px',
-                    textAlign: 'center',
-                    fontSize: '32px',
-                    fontWeight: 900,
-                    color: 'white',
-                    lineHeight: 1,
-                }}>{value === '' ? '0' : value}</span>
-                <button
-                    style={btnStyle}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                    onClick={() => updatePrediction(matchId, field, String(num + 1))}
-                >&gt;</button>
-            </div>
-        );
-    };
-
-    const MatchSimCard = ({ match }: { match: Match }) => {
+    const MatchSimCard = ({ match, disabled }: { match: Match; disabled?: boolean }) => {
         const [cardSaved, setCardSaved] = useState(false);
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
@@ -189,15 +184,12 @@ const Simulator: FC = () => {
 
         const saveThisCard = () => {
             if (!hasPrediction) return;
-            // persist full predictions (including this card's current values)
             const next = { ...predictions };
             localStorage.setItem(LS_KEY, JSON.stringify(next));
 
-            // per-card "saved" flash
             setCardSaved(true);
             setTimeout(() => setCardSaved(false), 3000);
 
-            // show global toast
             showToast({
                 message: 'Palpite salvo!',
                 teamA: match.teamA.name.split(' - ')[0],
@@ -207,82 +199,186 @@ const Simulator: FC = () => {
             });
         };
 
+        const formatFullDate = (dateStr: string) => {
+            const [year, month, day] = dateStr.split('-');
+            const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+            return `${day} DE ${months[parseInt(month) - 1]}. DE ${year}`;
+        };
+
         return (
             <div className="sim-match-card" style={{
                 background: '#1a1a1a',
-                border: hasPrediction ? '1px solid rgba(255,46,46,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.08)',
                 borderRadius: '16px',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'border-color 0.3s',
+                transition: 'all 0.3s',
             }}>
-                {/* ── Header strip ── */}
+                {/* ── Header: Date/Time + Countdown ── */}
                 <div style={{
-                    padding: '14px 18px',
+                    padding: '16px 18px',
                     borderBottom: '1px solid rgba(255,255,255,0.06)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '10px',
-                    flexWrap: 'wrap',
                 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {/* Sport + category */}
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-color)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                            {match.sport} · {match.category}
-                        </span>
-                        {/* Date/time row */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
-                                <Clock size={12} />
-                                {formatMatchDate(match.date, match.time)}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>
-                                <MapPin size={12} />
-                                {match.location}
-                            </span>
-                        </div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+                        {formatFullDate(match.date)}, {match.time}
                     </div>
-                    {/* Countdown badge */}
                     <div style={{
-                        padding: '5px 12px',
-                        borderRadius: '20px',
-                        background: hours <= 3 ? 'rgba(255,46,46,0.15)' : 'rgba(255,255,255,0.06)',
-                        border: `1px solid ${hours <= 3 ? 'rgba(255,46,46,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                        fontSize: '11px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '12px',
                         fontWeight: 700,
-                        color: hours <= 3 ? 'var(--accent-color)' : 'rgba(255,255,255,0.5)',
-                        whiteSpace: 'nowrap',
-                        letterSpacing: '0.04em',
+                        color: '#ffd700',
                     }}>
+                        <Zap size={14} />
                         {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}
                     </div>
                 </div>
 
-                {/* ── Teams + Scores ── */}
-                <div style={{ padding: '24px 18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    {/* Team A */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                        <TeamEmblem teamName={match.teamA.name} size={72} />
-                        <span style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: 'rgba(255,255,255,0.9)' }}>
-                            {match.teamA.name.split(' - ')[0]}
-                        </span>
+                {/* ── Central Area: Teams + Scoreboard ── */}
+                <div style={{
+                    padding: '32px 18px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto 1fr',
+                    alignItems: 'center',
+                    gap: '16px',
+                }}>
+                    {/* Team A and Score */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: disabled ? 0.5 : 1 }}>
+                        <TeamEmblem teamName={match.teamA.name} size={80} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                disabled={disabled}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                    fontSize: '16px',
+                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                    padding: '4px',
+                                    transition: 'color 0.2s',
+                                }}
+                                onClick={() => !disabled && updatePrediction(match.id, 'scoreA', String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)))}
+                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
+                            >
+                                &lt;
+                            </button>
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                border: '2px solid white',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '24px',
+                                fontWeight: 900,
+                                color: 'white',
+                            }}>
+                                {pred?.scoreA ?? 0}
+                            </div>
+                            <button
+                                disabled={disabled}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                    fontSize: '16px',
+                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                    padding: '4px',
+                                    transition: 'color 0.2s',
+                                }}
+                                onClick={() => !disabled && updatePrediction(match.id, 'scoreA', String((pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) + 1))}
+                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
+                            >
+                                &gt;
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Score steppers */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                        <ScoreStepper matchId={match.id} field="scoreA" value={pred?.scoreA ?? 0} />
-                        <span style={{ fontSize: '22px', fontWeight: 300, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>×</span>
-                        <ScoreStepper matchId={match.id} field="scoreB" value={pred?.scoreB ?? 0} />
+                    {/* Center: Category and X */}
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                    }}>
+                        <div style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'rgba(255,255,255,0.7)',
+                            textTransform: 'uppercase',
+                        }}>
+                            {match.category}
+                        </div>
+                        <div style={{
+                            fontSize: '28px',
+                            fontWeight: 300,
+                            color: 'rgba(255,255,255,0.4)',
+                        }}>
+                            ×
+                        </div>
                     </div>
 
-                    {/* Team B */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                        <TeamEmblem teamName={match.teamB.name} size={72} />
-                        <span style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: 'rgba(255,255,255,0.9)' }}>
-                            {match.teamB.name.split(' - ')[0]}
-                        </span>
+                    {/* Team B and Score */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: disabled ? 0.5 : 1 }}>
+                        <TeamEmblem teamName={match.teamB.name} size={80} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                disabled={disabled}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                    fontSize: '16px',
+                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                    padding: '4px',
+                                    transition: 'color 0.2s',
+                                }}
+                                onClick={() => !disabled && updatePrediction(match.id, 'scoreB', String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)))}
+                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
+                            >
+                                &lt;
+                            </button>
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                border: '2px solid white',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '24px',
+                                fontWeight: 900,
+                                color: 'white',
+                            }}>
+                                {pred?.scoreB ?? 0}
+                            </div>
+                            <button
+                                disabled={disabled}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                    fontSize: '16px',
+                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                    padding: '4px',
+                                    transition: 'color 0.2s',
+                                }}
+                                onClick={() => !disabled && updatePrediction(match.id, 'scoreB', String((pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) + 1))}
+                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
+                            >
+                                &gt;
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -306,43 +402,43 @@ const Simulator: FC = () => {
                 )}
 
                 {/* ── Save button ── */}
-                <div style={{ padding: '0 18px 18px', marginTop: 'auto' }}>
+                <div style={{ padding: '18px' }}>
                     <button
                         onClick={saveThisCard}
-                        disabled={!hasPrediction && !cardSaved}
+                        disabled={(!hasPrediction && !cardSaved) || disabled}
                         style={{
                             width: '100%',
-                            padding: '13px',
+                            padding: '14px',
                             borderRadius: '10px',
                             border: 'none',
-                            background: cardSaved
-                                ? 'linear-gradient(135deg, #1a7a3a, #22c55e)'
-                                : hasPrediction
-                                    ? 'linear-gradient(135deg, #cc0000, var(--accent-color))'
-                                    : 'rgba(255,255,255,0.06)',
-                            color: 'white',
+                            background: disabled
+                                ? 'rgba(255,255,255,0.05)'
+                                : cardSaved
+                                    ? '#1a7a3a'
+                                    : hasPrediction
+                                        ? '#dc2626'
+                                        : 'rgba(255,255,255,0.08)',
+                            color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
                             fontSize: '13px',
                             fontWeight: 800,
                             letterSpacing: '1.2px',
-                            cursor: hasPrediction || cardSaved ? 'pointer' : 'not-allowed',
-                            opacity: !hasPrediction && !cardSaved ? 0.45 : 1,
+                            cursor: (hasPrediction || cardSaved) && !disabled ? 'pointer' : 'not-allowed',
+                            opacity: disabled ? 0.5 : (!hasPrediction && !cardSaved ? 0.5 : 1),
                             transition: 'all 0.3s',
-                            boxShadow: cardSaved
-                                ? '0 4px 20px rgba(34,197,94,0.35)'
-                                : hasPrediction
-                                    ? '0 4px 20px rgba(255,46,46,0.35)'
-                                    : 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '8px',
+                            textTransform: 'uppercase',
                         }}
-                        onMouseEnter={(e) => { if (hasPrediction || cardSaved) { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = (!hasPrediction && !cardSaved) ? '0.45' : '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                        onMouseEnter={(e) => { if ((hasPrediction || cardSaved) && !disabled) { e.currentTarget.style.backgroundColor = cardSaved ? '#15803d' : '#b91c1c'; e.currentTarget.style.opacity = '0.9'; } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = cardSaved ? '#1a7a3a' : (hasPrediction && !disabled ? '#dc2626' : 'rgba(255,255,255,0.08)'); e.currentTarget.style.opacity = disabled ? '0.5' : (!hasPrediction && !cardSaved) ? '0.5' : '1'; }}
                     >
-                        {cardSaved
-                            ? <><CheckCircle size={16} /> PALPITE SALVO</>
-                            : <>SALVAR PALPITE</>}
+                        {disabled
+                            ? <>PALPITES FECHADOS</>
+                            : cardSaved
+                                ? <><CheckCircle size={16} /> PALPITE SALVO</>
+                                : <>SALVAR PALPITE</>}
                     </button>
                 </div>
             </div>
@@ -370,6 +466,7 @@ const Simulator: FC = () => {
                                 lineHeight: 1,
                             }}>BOLÃO</h1>
                             <button
+                                onClick={() => setAberto(true)}
                                 style={{
                                     padding: '8px 20px',
                                     borderRadius: '8px',
@@ -415,101 +512,75 @@ const Simulator: FC = () => {
                         </div>
                     </div>
 
-                    {/* Stats bar */}
-                    <div className="premium-card simulator-stats-bar" style={{
-                        padding: '16px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: '24px',
-                    }}>
-                        <div style={{ display: 'flex', gap: '24px' }} className="simulator-stats-metrics">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Calendar size={16} color="var(--text-secondary)" />
-                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    <strong style={{ color: 'white' }}>{displayMatches.length}</strong> jogos
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Trophy size={16} color="var(--text-secondary)" />
-                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    <strong style={{ color: 'white' }}>{filledCount}</strong> palpites
-                                </span>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '10px' }} className="simulator-stats-actions">
-                            <button
-                                onClick={resetPredictions}
-                                style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    background: 'transparent',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s',
-                                }}
-                            >
-                                <RotateCcw size={14} />
-                                Limpar
-                            </button>
-                            <button
-                                onClick={savePredictions}
-                                className="hover-glow"
-                                style={{
-                                    padding: '8px 20px',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    background: 'var(--accent-color)',
-                                    color: 'white',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.3s',
-                                    boxShadow: '0 2px 12px rgba(255,46,46,0.3)',
-                                }}
-                            >
-                                {<><CheckCircle size={14} /> Salvar Todos</>}
-                            </button>
-                        </div>
+                    {/* Summary Panel */}
+                    <SummaryPanel 
+                        totalPoints={scoringStats.totalPoints} 
+                        exactScores={scoringStats.exactScores} 
+                        winners={scoringStats.winners} 
+                    />
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                        <button
+                            onClick={resetPredictions}
+                            style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                background: 'transparent',
+                                color: predictionsFinalized ? 'rgba(255,255,255,0.4)' : 'var(--text-secondary)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: predictionsFinalized ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s',
+                            }}
+                            disabled={predictionsFinalized}
+                        >
+                            <RotateCcw size={14} />
+                            Limpar
+                        </button>
+                        <button
+                            onClick={savePredictions}
+                            className="hover-glow"
+                            style={{
+                                padding: '8px 20px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: predictionsFinalized ? '#1a7a3a' : 'var(--accent-color)',
+                                color: 'white',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.3s',
+                                boxShadow: predictionsFinalized
+                                    ? '0 2px 12px rgba(34,197,94,0.3)'
+                                    : '0 2px 12px rgba(255,46,46,0.3)',
+                            }}
+                        >
+                            {predictionsFinalized ? (
+                                <><CheckCircle size={14} /> PALPITES FECHADOS</>
+                            ) : (
+                                <><CheckCircle size={14} /> Salvar Todos</>
+                            )}
+                        </button>
                     </div>
 
                     {/* Info banner when showing all */}
-                    {showingAll && (
-                        <div style={{
-                            padding: '12px 20px',
-                            borderRadius: '10px',
-                            background: 'rgba(255,165,0,0.08)',
-                            border: '1px solid rgba(255,165,0,0.2)',
-                            marginBottom: '24px',
-                            fontSize: '13px',
-                            color: '#ffaa00',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                        }}>
-                            <Calendar size={16} />
-                            Não há jogos programados para hoje. Mostrando todos os jogos disponíveis para palpites.
-                        </div>
-                    )}
-
                     {/* Match cards grid */}
                     <div className="simulator-grid" style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
                         gap: '20px',
                         alignItems: 'stretch',
                     }}>
                         {displayMatches.map(match => (
-                            <MatchSimCard key={match.id} match={match} />
+                            <MatchSimCard key={match.id} match={match} disabled={predictionsFinalized} />
                         ))}
                     </div>
 
@@ -641,6 +712,7 @@ const Simulator: FC = () => {
             </main>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
+            <ModalRegras aberto={aberto} setAberto={setAberto} />
 
             {/* ── Toast Stack ── */}
             <div style={{ position: 'fixed', bottom: '28px', right: '28px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 9999, pointerEvents: 'none' }}>

@@ -100,7 +100,6 @@ export const mockTeams: Team[] = [
 ];
 
 export const mockMatches: Match[] = [
-  // Único jogo para teste
   {
     id: "m1",
     sport: "Futsal",
@@ -110,9 +109,49 @@ export const mockMatches: Match[] = [
     scoreA: 0,
     scoreB: 0,
     status: "scheduled",
-    date: "2026-03-11",
-    time: "19:00",
+    date: "2026-03-18",
+    time: "14:30",
     location: "Ginásio Laerte Gonçalves",
+    events: [],
+  },
+  {
+    id: "m2",
+    sport: "Futsal",
+    category: "Feminino",
+    teamA: {
+      name: "Sistemas de Informação - Unisanta",
+      emblem: "/emblemas/sistemas.png",
+    },
+    teamB: {
+      name: "Direito - Unisantos",
+      emblem: "/emblemas/direito.png",
+    },
+    scoreA: 0,
+    scoreB: 0,
+    status: "scheduled",
+    date: "2026-03-18",
+    time: "15:30",
+    location: "Ginásio Laerte Gonçalves",
+    events: [],
+  },
+  {
+    id: "m3",
+    sport: "Vôlei",
+    category: "Masculino",
+    teamA: {
+      name: "Engenharia - Unisanta",
+      emblem: "/emblemas/engenharia.png",
+    },
+    teamB: {
+      name: "Administração - Unisanta",
+      emblem: "/emblemas/administracao.png",
+    },
+    scoreA: 0,
+    scoreB: 0,
+    status: "scheduled",
+    date: "2026-03-18",
+    time: "16:30",
+    location: "Quadra 2 - Unisanta",
     events: [],
   },
 ];
