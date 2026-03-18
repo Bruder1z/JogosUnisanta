@@ -5,7 +5,8 @@ import {
     ChevronRight,
     History,
     LayoutGrid,
-    Calendar
+    Calendar,
+    Zap
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
@@ -214,7 +215,25 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                         Calendário dos Jogos
                     </Link>
 
-                    <Link to="/simulador" onClick={close} style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--accent-color)', textDecoration: 'none', fontWeight: 600 }}>⚡ Simulador</Link>
+                    <Link
+                        to="/simulador"
+                        onClick={close}
+                        className="sidebar-link"
+                        style={{
+                            padding: '10px 20px',
+                            fontSize: '13px',
+                            color: location.pathname === '/simulador' ? 'var(--accent-color)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            fontWeight: location.pathname === '/simulador' ? 700 : 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <Zap size={16} />
+                        Bolão
+                    </Link>
                 </div>
 
                 <style>{`

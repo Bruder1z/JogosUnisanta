@@ -3,7 +3,7 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { mockMatches, COURSE_EMBLEMS, type Match } from '../data/mockData';
-import { Zap, Save, CheckCircle, RotateCcw, Calendar, Trophy, Info } from 'lucide-react';
+import { CheckCircle, RotateCcw, Calendar, Trophy, Info, MapPin, Clock } from 'lucide-react';
 
 interface Prediction {
     matchId: string;
@@ -16,10 +16,20 @@ const LS_KEY = 'jogos-unisanta-predictions';
 const SET_SPORTS = ['Vôlei', 'Vôlei de Praia', 'Beach Tennis', 'Tênis de Mesa', 'Futevôlei'];
 const EXCLUDED_SPORTS = ['Xadrez', 'Natação'];
 
+interface ToastData {
+    id: number;
+    message: string;
+    teamA: string;
+    scoreA: number;
+    teamB: string;
+    scoreB: number;
+}
+
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-    const [saved, setSaved] = useState(false);
+    const [activeTab, setActiveTab] = useState<'palpitar' | 'competicoes'>('palpitar');
+    const [toasts, setToasts] = useState<ToastData[]>([]);
 
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
@@ -65,13 +75,10 @@ const Simulator: FC = () => {
                 scoreB: field === 'scoreB' ? numVal : (prev[matchId]?.scoreB ?? ''),
             }
         }));
-        setSaved(false);
     };
 
     const savePredictions = () => {
         localStorage.setItem(LS_KEY, JSON.stringify(predictions));
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
     };
 
     const resetPredictions = () => {
@@ -79,15 +86,35 @@ const Simulator: FC = () => {
         localStorage.removeItem(LS_KEY);
     };
 
+    const showToast = (data: Omit<ToastData, 'id'>) => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { ...data, id }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3200);
+    };
+
     const filledCount = Object.values(predictions).filter(p => p.scoreA !== '' && p.scoreB !== '').length;
 
-    const TeamEmblem = ({ teamName, size = 48 }: { teamName: string; size?: number }) => {
+    // ── helpers ──────────────────────────────────────────────
+    const formatMatchDate = (dateStr: string, timeStr: string) => {
+        const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const [, month, day] = dateStr.split('-').map(Number);
+        return `${day} de ${months[month - 1]}. ${timeStr}`;
+    };
+
+    const hoursUntil = (dateStr: string, timeStr: string): number => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const target = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        const diff = target.getTime() - Date.now();
+        return Math.max(0, Math.floor(diff / 3_600_000));
+    };
+
+    const TeamEmblem = ({ teamName, size = 72 }: { teamName: string; size?: number }) => {
         const emblemUrl = getTeamEmblem(teamName);
         return emblemUrl ? (
             <img
                 src={emblemUrl}
                 alt={teamName}
-                style={{ width: size, height: size, objectFit: 'contain' }}
+                style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
         ) : (
@@ -95,119 +122,165 @@ const Simulator: FC = () => {
                 width: size,
                 height: size,
                 borderRadius: '50%',
-                background: 'var(--bg-hover)',
+                background: 'rgba(255,255,255,0.06)',
+                border: '2px solid rgba(255,255,255,0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: size * 0.5,
+                fontSize: size * 0.42,
             }}>
                 ⚽
             </div>
         );
     };
 
-    const ScoreInput = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => (
-        <input
-            className="sim-score-input"
-            type="text"
-            inputMode="numeric"
-            value={value}
-            onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                updatePrediction(matchId, field, val);
-            }}
-            placeholder="-"
-            style={{
-                width: '60px',
-                height: '60px',
-                textAlign: 'center',
-                lineHeight: '60px',
-                padding: '0',
-                fontSize: '24px',
-                fontWeight: '900',
-                background: 'rgba(255,255,255,0.05)',
-                border: '2px solid var(--border-color)',
-                borderRadius: '16px',
-                color: 'white',
-                outline: 'none',
-                transition: 'all 0.2s',
-                MozAppearance: 'textfield',
-                WebkitAppearance: 'none',
-                appearance: 'none',
-            }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-color)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,46,46,0.2)'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.boxShadow = 'none'; }}
-        />
-    );
+    // +/- stepper control
+    const ScoreStepper = ({ matchId, field, value }: { matchId: string; field: 'scoreA' | 'scoreB'; value: number | '' }) => {
+        const num = value === '' ? 0 : Number(value);
+        const btnStyle: React.CSSProperties = {
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'rgba(255,255,255,0.06)',
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: 700,
+            lineHeight: 1,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s',
+            flexShrink: 0,
+        };
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                    style={btnStyle}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onClick={() => updatePrediction(matchId, field, String(Math.max(0, num - 1)))}
+                >&lt;</button>
+                <span style={{
+                    minWidth: '36px',
+                    textAlign: 'center',
+                    fontSize: '32px',
+                    fontWeight: 900,
+                    color: 'white',
+                    lineHeight: 1,
+                }}>{value === '' ? '0' : value}</span>
+                <button
+                    style={btnStyle}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onClick={() => updatePrediction(matchId, field, String(num + 1))}
+                >&gt;</button>
+            </div>
+        );
+    };
 
     const MatchSimCard = ({ match }: { match: Match }) => {
+        const [cardSaved, setCardSaved] = useState(false);
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
         const isSetSport = SET_SPORTS.includes(match.sport);
+        const hours = hoursUntil(match.date, match.time);
+
+        const saveThisCard = () => {
+            if (!hasPrediction) return;
+            // persist full predictions (including this card's current values)
+            const next = { ...predictions };
+            localStorage.setItem(LS_KEY, JSON.stringify(next));
+
+            // per-card "saved" flash
+            setCardSaved(true);
+            setTimeout(() => setCardSaved(false), 3000);
+
+            // show global toast
+            showToast({
+                message: 'Palpite salvo!',
+                teamA: match.teamA.name.split(' - ')[0],
+                scoreA: Number(pred.scoreA),
+                teamB: match.teamB.name.split(' - ')[0],
+                scoreB: Number(pred.scoreB),
+            });
+        };
 
         return (
-            <div className="premium-card sim-match-card" style={{
-                padding: '24px',
-                transition: 'all 0.3s',
-                border: hasPrediction ? '1px solid rgba(255,46,46,0.3)' : '1px solid var(--border-color)',
-                position: 'relative',
+            <div className="sim-match-card" style={{
+                background: '#1a1a1a',
+                border: hasPrediction ? '1px solid rgba(255,46,46,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '16px',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%',
+                transition: 'border-color 0.3s',
             }}>
-                {/* Status badge */}
+                {/* ── Header strip ── */}
                 <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
+                    padding: '14px 18px',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text-secondary)',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    flexWrap: 'wrap',
                 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {/* Sport + category */}
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-color)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                            {match.sport} · {match.category}
+                        </span>
+                        {/* Date/time row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
+                                <Clock size={12} />
+                                {formatMatchDate(match.date, match.time)}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>
+                                <MapPin size={12} />
+                                {match.location}
+                            </span>
+                        </div>
+                    </div>
+                    {/* Countdown badge */}
                     <div style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        background: 'var(--text-secondary)',
-                    }} />
-                    {match.time}
+                        padding: '5px 12px',
+                        borderRadius: '20px',
+                        background: hours <= 3 ? 'rgba(255,46,46,0.15)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${hours <= 3 ? 'rgba(255,46,46,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: hours <= 3 ? 'var(--accent-color)' : 'rgba(255,255,255,0.5)',
+                        whiteSpace: 'nowrap',
+                        letterSpacing: '0.04em',
+                    }}>
+                        {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}
+                    </div>
                 </div>
 
-                {/* Sport & category */}
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span>{match.sport}</span>
-                    <span style={{ opacity: 0.3 }}>•</span>
-                    <span>{match.category}</span>
-                </div>
-
-                {/* Teams and scores */}
-                <div className="sim-matchup-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                {/* ── Teams + Scores ── */}
+                <div style={{ padding: '24px 18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     {/* Team A */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <TeamEmblem teamName={match.teamA.name} size={48} />
-                        <span style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <TeamEmblem teamName={match.teamA.name} size={72} />
+                        <span style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: 'rgba(255,255,255,0.9)' }}>
                             {match.teamA.name.split(' - ')[0]}
                         </span>
                     </div>
 
-                    {/* Score inputs */}
-                    <div className="sim-score-inputs-row" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <ScoreInput matchId={match.id} field="scoreA" value={pred?.scoreA ?? ''} />
-                        <span style={{ fontSize: '20px', fontWeight: 300, color: 'var(--text-secondary)' }}>×</span>
-                        <ScoreInput matchId={match.id} field="scoreB" value={pred?.scoreB ?? ''} />
+                    {/* Score steppers */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                        <ScoreStepper matchId={match.id} field="scoreA" value={pred?.scoreA ?? 0} />
+                        <span style={{ fontSize: '22px', fontWeight: 300, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>×</span>
+                        <ScoreStepper matchId={match.id} field="scoreB" value={pred?.scoreB ?? 0} />
                     </div>
 
                     {/* Team B */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <TeamEmblem teamName={match.teamB.name} size={48} />
-                        <span style={{ fontSize: '13px', fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <TeamEmblem teamName={match.teamB.name} size={72} />
+                        <span style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: 'rgba(255,255,255,0.9)' }}>
                             {match.teamB.name.split(' - ')[0]}
                         </span>
                     </div>
@@ -216,32 +289,61 @@ const Simulator: FC = () => {
                 {/* Set sport notice */}
                 {isSetSport && (
                     <div style={{
-                        marginTop: '16px',
-                        padding: '10px 14px',
+                        margin: '0 18px 14px',
+                        padding: '8px 12px',
                         borderRadius: '8px',
-                        background: 'rgba(59,130,246,0.08)',
-                        border: '1px solid rgba(59,130,246,0.2)',
+                        background: 'rgba(59,130,246,0.07)',
+                        border: '1px solid rgba(59,130,246,0.18)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
                         fontSize: '12px',
                         color: '#60a5fa',
                     }}>
-                        <Info size={14} style={{ flexShrink: 0 }} />
+                        <Info size={13} style={{ flexShrink: 0 }} />
                         Placar em sets (ex: 3 × 1)
                     </div>
                 )}
 
-                {/* Match info */}
-                <div style={{
-                    marginTop: '14px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '16px',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                }}>
-                    <span>📍 {match.location}</span>
+                {/* ── Save button ── */}
+                <div style={{ padding: '0 18px 18px', marginTop: 'auto' }}>
+                    <button
+                        onClick={saveThisCard}
+                        disabled={!hasPrediction && !cardSaved}
+                        style={{
+                            width: '100%',
+                            padding: '13px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: cardSaved
+                                ? 'linear-gradient(135deg, #1a7a3a, #22c55e)'
+                                : hasPrediction
+                                    ? 'linear-gradient(135deg, #cc0000, var(--accent-color))'
+                                    : 'rgba(255,255,255,0.06)',
+                            color: 'white',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            letterSpacing: '1.2px',
+                            cursor: hasPrediction || cardSaved ? 'pointer' : 'not-allowed',
+                            opacity: !hasPrediction && !cardSaved ? 0.45 : 1,
+                            transition: 'all 0.3s',
+                            boxShadow: cardSaved
+                                ? '0 4px 20px rgba(34,197,94,0.35)'
+                                : hasPrediction
+                                    ? '0 4px 20px rgba(255,46,46,0.35)'
+                                    : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                        }}
+                        onMouseEnter={(e) => { if (hasPrediction || cardSaved) { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = (!hasPrediction && !cardSaved) ? '0.45' : '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                        {cardSaved
+                            ? <><CheckCircle size={16} /> PALPITE SALVO</>
+                            : <>SALVAR PALPITE</>}
+                    </button>
                 </div>
             </div>
         );
@@ -255,24 +357,62 @@ const Simulator: FC = () => {
                 <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
                     {/* Page header */}
-                    <div style={{ marginBottom: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                        <div style={{
-                            width: '60px',
-                            height: '60px',
-                            borderRadius: '16px',
-                            background: 'linear-gradient(135deg, var(--accent-color), #ff6b35)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 4px 25px rgba(255, 46, 46, 0.4)',
-                            marginBottom: '16px'
-                        }}>
-                            <Zap size={32} color="white" />
+                    <div style={{ marginBottom: '0', display: 'flex', flexDirection: 'column' }}>
+                        {/* Title row */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                            <h1 style={{
+                                fontSize: '38px',
+                                fontWeight: 900,
+                                margin: 0,
+                                letterSpacing: '2px',
+                                color: 'white',
+                                textTransform: 'uppercase',
+                                lineHeight: 1,
+                            }}>BOLÃO</h1>
+                            <button
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid rgba(255,255,255,0.3)',
+                                    background: 'transparent',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    letterSpacing: '1px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; e.currentTarget.style.background = 'transparent'; }}
+                            >
+                                REGRAS
+                            </button>
                         </div>
-                        <h1 style={{ fontSize: '36px', fontWeight: 900, margin: 0, letterSpacing: '-1px' }}>Simulador</h1>
-                        <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0', fontSize: '16px', fontWeight: 500 }}>
-                            Dê seus palpites nos jogos de hoje
-                        </p>
+
+                        {/* Tab bar */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
+                            {(['palpitar', 'competicoes'] as const).map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    style={{
+                                        padding: '12px 20px',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderBottom: activeTab === tab ? '2px solid var(--accent-color)' : '2px solid transparent',
+                                        color: activeTab === tab ? 'white' : 'var(--text-secondary)',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        letterSpacing: '1px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        marginBottom: '-1px',
+                                    }}
+                                >
+                                    {tab === 'palpitar' ? 'PALPITAR' : 'COMPETIÇÕES'}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Stats bar */}
@@ -325,7 +465,7 @@ const Simulator: FC = () => {
                                     padding: '8px 20px',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    background: saved ? '#00c853' : 'var(--accent-color)',
+                                    background: 'var(--accent-color)',
                                     color: 'white',
                                     fontSize: '12px',
                                     fontWeight: 700,
@@ -337,7 +477,7 @@ const Simulator: FC = () => {
                                     boxShadow: '0 2px 12px rgba(255,46,46,0.3)',
                                 }}
                             >
-                                {saved ? <><CheckCircle size={14} /> Salvo!</> : <><Save size={14} /> Salvar Palpites</>}
+                                {<><CheckCircle size={14} /> Salvar Todos</>}
                             </button>
                         </div>
                     </div>
@@ -501,6 +641,41 @@ const Simulator: FC = () => {
             </main>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
+
+            {/* ── Toast Stack ── */}
+            <div style={{ position: 'fixed', bottom: '28px', right: '28px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 9999, pointerEvents: 'none' }}>
+                {(toasts ?? []).map((toast) => (
+                    <div
+                        key={toast.id}
+                        className="bolao-toast"
+                        style={{
+                            background: 'linear-gradient(135deg, #cc0000, #ff2e2e)',
+                            borderRadius: '14px',
+                            padding: '14px 18px',
+                            boxShadow: '0 8px 32px rgba(255,46,46,0.45)',
+                            minWidth: '240px',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <CheckCircle size={15} color="white" />
+                            <span style={{ color: 'white', fontWeight: 800, fontSize: '12px', letterSpacing: '0.08em' }}>PALPITE SALVO!</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', fontWeight: 600, flex: 1, textAlign: 'left' }}>{toast.teamA}</span>
+                            <span style={{ color: 'white', fontWeight: 900, fontSize: '20px', letterSpacing: '2px' }}>{toast.scoreA} × {toast.scoreB}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', fontWeight: 600, flex: 1, textAlign: 'right' }}>{toast.teamB}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <style>{`
+                @keyframes bolao-toast-in {
+                    from { opacity: 0; transform: translateX(40px) scale(0.95); }
+                    to   { opacity: 1; transform: translateX(0)   scale(1); }
+                }
+                .bolao-toast { animation: bolao-toast-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+            `}</style>
         </div>
     );
 };
