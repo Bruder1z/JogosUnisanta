@@ -354,7 +354,7 @@ const Simulator: FC = () => {
                                 textTransform: 'uppercase',
                                 textAlign: 'center',
                             }}>
-                                {match.category}
+                                {match.sport} • {match.category}
                             </div>
                             {match.status === 'finished' ? (
                                 <div style={{

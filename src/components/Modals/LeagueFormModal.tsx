@@ -1,5 +1,7 @@
 import { type FC, useState } from 'react';
 import { X, Trophy, Link as LinkIcon, Copy, Check, ArrowRight, ArrowLeft } from 'lucide-react';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 interface LeagueFormModalProps {
     aberto: boolean;
@@ -11,15 +13,43 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [copied, setCopied] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const { user } = useAuth();
 
     if (!aberto) return null;
 
     const generatedLink = `https://jogosunisanta.com.br/liga/${name.toLowerCase().replace(/\s+/g, '-') || 'nova-liga'}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const handleNext = (e: React.FormEvent) => {
+    const handleNext = async (e: React.FormEvent) => {
         e.preventDefault();
         if (name.trim()) {
-            setStep(2);
+            setIsLoading(true);
+            try {
+                const creator = user?.email || 'anonymous';
+                const initialParticipants = [creator];
+
+                const { error } = await supabase
+                    .from('leagues')
+                    .insert([
+                        {
+                            name: name.trim(),
+                            description: description.trim(),
+                            participants: initialParticipants
+                        }
+                    ]);
+
+                if (error) {
+                    console.error("Erro ao criar liga:", error);
+                    alert("Erro ao salvar liga no banco de dados. Verifique a tabela 'leagues'.");
+                    return;
+                }
+                
+                setStep(2);
+            } catch (err) {
+                console.error("Exception ao criar liga:", err);
+            } finally {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -218,6 +248,7 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto }) => {
 
                             <button
                                 type="submit"
+                                disabled={isLoading}
                                 style={{
                                     marginTop: '12px',
                                     backgroundColor: 'var(--accent-color)',
@@ -227,7 +258,8 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto }) => {
                                     padding: '16px',
                                     fontSize: '15px',
                                     fontWeight: 800,
-                                    cursor: 'pointer',
+                                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                                    opacity: isLoading ? 0.7 : 1,
                                     transition: 'all 0.3s',
                                     textTransform: 'uppercase',
                                     letterSpacing: '1px',
@@ -238,18 +270,26 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto }) => {
                                     boxShadow: '0 8px 20px rgba(227, 6, 19, 0.3)',
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.filter = 'brightness(1.1)';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(227, 6, 19, 0.4)';
+                                    if(!isLoading) {
+                                        e.currentTarget.style.filter = 'brightness(1.1)';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(227, 6, 19, 0.4)';
+                                    }
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.filter = 'brightness(1)';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(227, 6, 19, 0.3)';
+                                    if(!isLoading) {
+                                        e.currentTarget.style.filter = 'brightness(1)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(227, 6, 19, 0.3)';
+                                    }
                                 }}
                             >
-                                Próximo Passo
-                                <ArrowRight size={18} />
+                                {isLoading ? 'CRIANDO...' : (
+                                    <>
+                                        Próximo Passo
+                                        <ArrowRight size={18} />
+                                    </>
+                                )}
                             </button>
                         </form>
                     </div>
