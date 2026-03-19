@@ -27,7 +27,7 @@ const Simulator: FC = () => {
     const [showBolaoRanking, setShowBolaoRanking] = useState(false);
     const [aberto, setAberto] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-    const [activeTab, setActiveTab] = useState<'palpitar' | 'historico'>('palpitar');
+    const [activeTab, setActiveTab] = useState<'palpitar' | 'historico' | 'competicoes'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
 
@@ -629,7 +629,7 @@ const Simulator: FC = () => {
 
                         {/* Tab bar */}
                         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
-                            {(['palpitar', 'historico'] as const).map((tab) => (
+                            {(['palpitar', 'historico', 'competicoes'] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -647,18 +647,20 @@ const Simulator: FC = () => {
                                         marginBottom: '-1px',
                                     }}
                                 >
-                                    {tab === 'palpitar' ? 'PALPITAR' : 'HISTÓRICO'}
+                                    {tab === 'palpitar' ? 'PALPITAR' : tab === 'historico' ? 'HISTÓRICO' : 'COMPETIÇÕES'}
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     {/* Summary Panel */}
-                    <SummaryPanel
-                        totalPoints={scoringStats.totalPoints}
-                        exactScores={scoringStats.exactScores}
-                        winners={scoringStats.winners}
-                    />
+                    {activeTab !== 'competicoes' && (
+                        <SummaryPanel
+                            totalPoints={scoringStats.totalPoints}
+                            exactScores={scoringStats.exactScores}
+                            winners={scoringStats.winners}
+                        />
+                    )}
 
                     {/* Action buttons */}
                     {activeTab === 'palpitar' && (
@@ -714,20 +716,46 @@ const Simulator: FC = () => {
                         </div>
                     )}
 
+                    {/* Competitions Tab */}
+                    {activeTab === 'competicoes' && (
+                        <div style={{ paddingTop: '16px' }}>
+                            <h2 style={{
+                                fontSize: '36px',
+                                fontWeight: 900,
+                                color: 'white',
+                                margin: '0 0 12px 0',
+                                letterSpacing: '0.5px',
+                            }}>
+                                Categoria de Liga
+                            </h2>
+                            <p style={{
+                                fontSize: '16px',
+                                color: 'var(--text-secondary)',
+                                margin: 0,
+                                fontWeight: 400,
+                                lineHeight: 1.5,
+                            }}>
+                                Crie sua liga e comece a competir com a galera!
+                            </p>
+                        </div>
+                    )}
+
                     {/* Info banner when showing all */}
                     {/* Match cards grid */}
-                    <div className="simulator-grid" style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-                        gap: '20px',
-                        alignItems: 'stretch',
-                    }}>
-                        {displayMatches.map(match => (
-                            <MatchSimCard key={match.id} match={match} disabled={predictionsFinalized} />
-                        ))}
-                    </div>
+                    {(activeTab === 'palpitar' || activeTab === 'historico') && (
+                        <div className="simulator-grid" style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+                            gap: '20px',
+                            alignItems: 'stretch',
+                        }}>
+                            {displayMatches.map(match => (
+                                <MatchSimCard key={match.id} match={match} disabled={predictionsFinalized} />
+                            ))}
+                        </div>
+                    )}
 
-                    {displayMatches.length === 0 && (
+                    {displayMatches.length === 0 && (activeTab === 'palpitar' || activeTab === 'historico') && (
                         <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-secondary)' }}>
                             <Calendar size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
                             <p>{activeTab === 'palpitar' ? 'Nenhum jogo disponível para simulação.' : 'Nenhum histórico de palpite concluído.'}</p>
