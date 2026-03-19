@@ -1,71 +1,109 @@
-import type { FC } from 'react';
+import { type FC, useState } from 'react';
+import LeagueFormModal from '../Modals/LeagueFormModal';
 
 const LigaCard: FC = () => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     return (
-        <div style={{
-            background: '#FFFFFF',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
-            width: '320px',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '16px',
-        }}>
-            <h3 style={{
-                margin: 0,
-                fontSize: '20px',
-                fontWeight: 'bold',
-                color: '#000000',
-                textTransform: 'uppercase',
-                textAlign: 'center',
-            }}>
-                LIGA CLÁSSICA
-            </h3>
-
-            <p style={{
-                margin: 0,
-                fontSize: '0.9rem',
-                color: '#777777',
-                textAlign: 'center',
-                lineHeight: 1.4,
-            }}>
-                Dispute o primeiro lugar do ranking de pontos corridos com seus amigos!
-            </p>
-
-            <img
-                src="/images/logo-liga.png"
-                alt="Logo Liga Clássica"
+        <>
+            <div 
+                className="premium-card"
                 style={{
-                    maxWidth: '200px',
-                    width: '100%',
-                    height: 'auto',
-                    objectFit: 'contain',
-                    margin: '8px 0',
+                    background: 'var(--bg-card)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    width: '320px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '16px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                    transition: 'all 0.3s ease',
                 }}
-            />
-
-            <button
-                style={{
-                    width: '100%',
-                    backgroundColor: '#dc2626',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '12px 16px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
             >
-                CRIAR LIGA
-            </button>
-        </div>
+                <h3 style={{
+                    margin: 0,
+                    fontSize: '22px',
+                    fontWeight: 900,
+                    color: 'var(--text-primary)',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    letterSpacing: '1px',
+                }}>
+                    LIGA CLÁSSICA
+                </h3>
+
+                <p style={{
+                    margin: 0,
+                    fontSize: '0.95rem',
+                    color: 'var(--text-secondary)',
+                    textAlign: 'center',
+                    lineHeight: 1.5,
+                    fontWeight: 500,
+                }}>
+                    Dispute o primeiro lugar do ranking de pontos corridos com seus amigos!
+                </p>
+
+                <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}>
+                    <img
+                        src="/images/logo-liga.png"
+                        alt="Logo Liga Clássica"
+                        style={{
+                            maxWidth: '180px',
+                            width: '100%',
+                            height: 'auto',
+                            objectFit: 'contain',
+                        }}
+                    />
+                </div>
+
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    style={{
+                        width: '100%',
+                        backgroundColor: 'var(--accent-color)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        boxShadow: '0 4px 12px rgba(227, 6, 19, 0.3)',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(227, 6, 19, 0.4)';
+                        e.currentTarget.style.filter = 'brightness(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(227, 6, 19, 0.3)';
+                        e.currentTarget.style.filter = 'brightness(1)';
+                    }}
+                >
+                    CRIAR LIGA
+                </button>
+            </div>
+
+            <LeagueFormModal 
+                aberto={isModalOpen} 
+                setAberto={setIsModalOpen} 
+            />
+        </>
     );
 };
 
