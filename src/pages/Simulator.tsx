@@ -5,6 +5,7 @@ import RankingModal from '../components/Modals/RankingModal';
 import ModalRegras from '../components/Modals/ModalRegras';
 import BolaoRankingModal from '../components/Modals/BolaoRankingModal';
 import SummaryPanel from '../components/Modals/SummaryPanel';
+import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
@@ -731,12 +732,15 @@ const Simulator: FC = () => {
                             <p style={{
                                 fontSize: '16px',
                                 color: 'var(--text-secondary)',
-                                margin: 0,
+                                margin: '0 0 24px 0',
                                 fontWeight: 400,
                                 lineHeight: 1.5,
                             }}>
                                 Crie sua liga e comece a competir com a galera!
                             </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                <LigaCard />
+                            </div>
                         </div>
                     )}
 
