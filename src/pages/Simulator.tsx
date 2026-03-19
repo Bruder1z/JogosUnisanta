@@ -3,6 +3,7 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import ModalRegras from '../components/Modals/ModalRegras';
+import BolaoRankingModal from '../components/Modals/BolaoRankingModal';
 import SummaryPanel from '../components/Modals/SummaryPanel';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
@@ -23,9 +24,10 @@ interface ToastData {
 
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
+    const [showBolaoRanking, setShowBolaoRanking] = useState(false);
     const [aberto, setAberto] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-    const [activeTab, setActiveTab] = useState<'palpitar' | 'competicoes'>('palpitar');
+    const [activeTab, setActiveTab] = useState<'palpitar' | 'historico'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
 
@@ -49,10 +51,19 @@ const Simulator: FC = () => {
     }, [matches]);
 
     // Also show all scheduled matches if none today
-    const displayMatches = useMemo(() => {
+    const palpitarMatches = useMemo(() => {
         if (todayMatches.length > 0) return todayMatches;
         return matches.filter(m => m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
     }, [todayMatches, matches]);
+
+    const historyMatches = useMemo(() => {
+        return matches.filter(m => m.status === 'finished' && userPredictions[m.id] && userPredictions[m.id].scoreA !== '' && userPredictions[m.id].scoreB !== '');
+    }, [matches, userPredictions]);
+
+    const displayMatches = useMemo(() => {
+        if (activeTab === 'historico') return historyMatches;
+        return palpitarMatches;
+    }, [activeTab, historyMatches, palpitarMatches]);
 
     // Load from userPredictions
     useEffect(() => {
@@ -136,11 +147,10 @@ const Simulator: FC = () => {
     }, [userPredictions, matches]);
 
     // ── helpers ──────────────────────────────────────────────
-    const hoursUntil = (dateStr: string, timeStr: string): number => {
+    const msUntil = (dateStr: string, timeStr: string): number => {
         const [h, m] = timeStr.split(':').map(Number);
         const target = new Date(`${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
-        const diff = target.getTime() - Date.now();
-        return Math.max(0, Math.floor(diff / 3_600_000));
+        return target.getTime() - Date.now();
     };
 
     const TeamEmblem = ({ teamName, size = 72 }: { teamName: string; size?: number }) => {
@@ -174,8 +184,16 @@ const Simulator: FC = () => {
         const [cardSaved, setCardSaved] = useState(false);
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
+        
         const isSetSport = SET_SPORTS.includes(match.sport);
-        const hours = hoursUntil(match.date, match.time);
+        
+        const timeLeftMs = msUntil(match.date, match.time);
+        const isTimeout = match.status !== 'finished' && timeLeftMs <= 3600000; // <= 1 hour
+        const hours = Math.max(0, Math.floor(timeLeftMs / 3_600_000));
+
+        // Block if globally disabled, visually timeout, or already saved in userPredictions DB
+        const isPreviouslySaved = userPredictions[match.id] && userPredictions[match.id].scoreA !== '' && userPredictions[match.id].scoreB !== '';
+        const isCardDisabled = disabled || isTimeout || isPreviouslySaved || match.status === 'finished';
 
         const saveThisCard = async () => {
             if (!hasPrediction) return;
@@ -232,10 +250,15 @@ const Simulator: FC = () => {
                         gap: '6px',
                         fontSize: '12px',
                         fontWeight: 700,
-                        color: '#ffd700',
+                        color: match.status === 'finished' ? '#4ade80' : isTimeout ? '#ef4444' : '#ffd700',
                     }}>
-                        <Zap size={14} />
-                        {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}
+                        {match.status === 'finished' ? (
+                            <>ENCERRADO</>
+                        ) : isTimeout ? (
+                            <>TEMPO ESGOTADO</>
+                        ) : (
+                            <><Zap size={14} /> {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}</>
+                        )}
                     </div>
                 </div>
 
@@ -248,136 +271,181 @@ const Simulator: FC = () => {
                     gap: '16px',
                 }}>
                     {/* Team A and Score */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: disabled ? 0.5 : 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
                         <TeamEmblem teamName={match.teamA.name} size={80} />
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                disabled={disabled}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                    fontSize: '16px',
-                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                    padding: '4px',
-                                    transition: 'color 0.2s',
-                                }}
-                                onClick={() => !disabled && updatePrediction(match.id, 'scoreA', String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)))}
-                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
-                            >
-                                &lt;
-                            </button>
+                            {match.status !== 'finished' && (
+                                <button
+                                    disabled={isCardDisabled}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                        fontSize: '16px',
+                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
+                                        padding: '4px',
+                                        transition: 'color 0.2s',
+                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
+                                    }}
+                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreA', String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)))}
+                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                                >
+                                    &lt;
+                                </button>
+                            )}
                             <div style={{
-                                width: '48px',
-                                height: '48px',
-                                border: '2px solid white',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '24px',
-                                fontWeight: 900,
-                                color: 'white',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
                             }}>
-                                {pred?.scoreA ?? 0}
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    border: '2px solid white',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '24px',
+                                    fontWeight: 900,
+                                    color: 'white',
+                                    background: match.status === 'finished' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                }}>
+                                    {pred?.scoreA ?? '-'}
+                                </div>
+                                {match.status === 'finished' && (
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>
+                                )}
                             </div>
-                            <button
-                                disabled={disabled}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                    fontSize: '16px',
-                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                    padding: '4px',
-                                    transition: 'color 0.2s',
-                                }}
-                                onClick={() => !disabled && updatePrediction(match.id, 'scoreA', String((pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) + 1))}
-                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
-                            >
-                                &gt;
-                            </button>
+                            {match.status !== 'finished' && (
+                                <button
+                                    disabled={isCardDisabled}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                        fontSize: '16px',
+                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
+                                        padding: '4px',
+                                        transition: 'color 0.2s',
+                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
+                                    }}
+                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreA', String((pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) + 1))}
+                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                                >
+                                    &gt;
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     {/* Center: Category and X */}
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '12px',
-                    }}>
                         <div style={{
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: 'rgba(255,255,255,0.7)',
-                            textTransform: 'uppercase',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '12px',
                         }}>
-                            {match.category}
+                            <div style={{
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                color: 'rgba(255,255,255,0.7)',
+                                textTransform: 'uppercase',
+                                textAlign: 'center',
+                            }}>
+                                {match.category}
+                            </div>
+                            {match.status === 'finished' ? (
+                                <div style={{
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+                                }}>
+                                    <div style={{
+                                        fontSize: '28px',
+                                        fontWeight: 900,
+                                        color: 'white',
+                                        whiteSpace: 'nowrap',
+                                    }}>
+                                        {match.scoreA} × {match.scoreB}
+                                    </div>
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80' }}>RESULTADO FINAL</div>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    fontSize: '28px',
+                                    fontWeight: 300,
+                                    color: 'rgba(255,255,255,0.4)',
+                                }}>
+                                    ×
+                                </div>
+                            )}
                         </div>
-                        <div style={{
-                            fontSize: '28px',
-                            fontWeight: 300,
-                            color: 'rgba(255,255,255,0.4)',
-                        }}>
-                            ×
-                        </div>
-                    </div>
 
                     {/* Team B and Score */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: disabled ? 0.5 : 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
                         <TeamEmblem teamName={match.teamB.name} size={80} />
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                disabled={disabled}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                    fontSize: '16px',
-                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                    padding: '4px',
-                                    transition: 'color 0.2s',
-                                }}
-                                onClick={() => !disabled && updatePrediction(match.id, 'scoreB', String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)))}
-                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
-                            >
-                                &lt;
-                            </button>
+                            {match.status !== 'finished' && (
+                                <button
+                                    disabled={isCardDisabled}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                        fontSize: '16px',
+                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
+                                        padding: '4px',
+                                        transition: 'color 0.2s',
+                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
+                                    }}
+                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreB', String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)))}
+                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                                >
+                                    &lt;
+                                </button>
+                            )}
                             <div style={{
-                                width: '48px',
-                                height: '48px',
-                                border: '2px solid white',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '24px',
-                                fontWeight: 900,
-                                color: 'white',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
                             }}>
-                                {pred?.scoreB ?? 0}
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    border: '2px solid white',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '24px',
+                                    fontWeight: 900,
+                                    color: 'white',
+                                    background: match.status === 'finished' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                }}>
+                                    {pred?.scoreB ?? '-'}
+                                </div>
+                                {match.status === 'finished' && (
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>
+                                )}
                             </div>
-                            <button
-                                disabled={disabled}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                    fontSize: '16px',
-                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                    padding: '4px',
-                                    transition: 'color 0.2s',
-                                }}
-                                onClick={() => !disabled && updatePrediction(match.id, 'scoreB', String((pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) + 1))}
-                                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = 'white'; }}
-                            >
-                                &gt;
-                            </button>
+                            {match.status !== 'finished' && (
+                                <button
+                                    disabled={isCardDisabled}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                        fontSize: '16px',
+                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
+                                        padding: '4px',
+                                        transition: 'color 0.2s',
+                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
+                                    }}
+                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreB', String((pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) + 1))}
+                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                                >
+                                    &gt;
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -401,46 +469,95 @@ const Simulator: FC = () => {
                     </div>
                 )}
 
+                {/* ── Match Results History Indicator ── */}
+                {match.status === 'finished' && hasPrediction && (
+                    <div style={{
+                        padding: '12px 18px',
+                        background: 'rgba(0,0,0,0.2)',
+                        borderTop: '1px solid rgba(255,255,255,0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                    }}>
+                        {(() => {
+                            const predA = Number(pred.scoreA);
+                            const predB = Number(pred.scoreB);
+                            const actualA = match.scoreA;
+                            const actualB = match.scoreB;
+                            const isExact = predA === actualA && predB === actualB;
+                            const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                            const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
+                            const isWinner = predWinner === actualWinner;
+
+                            if (isExact) {
+                                return (
+                                    <>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#4ade80' }}></div>
+                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#4ade80' }}>PLACAR EXATO (+3)</span>
+                                    </>
+                                );
+                            } else if (isWinner) {
+                                return (
+                                    <>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#eab308' }}></div>
+                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#eab308' }}>ACERTOU VENCEDOR (+1)</span>
+                                    </>
+                                );
+                            } else {
+                                return (
+                                    <>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></div>
+                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#ef4444' }}>ERROU (0)</span>
+                                    </>
+                                );
+                            }
+                        })()}
+                    </div>
+                )}
+
                 {/* ── Save button ── */}
-                <div style={{ padding: '18px' }}>
-                    <button
-                        onClick={saveThisCard}
-                        disabled={(!hasPrediction && !cardSaved) || disabled}
-                        style={{
-                            width: '100%',
-                            padding: '14px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            background: disabled
-                                ? 'rgba(255,255,255,0.05)'
-                                : cardSaved
-                                    ? '#1a7a3a'
-                                    : hasPrediction
-                                        ? '#dc2626'
-                                        : 'rgba(255,255,255,0.08)',
-                            color: disabled ? 'rgba(255,255,255,0.3)' : 'white',
-                            fontSize: '13px',
-                            fontWeight: 800,
-                            letterSpacing: '1.2px',
-                            cursor: (hasPrediction || cardSaved) && !disabled ? 'pointer' : 'not-allowed',
-                            opacity: disabled ? 0.5 : (!hasPrediction && !cardSaved ? 0.5 : 1),
-                            transition: 'all 0.3s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            textTransform: 'uppercase',
-                        }}
-                        onMouseEnter={(e) => { if ((hasPrediction || cardSaved) && !disabled) { e.currentTarget.style.backgroundColor = cardSaved ? '#15803d' : '#b91c1c'; e.currentTarget.style.opacity = '0.9'; } }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = cardSaved ? '#1a7a3a' : (hasPrediction && !disabled ? '#dc2626' : 'rgba(255,255,255,0.08)'); e.currentTarget.style.opacity = disabled ? '0.5' : (!hasPrediction && !cardSaved) ? '0.5' : '1'; }}
-                    >
-                        {disabled
-                            ? <>PALPITES FECHADOS</>
-                            : cardSaved
-                                ? <><CheckCircle size={16} /> PALPITE SALVO</>
+                {match.status !== 'finished' && (
+                    <div style={{ padding: '18px' }}>
+                        <button
+                            onClick={saveThisCard}
+                            disabled={(!hasPrediction && !cardSaved) || isCardDisabled}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: isCardDisabled
+                                    ? 'rgba(255,255,255,0.05)'
+                                    : cardSaved || isPreviouslySaved
+                                        ? '#1a7a3a'
+                                        : hasPrediction
+                                            ? '#dc2626'
+                                            : 'rgba(255,255,255,0.08)',
+                                color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                                fontSize: '13px',
+                                fontWeight: 800,
+                                letterSpacing: '1.2px',
+                                cursor: (hasPrediction || cardSaved || isPreviouslySaved) && !isCardDisabled ? 'pointer' : 'not-allowed',
+                                opacity: isCardDisabled ? (isPreviouslySaved ? 1 : 0.5) : (!hasPrediction && !cardSaved ? 0.5 : 1),
+                                transition: 'all 0.3s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                textTransform: 'uppercase',
+                            }}
+                            onMouseEnter={(e) => { if ((hasPrediction || cardSaved) && !isCardDisabled) { e.currentTarget.style.backgroundColor = cardSaved ? '#15803d' : '#b91c1c'; e.currentTarget.style.opacity = '0.9'; } }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = cardSaved || isPreviouslySaved ? '#1a7a3a' : (hasPrediction && !isCardDisabled ? '#dc2626' : 'rgba(255,255,255,0.08)'); e.currentTarget.style.opacity = isCardDisabled ? (isPreviouslySaved ? '1' : '0.5') : (!hasPrediction && !cardSaved) ? '0.5' : '1'; }}
+                        >
+                            {isPreviouslySaved || cardSaved
+                                ? <><CheckCircle size={16} /> PALPITE CONFIRMADO</>
+                                : isTimeout || disabled
+                                ? <>PALPITES FECHADOS</>
                                 : <>SALVAR PALPITE</>}
-                    </button>
-                </div>
+                        </button>
+                    </div>
+                )}
             </div>
         );
     };
@@ -465,30 +582,54 @@ const Simulator: FC = () => {
                                 textTransform: 'uppercase',
                                 lineHeight: 1,
                             }}>BOLÃO</h1>
-                            <button
-                                onClick={() => setAberto(true)}
-                                style={{
-                                    padding: '8px 20px',
-                                    borderRadius: '8px',
-                                    border: '1.5px solid rgba(255,255,255,0.3)',
-                                    background: 'transparent',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    fontWeight: 700,
-                                    letterSpacing: '1px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; e.currentTarget.style.background = 'transparent'; }}
-                            >
-                                REGRAS
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={() => setShowBolaoRanking(true)}
+                                    style={{
+                                        padding: '8px 20px',
+                                        borderRadius: '8px',
+                                        border: '1.5px solid rgba(220,38,38,0.4)',
+                                        background: 'rgba(220,38,38,0.1)',
+                                        color: '#ff6b6b',
+                                        fontSize: '13px',
+                                        fontWeight: 800,
+                                        letterSpacing: '1px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#dc2626'; e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fff'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'; e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; e.currentTarget.style.color = '#ff6b6b'; }}
+                                >
+                                    RANKING BOLÃO
+                                </button>
+                                <button
+                                    onClick={() => setAberto(true)}
+                                    style={{
+                                        padding: '8px 20px',
+                                        borderRadius: '8px',
+                                        border: '1.5px solid rgba(255,255,255,0.3)',
+                                        background: 'transparent',
+                                        color: 'white',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        letterSpacing: '1px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                    REGRAS
+                                </button>
+                            </div>
                         </div>
 
                         {/* Tab bar */}
                         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
-                            {(['palpitar', 'competicoes'] as const).map((tab) => (
+                            {(['palpitar', 'historico'] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -506,7 +647,7 @@ const Simulator: FC = () => {
                                         marginBottom: '-1px',
                                     }}
                                 >
-                                    {tab === 'palpitar' ? 'PALPITAR' : 'COMPETIÇÕES'}
+                                    {tab === 'palpitar' ? 'PALPITAR' : 'HISTÓRICO'}
                                 </button>
                             ))}
                         </div>
@@ -520,56 +661,58 @@ const Simulator: FC = () => {
                     />
 
                     {/* Action buttons */}
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
-                        <button
-                            onClick={resetPredictions}
-                            style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                background: 'transparent',
-                                color: predictionsFinalized ? 'rgba(255,255,255,0.4)' : 'var(--text-secondary)',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: predictionsFinalized ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.2s',
-                            }}
-                            disabled={predictionsFinalized}
-                        >
-                            <RotateCcw size={14} />
-                            Limpar
-                        </button>
-                        <button
-                            onClick={savePredictions}
-                            className="hover-glow"
-                            style={{
-                                padding: '8px 20px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                background: predictionsFinalized ? '#1a7a3a' : 'var(--accent-color)',
-                                color: 'white',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.3s',
-                                boxShadow: predictionsFinalized
-                                    ? '0 2px 12px rgba(34,197,94,0.3)'
-                                    : '0 2px 12px rgba(255,46,46,0.3)',
-                            }}
-                        >
-                            {predictionsFinalized ? (
-                                <><CheckCircle size={14} /> PALPITES FECHADOS</>
-                            ) : (
-                                <><CheckCircle size={14} /> Salvar Todos</>
-                            )}
-                        </button>
-                    </div>
+                    {activeTab === 'palpitar' && (
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                            <button
+                                onClick={resetPredictions}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'transparent',
+                                    color: predictionsFinalized ? 'rgba(255,255,255,0.4)' : 'var(--text-secondary)',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: predictionsFinalized ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                }}
+                                disabled={predictionsFinalized}
+                            >
+                                <RotateCcw size={14} />
+                                Limpar
+                            </button>
+                            <button
+                                onClick={savePredictions}
+                                className="hover-glow"
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: predictionsFinalized ? '#1a7a3a' : 'var(--accent-color)',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.3s',
+                                    boxShadow: predictionsFinalized
+                                        ? '0 2px 12px rgba(34,197,94,0.3)'
+                                        : '0 2px 12px rgba(255,46,46,0.3)',
+                                }}
+                            >
+                                {predictionsFinalized ? (
+                                    <><CheckCircle size={14} /> PALPITES FECHADOS</>
+                                ) : (
+                                    <><CheckCircle size={14} /> Salvar Todos</>
+                                )}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Info banner when showing all */}
                     {/* Match cards grid */}
@@ -587,7 +730,7 @@ const Simulator: FC = () => {
                     {displayMatches.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-secondary)' }}>
                             <Calendar size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
-                            <p>Nenhum jogo disponível para simulação.</p>
+                            <p>{activeTab === 'palpitar' ? 'Nenhum jogo disponível para simulação.' : 'Nenhum histórico de palpite concluído.'}</p>
                         </div>
                     )}
                 </div>
@@ -712,6 +855,7 @@ const Simulator: FC = () => {
             </main>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
+            {showBolaoRanking && <BolaoRankingModal onClose={() => setShowBolaoRanking(false)} />}
             <ModalRegras aberto={aberto} setAberto={setAberto} />
 
             {/* ── Toast Stack ── */}

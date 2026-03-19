@@ -119,12 +119,14 @@ export const mockMatches: Match[] = [
     sport: "Futsal",
     category: "Feminino",
     teamA: {
+      id: "t3",
       name: "Sistemas de Informação - Unisanta",
-      emblem: "/emblemas/sistemas.png",
+      course: "Sistemas",
     },
     teamB: {
+      id: "t4",
       name: "Direito - Unisantos",
-      emblem: "/emblemas/direito.png",
+      course: "Direito",
     },
     scoreA: 0,
     scoreB: 0,
@@ -139,12 +141,14 @@ export const mockMatches: Match[] = [
     sport: "Vôlei",
     category: "Masculino",
     teamA: {
+      id: "t5",
       name: "Engenharia - Unisanta",
-      emblem: "/emblemas/engenharia.png",
+      course: "Engenharia",
     },
     teamB: {
+      id: "t6",
       name: "Administração - Unisanta",
-      emblem: "/emblemas/administracao.png",
+      course: "Administração",
     },
     scoreA: 0,
     scoreB: 0,
