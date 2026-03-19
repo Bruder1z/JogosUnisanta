@@ -4,16 +4,10 @@ import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import ModalRegras from '../components/Modals/ModalRegras';
 import SummaryPanel from '../components/Modals/SummaryPanel';
-import { mockMatches, COURSE_EMBLEMS, type Match } from '../data/mockData';
-import { CheckCircle, RotateCcw, Calendar, Trophy, Info, MapPin, Clock, Zap } from 'lucide-react';
-
-interface Prediction {
-    matchId: string;
-    scoreA: number | '';
-    scoreB: number | '';
-}
-
-const LS_KEY = 'jogos-unisanta-predictions';
+import { COURSE_EMBLEMS, type Match } from '../data/mockData';
+import { useAuth, type Prediction } from '../context/AuthContext';
+import { useData } from '../components/context/DataContext';
+import { CheckCircle, RotateCcw, Calendar, Info, Zap } from 'lucide-react';
 
 const SET_SPORTS = ['Vôlei', 'Vôlei de Praia', 'Beach Tennis', 'Tênis de Mesa', 'Futevôlei'];
 const EXCLUDED_SPORTS = ['Xadrez', 'Natação'];
@@ -35,6 +29,9 @@ const Simulator: FC = () => {
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
 
+    const { userPredictions, saveUserPredictions } = useAuth();
+    const { matches } = useData();
+
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
             courseKey.toLowerCase().includes(teamName.toLowerCase())
@@ -48,26 +45,19 @@ const Simulator: FC = () => {
         const offset = now.getTimezoneOffset();
         const local = new Date(now.getTime() - (offset * 60 * 1000));
         const todayStr = local.toISOString().split('T')[0];
-        return mockMatches.filter(m => m.date === todayStr && m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
-    }, []);
+        return matches.filter(m => m.date === todayStr && m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
+    }, [matches]);
 
     // Also show all scheduled matches if none today
     const displayMatches = useMemo(() => {
         if (todayMatches.length > 0) return todayMatches;
-        return mockMatches.filter(m => m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
-    }, [todayMatches]);
+        return matches.filter(m => m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
+    }, [todayMatches, matches]);
 
-    const showingAll = todayMatches.length === 0;
-
-    // Load from localStorage
+    // Load from userPredictions
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem(LS_KEY);
-            if (stored) {
-                setPredictions(JSON.parse(stored));
-            }
-        } catch { /* ignore */ }
-    }, []);
+        setPredictions(userPredictions);
+    }, [userPredictions]);
 
     const updatePrediction = (matchId: string, field: 'scoreA' | 'scoreB', value: string) => {
         const numVal = value === '' ? '' : Math.max(0, parseInt(value) || 0);
@@ -81,22 +71,25 @@ const Simulator: FC = () => {
         }));
     };
 
-    const savePredictions = () => {
-        localStorage.setItem(LS_KEY, JSON.stringify(predictions));
+    const savePredictions = async () => {
         setPredictionsFinalized(true);
-        showToast({
-            message: 'Todos os palpites foram salvos!',
-            teamA: 'BOLÃO',
-            scoreA: filledCount,
-            teamB: 'SALVO',
-            scoreB: 1,
-        });
+        const success = await saveUserPredictions(predictions);
+        if (success) {
+            showToast({
+                message: 'Todos os palpites foram salvos no banco!',
+                teamA: 'BOLÃO',
+                scoreA: filledCount,
+                teamB: 'SALVO',
+                scoreB: 1,
+            });
+        } else {
+            alert('Erro ao salvar palpites.');
+        }
         setTimeout(() => setPredictionsFinalized(false), 3000);
     };
 
     const resetPredictions = () => {
-        setPredictions({});
-        localStorage.removeItem(LS_KEY);
+        setPredictions(userPredictions); // reset to what's in DB
         setPredictionsFinalized(false);
     };
 
@@ -114,36 +107,38 @@ const Simulator: FC = () => {
         let exactScores = 0;
         let winners = 0;
 
-        mockMatches.forEach(match => {
-            const pred = predictions[match.id];
+        matches.forEach(match => {
+            const pred = userPredictions[match.id];
             if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
                 const predScoreA = Number(pred.scoreA);
                 const predScoreB = Number(pred.scoreB);
 
                 // Check if it's an exact score match
-                if (match.status === 'finished' && predScoreA === match.scoreA && predScoreB === match.scoreB) {
-                    exactScores++;
-                    totalPoints += 3;
-                }
-                // Check if winner is correct (even if exact score is wrong)
-                else if (match.status === 'finished') {
-                    const predWinner = predScoreA > predScoreB ? 'A' : predScoreB > predScoreA ? 'B' : 'draw';
-                    const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
-                    if (predWinner === actualWinner) {
-                        winners++;
-                        totalPoints += 1;
+                if (match.status === 'finished') {
+                    if (predScoreA === match.scoreA && predScoreB === match.scoreB) {
+                        exactScores++;
+                        totalPoints += 3;
+                    }
+                    // Check if winner is correct (even if exact score is wrong)
+                    else {
+                        const predWinner = predScoreA > predScoreB ? 'A' : predScoreB > predScoreA ? 'B' : 'draw';
+                        const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
+                        if (predWinner === actualWinner) {
+                            winners++;
+                            totalPoints += 1;
+                        }
                     }
                 }
             }
         });
 
         return { totalPoints, exactScores, winners };
-    }, [predictions]);
+    }, [userPredictions, matches]);
 
     // ── helpers ──────────────────────────────────────────────
     const hoursUntil = (dateStr: string, timeStr: string): number => {
         const [h, m] = timeStr.split(':').map(Number);
-        const target = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        const target = new Date(`${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
         const diff = target.getTime() - Date.now();
         return Math.max(0, Math.floor(diff / 3_600_000));
     };
@@ -182,10 +177,15 @@ const Simulator: FC = () => {
         const isSetSport = SET_SPORTS.includes(match.sport);
         const hours = hoursUntil(match.date, match.time);
 
-        const saveThisCard = () => {
+        const saveThisCard = async () => {
             if (!hasPrediction) return;
             const next = { ...predictions };
-            localStorage.setItem(LS_KEY, JSON.stringify(next));
+
+            const success = await saveUserPredictions({ [match.id]: next[match.id] });
+            if (!success) {
+                alert('Erro ao salvar o palpite.');
+                return;
+            }
 
             setCardSaved(true);
             setTimeout(() => setCardSaved(false), 3000);
@@ -513,10 +513,10 @@ const Simulator: FC = () => {
                     </div>
 
                     {/* Summary Panel */}
-                    <SummaryPanel 
-                        totalPoints={scoringStats.totalPoints} 
-                        exactScores={scoringStats.exactScores} 
-                        winners={scoringStats.winners} 
+                    <SummaryPanel
+                        totalPoints={scoringStats.totalPoints}
+                        exactScores={scoringStats.exactScores}
+                        winners={scoringStats.winners}
                     />
 
                     {/* Action buttons */}

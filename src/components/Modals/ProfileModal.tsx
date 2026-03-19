@@ -1,7 +1,7 @@
 import { type FC, useState, useMemo } from 'react';
 import { X, Trophy, Save, CheckCircle, Zap, User as UserIcon, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { mockMatches } from '../../data/mockData';
+import { mockMatches, AVAILABLE_COURSES } from '../../data/mockData';
 
 interface ProfileModalProps {
     onClose: () => void;
@@ -13,8 +13,7 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
 
     // Settings state
     const [name, setName] = useState(user?.name || '');
-    const [preferredCourse, setPreferredCourse] = useState(user?.preferredCourse || '');
-    const [favoriteTeam, setFavoriteTeam] = useState(user?.favoriteTeam || '');
+    const [preferredCourse, setPreferredCourse] = useState(user?.preferredCourse || (user as any)?.preferredcourse || '');
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -53,8 +52,7 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
         setIsSaving(true);
         const success = await updateUser({
             name,
-            preferredCourse,
-            favoriteTeam
+            preferredCourse
         });
 
         setIsSaving(false);
@@ -129,7 +127,12 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                         </div>
                         <div>
                             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#fff' }}>{user?.name}</h2>
-                            <span style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>{user?.role}</span>
+                            <span style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', display: 'block' }}>{user?.role}</span>
+                            {(user?.preferredCourse || (user as any)?.preferredcourse) && (
+                                <span style={{ fontSize: '11px', color: '#aaa', marginTop: '2px', display: 'block' }}>
+                                    {user?.preferredCourse || (user as any)?.preferredcourse}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
@@ -205,12 +208,10 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Faculdade</label>
-                                <input
-                                    type="text"
+                                <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Curso de Preferência</label>
+                                <select
                                     value={preferredCourse}
                                     onChange={(e) => setPreferredCourse(e.target.value)}
-                                    placeholder="Ex: Unisanta"
                                     style={{
                                         background: '#2a2a2a',
                                         border: '1px solid #333',
@@ -219,34 +220,22 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                                         color: '#fff',
                                         outline: 'none',
                                         fontSize: '14px',
-                                        transition: 'border-color 0.2s'
+                                        transition: 'border-color 0.2s',
+                                        appearance: 'none',
+                                        cursor: 'pointer'
                                     }}
                                     onFocus={e => e.target.style.borderColor = '#e30613'}
                                     onBlur={e => e.target.style.borderColor = '#333'}
-                                />
+                                >
+                                    <option value="" disabled>Selecione um curso...</option>
+                                    {AVAILABLE_COURSES.map(course => (
+                                        <option key={course} value={course}>
+                                            {course}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Time / Atlética</label>
-                                <input
-                                    type="text"
-                                    value={favoriteTeam}
-                                    onChange={(e) => setFavoriteTeam(e.target.value)}
-                                    placeholder="Ex: Fefesp"
-                                    style={{
-                                        background: '#2a2a2a',
-                                        border: '1px solid #333',
-                                        borderRadius: '6px',
-                                        padding: '12px 16px',
-                                        color: '#fff',
-                                        outline: 'none',
-                                        fontSize: '14px',
-                                        transition: 'border-color 0.2s'
-                                    }}
-                                    onFocus={e => e.target.style.borderColor = '#e30613'}
-                                    onBlur={e => e.target.style.borderColor = '#333'}
-                                />
-                            </div>
 
                             <button
                                 onClick={handleSave}

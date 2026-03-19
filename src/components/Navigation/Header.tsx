@@ -4,11 +4,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import ProfileModal from '../Modals/ProfileModal';
-import { mockMatches } from '../../data/mockData';
+import { useData } from '../context/DataContext';
 
 const Header: FC = () => {
-    const { user, openLoginModal } = useAuth();
+    const { user, openLoginModal, userPredictions } = useAuth();
     const { toggle } = useSidebar();
+    const { matches } = useData();
     const location = useLocation();
     const navigate = useNavigate();
     const [showProfile, setShowProfile] = useState(false);
@@ -18,26 +19,27 @@ const Header: FC = () => {
 
     const totalPoints = useMemo(() => {
         if (!user) return 0;
-        try {
-            const stored = localStorage.getItem('jogos-unisanta-predictions');
-            if (!stored) return 0;
-            const predictions = JSON.parse(stored);
-            let points = 0;
-            mockMatches.forEach(match => {
-                if (match.status === 'finished') {
-                    const pred = predictions[match.id];
-                    if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
-                        if (Number(pred.scoreA) === match.scoreA && Number(pred.scoreB) === match.scoreB) {
+        let points = 0;
+        matches.forEach(match => {
+            if (match.status === 'finished') {
+                const pred = userPredictions[match.id];
+                if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
+                    const predA = Number(pred.scoreA);
+                    const predB = Number(pred.scoreB);
+                    if (predA === match.scoreA && predB === match.scoreB) {
+                        points += 3;
+                    } else {
+                        const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                        const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
+                        if (predWinner === actualWinner) {
                             points += 1;
                         }
                     }
                 }
-            });
-            return points;
-        } catch {
-            return 0;
-        }
-    }, [user, showProfile]); // Also update when profile closes to catch new points
+            }
+        });
+        return points;
+    }, [user, userPredictions, matches, showProfile]);
 
     return (
         <>

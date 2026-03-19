@@ -3,12 +3,21 @@ import { type User } from '../data/mockData';
 import { supabase } from '../services/supabaseClient';
 import bcrypt from 'bcryptjs';
 
+export interface Prediction {
+    matchId: string;
+    scoreA: number | '';
+    scoreB: number | '';
+}
+
 interface AuthContextType {
     user: User | null;
     login: (email: string, password: string) => Promise<boolean>;
     register: (userData: RegisterUser) => Promise<boolean>;
     logout: () => void;
     updateUser: (updates: Partial<User>) => Promise<boolean>;
+    userPredictions: Record<string, Prediction>;
+    fetchUserPredictions: () => Promise<void>;
+    saveUserPredictions: (predictions: Record<string, Prediction>) => Promise<boolean>;
     isLoading: boolean;
     isLoginModalOpen: boolean;
     openLoginModal: () => void;
@@ -21,6 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [userPredictions, setUserPredictions] = useState<Record<string, Prediction>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -31,6 +41,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setIsLoading(false);
     }, []);
+
+    const fetchUserPredictions = async () => {
+        if (!user) return;
+        const { data, error } = await supabase
+            .from('predictions')
+            .select('*')
+            .eq('user_email', user.email);
+
+        if (!error && data) {
+            const preds: Record<string, Prediction> = {};
+            data.forEach((p: any) => {
+                preds[p.match_id] = {
+                    matchId: p.match_id,
+                    scoreA: p.score_a,
+                    scoreB: p.score_b
+                };
+            });
+            setUserPredictions(preds);
+        }
+    };
+
+    // Whenever user changes, load predictions
+    useEffect(() => {
+        if (user) {
+            fetchUserPredictions();
+        } else {
+            setUserPredictions({});
+        }
+    }, [user?.email]);
 
     const login = async (email: string, password: string): Promise<boolean> => {
         // Busca usuário no banco
@@ -44,8 +83,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!data.password) return false;
         const isValid = await bcrypt.compare(password, data.password);
         if (isValid) {
-            setUser(data);
-            localStorage.setItem('jogos_unisanta_user', JSON.stringify(data));
+            const mappedUser = {
+                ...data,
+                preferredCourse: data.preferredcourse,
+                favoriteTeam: data.favoriteteam,
+            };
+            delete mappedUser.preferredcourse;
+            delete mappedUser.favoriteteam;
+
+            setUser(mappedUser);
+            localStorage.setItem('jogos_unisanta_user', JSON.stringify(mappedUser));
             return true;
         }
         return false;
@@ -66,8 +113,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             },
         ]).select('*').single();
         if (error || !data) return false;
-        setUser(data);
-        localStorage.setItem('jogos_unisanta_user', JSON.stringify(data));
+
+        const mappedUser = {
+            ...data,
+            preferredCourse: data.preferredcourse,
+            favoriteTeam: data.favoriteteam,
+        };
+        delete mappedUser.preferredcourse;
+        delete mappedUser.favoriteteam;
+
+        setUser(mappedUser);
+        localStorage.setItem('jogos_unisanta_user', JSON.stringify(mappedUser));
         return true;
     };
 
@@ -78,14 +134,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updateUser = async (updates: Partial<User>): Promise<boolean> => {
         if (!user) return false;
+
+        const dbUpdates: any = {};
+        if (updates.name !== undefined) dbUpdates.name = updates.name;
+        if (updates.preferredCourse !== undefined) dbUpdates.preferredcourse = updates.preferredCourse;
+        if (updates.favoriteTeam !== undefined) dbUpdates.favoriteteam = updates.favoriteTeam;
+
         const { error } = await supabase
             .from('users')
-            .update(updates)
+            .update(dbUpdates)
             .eq('email', user.email);
         if (!error) {
-            setUser({ ...user, ...updates });
+            const newUser = { ...user, ...updates };
+            setUser(newUser);
+            localStorage.setItem('jogos_unisanta_user', JSON.stringify(newUser));
             return true;
         }
+        return false;
+    };
+
+    const saveUserPredictions = async (predictionsToSave: Record<string, Prediction>): Promise<boolean> => {
+        if (!user) return false;
+
+        const rows = Object.values(predictionsToSave).map(p => ({
+            user_email: user.email,
+            match_id: p.matchId,
+            score_a: p.scoreA === '' ? 0 : p.scoreA,
+            score_b: p.scoreB === '' ? 0 : p.scoreB
+        }));
+
+        if (rows.length === 0) return true;
+
+        const { error } = await supabase
+            .from('predictions')
+            .upsert(rows, { onConflict: 'user_email,match_id' });
+
+        if (!error) {
+            setUserPredictions(prev => ({ ...prev, ...predictionsToSave }));
+            return true;
+        }
+        console.error('Error saving predictions:', error);
         return false;
     };
 
@@ -95,7 +183,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (
         <AuthContext.Provider value={{
             user, login, register, logout, updateUser, isLoading,
-            isLoginModalOpen, openLoginModal, closeLoginModal
+            isLoginModalOpen, openLoginModal, closeLoginModal,
+            userPredictions, fetchUserPredictions, saveUserPredictions
         }}>
             {children}
         </AuthContext.Provider>
