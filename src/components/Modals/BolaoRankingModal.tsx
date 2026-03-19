@@ -10,6 +10,8 @@ interface BolaoRankingModalProps {
 interface BolaoUserRanking {
     email: string;
     name: string;
+    surname?: string;
+    preferredCourse?: string;
     avatar?: string;
     points: number;
     exactMatches: number;
@@ -26,7 +28,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
             // 1. Fetch users (exclude superadmin)
             const { data: usersData, error: usersError } = await supabase
                 .from('users')
-                .select('email, name, role');
+                .select('email, name, surname, preferredcourse, role');
             
             if (usersError) {
                 console.error('Error fetching users:', usersError);
@@ -56,6 +58,8 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                 userScores[u.email] = {
                     email: u.email,
                     name: u.name || u.email,
+                    surname: u.surname,
+                    preferredCourse: u.preferredcourse,
                     avatar: undefined,
                     points: 0,
                     exactMatches: 0,
@@ -254,7 +258,10 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>{user.name}</div>
+                                                        <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>
+                                                            {user.name} {user.surname ? user.surname : ''}
+                                                        </div>
+                                                        {user.preferredCourse ? <span style={{ color: '#dc2626', fontWeight: 500, fontSize: '15px' }}>({user.preferredCourse})</span> : null}
                                                     </div>
                                                 </div>
                                             </td>
