@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Medal, Crown } from 'lucide-react';
+import { X, Medal, Crown, Eye } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { supabase } from '../../services/supabaseClient';
 
@@ -22,6 +22,19 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
     const { matches } = useData();
     const [ranking, setRanking] = useState<BolaoUserRanking[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+    const [userPredictions, setUserPredictions] = useState<any[]>([]);
+    const [loadingPreds, setLoadingPreds] = useState(false);
+    // Função para buscar palpites do usuário
+    const fetchUserPredictions = async (email: string) => {
+        setLoadingPreds(true);
+        const { data: preds, error } = await supabase
+            .from('predictions')
+            .select('*')
+            .eq('user_email', email);
+        setUserPredictions(preds || []);
+        setLoadingPreds(false);
+    };
 
     useEffect(() => {
         const fetchGlobalRanking = async () => {
@@ -29,7 +42,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
             const { data: usersData, error: usersError } = await supabase
                 .from('users')
                 .select('email, name, surname, preferredcourse, role');
-            
+
             if (usersError) {
                 console.error('Error fetching users:', usersError);
                 // Continue with empty array if error
@@ -51,9 +64,9 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
 
             // 3. Compute points
             const finishedMatches = matches.filter(m => m.status === 'finished');
-            
+
             const userScores: Record<string, BolaoUserRanking> = {};
-            
+
             validUsers.forEach(u => {
                 userScores[u.email] = {
                     email: u.email,
@@ -87,7 +100,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                     const predB = Number(pred.score_b);
                     const actualA = match.scoreA;
                     const actualB = match.scoreB;
-                    
+
                     const isExact = predA === actualA && predB === actualB;
                     const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
                     const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
@@ -206,7 +219,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                     const isTop3 = index < 3;
                                     const highlightColor = index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : null;
 
-                                    return (
+                                    const rows = [
                                         <tr
                                             key={user.email}
                                             style={{
@@ -260,23 +273,98 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                                     <div>
                                                         <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>
                                                             {user.name} {user.surname ? user.surname : ''}
+
                                                         </div>
-                                                        {user.preferredCourse ? <span style={{ color: '#dc2626', fontWeight: 500, fontSize: '15px' }}>({user.preferredCourse})</span> : null}
+                                                        {user.preferredCourse ? <span style={{ color: '#dc2626', fontWeight: 500, fontSize: '13px' }}>({user.preferredCourse})</span> : null}
+
                                                     </div>
                                                 </div>
                                             </td>
                                             <td style={{ padding: '15px 20px', textAlign: 'center' }}>
-                                                <div style={{
-                                                    fontSize: '18px',
-                                                    fontWeight: 900,
-                                                    color: isTop3 ? (highlightColor as string) : 'white',
-                                                    fontVariantNumeric: 'tabular-nums'
-                                                }}>
-                                                    {user.points}
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                                    <span style={{
+                                                        fontSize: '18px',
+                                                        fontWeight: 900,
+                                                        color: isTop3 ? (highlightColor as string) : 'white',
+                                                        fontVariantNumeric: 'tabular-nums'
+                                                    }}>{user.points}</span>
+                                                    <button
+                                                        style={{
+                                                            background: selectedUser === user.email ? '#dc2626' : 'transparent',
+                                                            border: 'none',
+                                                            borderRadius: 4,
+                                                            padding: 4,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'background 0.2s',
+                                                        }}
+                                                        title={selectedUser === user.email ? 'Fechar partidas' : 'Ver partidas'}
+                                                        onClick={() => {
+                                                            if (selectedUser === user.email) {
+                                                                setSelectedUser(null);
+                                                                setUserPredictions([]);
+                                                            } else {
+                                                                setSelectedUser(user.email);
+                                                                fetchUserPredictions(user.email);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Eye size={20} color={selectedUser === user.email ? 'white' : '#dc2626'} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                    );
+                                    ];
+                                    if (selectedUser === user.email) {
+                                        rows.push(
+                                            <tr key={user.email + '-panel'}>
+                                                <td colSpan={3}>
+                                                    <div style={{ marginTop: 10, marginBottom: 10, background: '#222', borderRadius: 8, padding: 12, color: '#fff', boxShadow: '0 2px 8px #0002' }}>
+                                                        {loadingPreds ? (
+                                                            <div>Carregando partidas...</div>
+                                                        ) : userPredictions.length === 0 ? (
+                                                            <div>Nenhum palpite encontrado.</div>
+                                                        ) : (
+                                                            <table style={{ width: '100%', fontSize: 13, color: '#fff' }}>
+                                                                <thead>
+                                                                    <tr style={{ color: '#dc2626' }}>
+                                                                        <th style={{ textAlign: 'left', padding: 4 }}>Partida</th>
+                                                                        <th style={{ textAlign: 'center', padding: 4 }}>Palpite</th>
+                                                                        <th style={{ textAlign: 'center', padding: 4 }}>Real</th>
+                                                                        <th style={{ textAlign: 'center', padding: 4 }}>Correto?</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {userPredictions.map(pred => {
+                                                                        const match = matches.find(m => m.id === pred.match_id);
+                                                                        if (!match) return null;
+                                                                        const isFinished = match.status === 'finished';
+                                                                        const isExact = isFinished && Number(pred.score_a) === match.scoreA && Number(pred.score_b) === match.scoreB;
+                                                                        const predWinner = Number(pred.score_a) > Number(pred.score_b) ? 'A' : Number(pred.score_b) > Number(pred.score_a) ? 'B' : 'draw';
+                                                                        const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
+                                                                        const isWinner = isFinished && !isExact && predWinner === actualWinner;
+                                                                        return (
+                                                                            <tr key={pred.match_id} style={{ background: isExact ? '#16a34a55' : isWinner ? '#facc1555' : 'transparent' }}>
+                                                                                <td style={{ padding: 4 }}>{match.teamA.name} x {match.teamB.name}</td>
+                                                                                <td style={{ textAlign: 'center', padding: 4 }}>{pred.score_a} x {pred.score_b}</td>
+                                                                                <td style={{ textAlign: 'center', padding: 4 }}>{isFinished ? `${match.scoreA} x ${match.scoreB}` : '-'}</td>
+                                                                                <td style={{ textAlign: 'center', padding: 4 }}>
+                                                                                    {isFinished ? (isExact ? <span style={{ color: '#16a34a', fontWeight: 700 }}>Exato</span> : isWinner ? <span style={{ color: '#facc15', fontWeight: 700 }}>Vencedor</span> : <span style={{ color: '#dc2626' }}>Errado</span>) : <span style={{ color: '#888' }}>-</span>}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                    return rows;
                                 })}
                                 {ranking.length === 0 && !loading && (
                                     <tr>
