@@ -9,7 +9,12 @@ import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
-import { CheckCircle, RotateCcw, Calendar, Zap, Plus } from 'lucide-react';
+import { 
+    X, Trophy, Users, Star, History, Layout, 
+    ArrowRight, ChevronLeft, ChevronRight, Share2, 
+    Copy, Plus, LogIn, Search, Filter,
+    CheckCircle, RotateCcw, Calendar, Zap
+} from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import LeagueDetailsModal from '../components/Modals/LeagueDetailsModal.tsx';
 import LeagueFormModal from '../components/Modals/LeagueFormModal';
@@ -40,6 +45,14 @@ const Simulator: FC = () => {
     const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
     const [joiningLeagueId, setJoiningLeagueId] = useState<string | null>(null);
     const [userRequests, setUserRequests] = useState<any[]>([]);
+    const [userPrivateLeaguesCount, setUserPrivateLeaguesCount] = useState(0);
+
+    // Historico filters
+    const [filterSport, setFilterSport] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterResult, setFilterResult] = useState('');
+    const [filterLocation, setFilterLocation] = useState('');
+    const [selectedDayOffset, setSelectedDayOffset] = useState(0); // 0=hoje, 1=amanhã, 2=depois
 
     const { user, openLoginModal, userPredictions, saveUserPredictions } = useAuth();
     const { matches } = useData();
@@ -51,29 +64,58 @@ const Simulator: FC = () => {
         return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
     };
 
-    // Filter today's matches (exclude finished)
-    const todayMatches = useMemo(() => {
+    // Helper to get date string for offset
+    const getDateForOffset = (offset: number) => {
         const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const local = new Date(now.getTime() - (offset * 60 * 1000));
-        const todayStr = local.toISOString().split('T')[0];
-        return matches.filter(m => m.date === todayStr && m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
-    }, [matches]);
+        const d = new Date(now.getTime() - (now.getTimezoneOffset() * 60 * 1000));
+        d.setDate(d.getDate() + offset);
+        return d.toISOString().split('T')[0];
+    };
 
-    // Also show all scheduled matches if none today
+    // Filter matches by selected day for palpitar
     const palpitarMatches = useMemo(() => {
-        if (todayMatches.length > 0) return todayMatches;
-        return matches.filter(m => m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
-    }, [todayMatches, matches]);
+        const targetDate = getDateForOffset(selectedDayOffset);
+        return matches.filter(m => m.date === targetDate && m.status === 'scheduled' && !EXCLUDED_SPORTS.includes(m.sport));
+    }, [matches, selectedDayOffset]);
 
     const historyMatches = useMemo(() => {
         return matches.filter(m => m.status === 'finished' && userPredictions[m.id] && userPredictions[m.id].scoreA !== '' && userPredictions[m.id].scoreB !== '');
     }, [matches, userPredictions]);
 
     const displayMatches = useMemo(() => {
-        if (activeTab === 'historico') return historyMatches;
+        if (activeTab === 'historico') {
+            let filtered = historyMatches;
+            if (filterSport) filtered = filtered.filter(m => m.sport === filterSport);
+            if (filterCategory) filtered = filtered.filter(m => m.category === filterCategory);
+            if (filterLocation) filtered = filtered.filter(m => m.location === filterLocation);
+            if (filterResult) {
+                filtered = filtered.filter(m => {
+                    const pred = userPredictions[m.id];
+                    if (!pred || pred.scoreA === '' || pred.scoreB === '') return false;
+                    const predA = Number(pred.scoreA);
+                    const predB = Number(pred.scoreB);
+                    const isExact = predA === m.scoreA && predB === m.scoreB;
+                    const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                    const actualWinner = m.scoreA > m.scoreB ? 'A' : m.scoreB > m.scoreA ? 'B' : 'draw';
+                    const isWinner = predWinner === actualWinner;
+                    if (filterResult === 'exact') return isExact;
+                    if (filterResult === 'winner') return !isExact && isWinner;
+                    if (filterResult === 'wrong') return !isExact && !isWinner;
+                    return true;
+                });
+            }
+            return filtered;
+        }
         return palpitarMatches;
-    }, [activeTab, historyMatches, palpitarMatches]);
+    }, [activeTab, historyMatches, palpitarMatches, filterSport, filterCategory, filterResult, filterLocation, userPredictions]);
+
+    // Unique values for filter dropdowns
+    const historyFilterOptions = useMemo(() => {
+        const sports = [...new Set(historyMatches.map(m => m.sport))].sort();
+        const categories = [...new Set(historyMatches.map(m => m.category))].sort();
+        const locations = [...new Set(historyMatches.map(m => m.location))].sort();
+        return { sports, categories, locations };
+    }, [historyMatches]);
 
     // Load from userPredictions
     useEffect(() => {
@@ -100,6 +142,10 @@ const Simulator: FC = () => {
             );
             console.log("Filtered leagues:", userLeagues.length);
             setLeagues(userLeagues);
+
+            // Count private leagues (exclude global/course)
+            const count = userLeagues.filter(l => l.type !== 'global' && l.type !== 'course').length;
+            setUserPrivateLeaguesCount(count);
 
             // Fetch user requests
             const { data: requestsData } = await supabase
@@ -716,13 +762,35 @@ const Simulator: FC = () => {
                         </div>
                     </div>
 
-                    {/* Summary Panel */}
-                    {activeTab !== 'competicoes' && activeTab !== 'sugeridas' && (
-                        <SummaryPanel
-                            totalPoints={scoringStats.totalPoints}
-                            exactScores={scoringStats.exactScores}
-                            winners={scoringStats.winners}
-                        />
+                    {/* Day Tabs for Palpitar */}
+                    {activeTab === 'palpitar' && (
+                        <div style={{
+                            display: 'flex',
+                            gap: '8px',
+                            marginBottom: '20px',
+                        }}>
+                            {[{ label: 'HOJE', offset: 0 }, { label: 'AMANHÃ', offset: 1 }].map(day => (
+                                <button
+                                    key={day.offset}
+                                    onClick={() => setSelectedDayOffset(day.offset)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px 16px',
+                                        borderRadius: '10px',
+                                        border: selectedDayOffset === day.offset ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.08)',
+                                        background: selectedDayOffset === day.offset ? 'rgba(255,46,46,0.12)' : 'rgba(255,255,255,0.03)',
+                                        color: selectedDayOffset === day.offset ? 'white' : 'var(--text-secondary)',
+                                        fontSize: '12px',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.5px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    {day.label}
+                                </button>
+                            ))}
+                        </div>
                     )}
 
                     {/* Action buttons */}
@@ -899,6 +967,17 @@ const Simulator: FC = () => {
                                 .filter(l => !leagues.some(my => my.id === l.id) && l.name !== 'Liga Geral' && !l.name.startsWith('Liga '))
                                 .map(league => (
                                     <div key={league.id} className="premium-card league-card" style={{ padding: '24px', position: 'relative' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                                <Users size={16} />
+                                                <span>{league.participants?.length || 0} Membros</span>
+                                            </div>
+                                            {userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id) && (
+                                                <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>
+                                                    Limite de 3 ligas atingido
+                                                </div>
+                                            )}
+                                        </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
                                             <div style={{ width: '50px', height: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
                                                 🏆
@@ -909,24 +988,28 @@ const Simulator: FC = () => {
                                             </div>
                                         </div>
                                         <button
+                                            disabled={userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id)}
                                             onClick={() => {
                                                 const hasRequest = userRequests.some(r => r.league_id === league.id);
-                                                if (!hasRequest) handleRequestJoin(league.id);
+                                                if (!hasRequest && userPrivateLeaguesCount < 3) handleRequestJoin(league.id);
                                             }}
-                                            className={userRequests.some(r => r.league_id === league.id) ? "" : "hover-glow"}
+                                            className={(userRequests.some(r => r.league_id === league.id) || (userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id))) ? "" : "hover-glow"}
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
-                                                background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 'var(--accent-color)',
-                                                color: userRequests.some(r => r.league_id === league.id) ? 'var(--text-secondary)' : 'white',
-                                                border: userRequests.some(r => r.league_id === league.id) ? '1px solid var(--border-color)' : 'none',
+                                                background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 
+                                                           (userPrivateLeaguesCount >= 3 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
+                                                color: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? 'var(--text-secondary)' : 'white',
+                                                border: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? '1px solid var(--border-color)' : 'none',
                                                 borderRadius: '8px',
                                                 fontWeight: 700,
                                                 fontSize: '14px',
-                                                cursor: userRequests.some(r => r.league_id === league.id) ? 'default' : 'pointer'
+                                                cursor: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? 'default' : 'pointer',
+                                                opacity: (userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
                                             }}
                                         >
-                                            {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 'PEDIR PARA ENTRAR'}
+                                            {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 
+                                             (userPrivateLeaguesCount >= 3 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
                                         </button>
                                     </div>
                                 ))}
@@ -939,6 +1022,116 @@ const Simulator: FC = () => {
                     )}
 
                     {/* Info banner when showing all */}
+                    {/* Historico Filters */}
+                    {activeTab === 'historico' && historyMatches.length > 0 && (
+                        <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '10px',
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: 'rgba(255,255,255,0.03)',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                            <select
+                                value={filterSport}
+                                onChange={e => setFilterSport(e.target.value)}
+                                style={{
+                                    flex: '1 1 140px',
+                                    padding: '10px 14px',
+                                    background: 'var(--bg-card)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <option value="">Todos os Esportes</option>
+                                {historyFilterOptions.sports.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+
+                            <select
+                                value={filterCategory}
+                                onChange={e => setFilterCategory(e.target.value)}
+                                style={{
+                                    flex: '1 1 140px',
+                                    padding: '10px 14px',
+                                    background: 'var(--bg-card)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <option value="">Todas Modalidades</option>
+                                {historyFilterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+
+                            <select
+                                value={filterResult}
+                                onChange={e => setFilterResult(e.target.value)}
+                                style={{
+                                    flex: '1 1 140px',
+                                    padding: '10px 14px',
+                                    background: 'var(--bg-card)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <option value="">Todos os Resultados</option>
+                                <option value="exact">🟢 Placar Exato</option>
+                                <option value="winner">🟡 Acertou Vencedor</option>
+                                <option value="wrong">🔴 Errou</option>
+                            </select>
+
+                            <select
+                                value={filterLocation}
+                                onChange={e => setFilterLocation(e.target.value)}
+                                style={{
+                                    flex: '1 1 140px',
+                                    padding: '10px 14px',
+                                    background: 'var(--bg-card)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <option value="">Todas as Quadras</option>
+                                {historyFilterOptions.locations.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+
+                            {(filterSport || filterCategory || filterResult || filterLocation) && (
+                                <button
+                                    onClick={() => { setFilterSport(''); setFilterCategory(''); setFilterResult(''); setFilterLocation(''); }}
+                                    style={{
+                                        padding: '10px 16px',
+                                        background: 'rgba(239,68,68,0.15)',
+                                        color: '#ef4444',
+                                        border: '1px solid rgba(239,68,68,0.3)',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Limpar Filtros
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Match cards grid */}
                     {(activeTab === 'palpitar' || activeTab === 'historico') && (
                         <div className="simulator-grid" style={{

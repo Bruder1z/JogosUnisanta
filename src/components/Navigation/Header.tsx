@@ -93,6 +93,11 @@ const Header: FC = () => {
                             textDecoration: 'none',
                             transition: 'color 0.2s'
                         }}>Notícias</Link>
+                        <Link to="/simulador" style={{
+                            color: isActive('/simulador') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            transition: 'color 0.2s'
+                        }}>Bolão</Link>
                         {user?.role === 'superadmin' && (
                             <Link to="/controle-partida" style={{
                                 color: isActive('/controle-partida') ? 'var(--text-primary)' : 'var(--text-secondary)',

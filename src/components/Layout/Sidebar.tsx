@@ -84,6 +84,10 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                             <span style={{ fontSize: '16px' }}>📰</span>
                             <span className="sidebar-mobile-nav-label">Notícias</span>
                         </Link>
+                        <Link to="/simulador" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                            <span style={{ fontSize: '16px' }}>⚡</span>
+                            <span className="sidebar-mobile-nav-label">Bolão</span>
+                        </Link>
                         {user?.role === 'superadmin' && (
                             <Link to="/controle-partida" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--accent-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s', fontWeight: 700 }}>
                                 <span className="sidebar-mobile-nav-label">Controle de Partida</span>
@@ -215,25 +219,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                         Calendário dos Jogos
                     </Link>
 
-                    <Link
-                        to="/simulador"
-                        onClick={close}
-                        className="sidebar-link"
-                        style={{
-                            padding: '10px 20px',
-                            fontSize: '13px',
-                            color: location.pathname === '/simulador' ? 'var(--accent-color)' : 'var(--text-secondary)',
-                            textDecoration: 'none',
-                            fontWeight: location.pathname === '/simulador' ? 700 : 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            transition: 'all 0.2s',
-                        }}
-                    >
-                        <Zap size={16} />
-                        Bolão
-                    </Link>
                 </div>
 
                 <style>{`

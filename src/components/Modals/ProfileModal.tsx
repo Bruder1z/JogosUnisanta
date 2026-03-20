@@ -1,14 +1,16 @@
 import { type FC, useState, useMemo } from 'react';
 import { X, Trophy, Save, CheckCircle, Zap, User as UserIcon, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { mockMatches, AVAILABLE_COURSES } from '../../data/mockData';
+import { useData } from '../context/DataContext';
+import { AVAILABLE_COURSES } from '../../data/mockData';
 
 interface ProfileModalProps {
     onClose: () => void;
 }
 
 const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
-    const { user, updateUser, logout } = useAuth();
+    const { matches } = useData();
+    const { user, updateUser, logout, userPredictions } = useAuth();
     const [activeTab, setActiveTab] = useState<'settings' | 'points'>('settings');
 
     // Settings state
@@ -19,34 +21,39 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
 
     // Calculate Points
     const simulatorStats = useMemo(() => {
-        try {
-            const stored = localStorage.getItem('jogos-unisanta-predictions');
-            if (!stored) return { totalPoints: 0, correctGuesses: 0, totalGuesses: 0 };
+        let points = 0;
+        let exact = 0;
+        let winners = 0;
+        let total = 0;
 
-            const predictions = JSON.parse(stored);
-            let points = 0;
-            let correct = 0;
-            let total = 0;
+        const finishedMatches = matches.filter((m: any) => m.status === 'finished');
 
-            mockMatches.forEach(match => {
-                if (match.status === 'finished') {
-                    const pred = predictions[match.id];
-                    if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
-                        total++;
-                        // For each correct score, 1pt
-                        if (Number(pred.scoreA) === match.scoreA && Number(pred.scoreB) === match.scoreB) {
-                            points += 1;
-                            correct += 1;
-                        }
-                    }
+        finishedMatches.forEach((match: any) => {
+            const pred = userPredictions[match.id];
+            if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
+                total++;
+                const predA = Number(pred.scoreA);
+                const predB = Number(pred.scoreB);
+                const actualA = match.scoreA;
+                const actualB = match.scoreB;
+
+                const isExact = predA === actualA && predB === actualB;
+                const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
+                const isWinner = predWinner === actualWinner;
+
+                if (isExact) {
+                    points += 3;
+                    exact++;
+                } else if (isWinner) {
+                    points += 1;
+                    winners++;
                 }
-            });
+            }
+        });
 
-            return { totalPoints: points, correctGuesses: correct, totalGuesses: total };
-        } catch {
-            return { totalPoints: 0, correctGuesses: 0, totalGuesses: 0 };
-        }
-    }, []);
+        return { totalPoints: points, exactScores: exact, winners, totalGuesses: total };
+    }, [matches, userPredictions]);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -284,7 +291,7 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                                 {simulatorStats.totalPoints} <span style={{ fontSize: '16px', color: '#888', fontWeight: 600 }}>PTS</span>
                             </h3>
                             <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 30px' }}>
-                                Acertos exatos no Simulador
+                                Pontuação Total no Bolão
                             </p>
 
                             <div style={{
@@ -293,16 +300,20 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                                 borderRadius: '12px',
                                 padding: '20px',
                                 display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '15px'
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '10px'
                             }}>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid #333' }}>
-                                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Placares Exatos</div>
-                                    <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{simulatorStats.correctGuesses}</div>
+                                    <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Exatos (3pts)</div>
+                                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#fff' }}>{simulatorStats.exactScores}</div>
+                                </div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid #333' }}>
+                                    <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Vencedor (1pt)</div>
+                                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#fff' }}>{simulatorStats.winners}</div>
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Total de Palpites</div>
-                                    <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{simulatorStats.totalGuesses}</div>
+                                    <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Total Palpites</div>
+                                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#fff' }}>{simulatorStats.totalGuesses}</div>
                                 </div>
                             </div>
 
@@ -311,7 +322,7 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                                     <Zap size={16} /> Como funciona?
                                 </div>
                                 <p style={{ margin: 0, fontSize: '12px', color: '#a0aec0', textAlign: 'left', lineHeight: 1.5 }}>
-                                    Para cada partida finalizada, se o seu palpite coincidir exatamente com o placar oficial, você ganha <strong>1 ponto</strong>.
+                                    Ao acertar o placar são <strong>3 pontos</strong> e ao acertar o ganhador é <strong>1 ponto</strong>.
                                 </p>
                             </div>
                         </div>

@@ -197,7 +197,6 @@ const AdminDashboard: React.FC = () => {
             fetchLeagueRequests();
         }
     }, [activeTab]);
-
     const handleApproveRequest = async (request: any) => {
         try {
             const { data: league, error: lError } = await supabase
@@ -207,6 +206,25 @@ const AdminDashboard: React.FC = () => {
                 .single();
             
             if (lError) throw lError;
+
+            // Check if user is already in 3 private leagues
+            const { data: userLeagues, error: ulError } = await supabase
+                .from('leagues')
+                .select('id, type, participants, owner_email');
+            
+            if (ulError) throw ulError;
+
+            const userEmail = request.user_email.toLowerCase();
+            const privateLeaguesCount = userLeagues.filter(l => {
+                const isOwner = l.owner_email?.toLowerCase() === userEmail;
+                const isParticipant = Array.isArray(l.participants) && l.participants.some((p: string) => p.toLowerCase() === userEmail);
+                return (isOwner || isParticipant) && l.type !== 'global' && l.type !== 'course';
+            }).length;
+
+            if (privateLeaguesCount >= 3) {
+                showNotification(`O usuário já atingiu o limite de 3 ligas privadas.`);
+                return;
+            }
 
             let participants: string[] = [];
             if (Array.isArray(league.participants)) {
