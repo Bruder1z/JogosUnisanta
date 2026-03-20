@@ -28,9 +28,9 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 let usersQuery = supabase.from('users').select('email, name, surname, preferredcourse, role');
                 
                 if (league.type === 'global') {
-                    usersQuery = usersQuery.neq('role', 'superadmin');
+                    usersQuery = usersQuery; // Fetch everyone
                 } else if (league.type === 'course') {
-                    usersQuery = usersQuery.eq('preferredcourse', league.course).neq('role', 'superadmin');
+                    usersQuery = usersQuery.eq('preferredcourse', league.course);
                 } else {
                     usersQuery = usersQuery.in('email', league.participants || []);
                 }
@@ -45,9 +45,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
                 const scores: Record<string, any> = {};
                 usersData.forEach(u => {
+                    const isSuperAdmin = u.role === 'superadmin' || u.email === 'superadmin@gmail.com';
                     scores[u.email] = {
                         email: u.email,
-                        name: `${u.name} ${u.surname || ''}`.trim(),
+                        name: isSuperAdmin ? "Mestre" : `${u.name} ${u.surname || ''}`.trim(),
                         course: u.preferredcourse,
                         points: 0,
                     };
@@ -127,9 +128,26 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
     const handleDeleteLeague = async () => {
         if (confirm('Tem certeza que deseja excluir esta liga permanentemente?')) {
-            const { error } = await supabase.from('leagues').delete().eq('id', league.id);
-            if (!error) {
+            try {
+                // Delete all requests first to avoid foreign key errors
+                const { error: reqError } = await supabase
+                    .from('league_requests')
+                    .delete()
+                    .eq('league_id', league.id);
+                
+                if (reqError) throw reqError;
+
+                const { error } = await supabase
+                    .from('leagues')
+                    .delete()
+                    .eq('id', league.id);
+
+                if (error) throw error;
+                
                 onClose();
+            } catch (err) {
+                console.error("Erro ao excluir liga:", err);
+                alert("Erro ao excluir liga. Verifique se há dependências ou tente novamente.");
             }
         }
     };
@@ -161,6 +179,26 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
         } catch (err) {
             console.error("Erro ao aprovar:", err);
             alert("Erro ao aprovar solicitação.");
+        }
+    };
+    const handleLeaveLeague = async () => {
+        if (!currentUser?.email) return;
+        if (confirm('Deseja realmente sair desta liga?')) {
+            try {
+                const updatedParticipants = (league.participants || []).filter((p: string) => p.toLowerCase() !== currentUser.email?.toLowerCase());
+                const { error } = await supabase
+                    .from('leagues')
+                    .update({ participants: updatedParticipants })
+                    .eq('id', league.id);
+
+                if (error) throw error;
+                
+                alert('Você saiu da liga.');
+                onClose(); // Close modal and let Simulator refresh
+            } catch (err) {
+                console.error("Erro ao sair da liga:", err);
+                alert("Erro ao sair da liga.");
+            }
         }
     };
 
@@ -275,6 +313,35 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                         </div>
                     ) : (
                         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                            {/* Exit League Action for Members */}
+                            {!isSpecialLeague && !isAdmin && (league.participants || []).some((p: string) => p.toLowerCase() === currentUser?.email?.toLowerCase()) && (
+                                <section style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
+                                    <button 
+                                        onClick={handleLeaveLeague}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            background: 'rgba(239, 68, 68, 0.1)',
+                                            color: '#ef4444',
+                                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                                            borderRadius: '8px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                                    >
+                                        <X size={16} /> SAIR DA LIGA
+                                    </button>
+                                </section>
+                            )}
+
                             {/* Share Link */}
                             <section>
                                 <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>

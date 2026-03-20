@@ -166,7 +166,7 @@ const Simulator: FC = () => {
                     {
                         league_id: leagueId,
                         user_email: user.email,
-                        user_name: user.name || user.email.split('@')[0],
+                        user_name: user.role === 'superadmin' ? "Mestre" : (user.name || user.email.split('@')[0]),
                         status: 'pending'
                     }
                 ]);
@@ -934,9 +934,9 @@ const Simulator: FC = () => {
                                                 <Users size={16} />
                                                 <span>{league.participants?.length || 0} Membros</span>
                                             </div>
-                                            {userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id) && (
+                                            {userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id) && (
                                                 <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>
-                                                    Limite de 3 ligas atingido
+                                                    Limite de 5 ligas atingido
                                                 </div>
                                             )}
                                         </div>
@@ -950,28 +950,28 @@ const Simulator: FC = () => {
                                             </div>
                                         </div>
                                         <button
-                                            disabled={userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id)}
+                                            disabled={userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)}
                                             onClick={() => {
                                                 const hasRequest = userRequests.some(r => r.league_id === league.id);
-                                                if (!hasRequest && userPrivateLeaguesCount < 3) handleRequestJoin(league.id);
+                                                if (!hasRequest && userPrivateLeaguesCount < 5) handleRequestJoin(league.id);
                                             }}
-                                            className={(userRequests.some(r => r.league_id === league.id) || (userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id))) ? "" : "hover-glow"}
+                                            className={(userRequests.some(r => r.league_id === league.id) || (userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id))) ? "" : "hover-glow"}
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
                                                 background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 
-                                                           (userPrivateLeaguesCount >= 3 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
-                                                color: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? 'var(--text-secondary)' : 'white',
-                                                border: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? '1px solid var(--border-color)' : 'none',
+                                                           (userPrivateLeaguesCount >= 5 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
+                                                color: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? 'var(--text-secondary)' : 'white',
+                                                border: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? '1px solid var(--border-color)' : 'none',
                                                 borderRadius: '8px',
                                                 fontWeight: 700,
                                                 fontSize: '14px',
-                                                cursor: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 3) ? 'default' : 'pointer',
-                                                opacity: (userPrivateLeaguesCount >= 3 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
+                                                cursor: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? 'default' : 'pointer',
+                                                opacity: (userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
                                             }}
                                         >
                                             {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 
-                                             (userPrivateLeaguesCount >= 3 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
+                                             (userPrivateLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
                                         </button>
                                     </div>
                                 ))}

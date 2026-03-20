@@ -65,10 +65,11 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                 const userScores: Record<string, BolaoUserRanking> = {};
 
                 validUsers.forEach(u => {
+                    const isSuperAdmin = u.role === 'superadmin' || u.email === 'superadmin@gmail.com';
                     userScores[u.email] = {
                         email: u.email,
-                        name: u.name || u.email,
-                        surname: u.surname,
+                        name: isSuperAdmin ? "Mestre" : (u.name || u.email),
+                        surname: isSuperAdmin ? "" : u.surname,
                         preferredCourse: u.preferredcourse,
                         avatar: undefined,
                         points: 0,
@@ -79,9 +80,10 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
 
                 validPreds.forEach(pred => {
                     if (!userScores[pred.user_email]) {
+                        const isSuperAdmin = pred.user_email === 'superadmin@gmail.com';
                         userScores[pred.user_email] = {
                             email: pred.user_email,
-                            name: pred.user_email.split('@')[0],
+                            name: isSuperAdmin ? "Mestre" : pred.user_email.split('@')[0],
                             points: 0,
                             exactMatches: 0,
                             winnerMatches: 0,
