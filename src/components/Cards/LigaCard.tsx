@@ -1,8 +1,18 @@
 import { type FC, useState } from 'react';
 import LeagueFormModal from '../Modals/LeagueFormModal';
+import { useAuth } from '../../context/AuthContext';
 
 const LigaCard: FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const { user, openLoginModal } = useAuth();
+
+    const handleCreateLeagueClick = () => {
+        if (!user) {
+            openLoginModal();
+        } else {
+            setIsModalOpen(true);
+        }
+    };
 
     return (
         <>
@@ -67,7 +77,7 @@ const LigaCard: FC = () => {
                 </div>
 
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={handleCreateLeagueClick}
                     style={{
                         width: '100%',
                         backgroundColor: 'var(--accent-color)',
