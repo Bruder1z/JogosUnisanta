@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import Home from './pages/Home';
 import News from './pages/News';
 import Participants from './pages/Participants';
@@ -15,6 +16,17 @@ import Login from './pages/Login';
 
 const AppContent = () => {
   const { isLoginModalOpen, closeLoginModal } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const joinId = params.get('join');
+    if (joinId && location.pathname !== '/simulador') {
+      // Se tiver join e não estiver no simulador, redireciona
+      navigate(`/simulador?join=${joinId}`, { replace: true });
+    }
+  }, [location, navigate]);
 
   return (
     <>

@@ -1,0 +1,281 @@
+import React, { useEffect, useState } from 'react';
+import { X, Trophy, Users, Settings, Plus, Trash2, Shield } from 'lucide-react';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
+import { useData } from '../context/DataContext';
+
+interface LeagueDetailsModalProps {
+    league: any;
+    onClose: () => void;
+}
+
+const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose }) => {
+    const { user: currentUser } = useAuth();
+    const { matches } = useData();
+    const [ranking, setRanking] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'ranking' | 'manage'>('ranking');
+
+    const isAdmin = league.owner_email === currentUser?.email;
+    const isSpecialLeague = league.type === 'global' || league.type === 'course';
+
+    useEffect(() => {
+        const fetchLeagueRanking = async () => {
+            setLoading(true);
+            try {
+                // 1. Fetch users for this league
+                let usersQuery = supabase.from('users').select('email, name, surname, preferredcourse, role');
+                
+                if (league.type === 'global') {
+                    usersQuery = usersQuery.neq('role', 'superadmin');
+                } else if (league.type === 'course') {
+                    usersQuery = usersQuery.eq('preferredcourse', league.course).neq('role', 'superadmin');
+                } else {
+                    usersQuery = usersQuery.in('email', league.participants || []);
+                }
+
+                const { data: usersData } = await usersQuery;
+                if (!usersData) return;
+
+                // 2. Fetch predictions
+                const { data: predsData } = await supabase.from('predictions').select('*');
+                const validPreds = predsData || [];
+                const finishedMatches = matches.filter(m => m.status === 'finished');
+
+                const scores: Record<string, any> = {};
+                usersData.forEach(u => {
+                    scores[u.email] = {
+                        email: u.email,
+                        name: `${u.name} ${u.surname || ''}`.trim(),
+                        course: u.preferredcourse,
+                        points: 0,
+                    };
+                });
+
+                validPreds.forEach(pred => {
+                    const match = finishedMatches.find(m => m.id === pred.match_id);
+                    if (match && scores[pred.user_email]) {
+                        const predA = Number(pred.score_a);
+                        const predB = Number(pred.score_b);
+                        const actualA = match.scoreA;
+                        const actualB = match.scoreB;
+
+                        const isExact = predA === actualA && predB === actualB;
+                        const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                        const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
+                        const isWinner = predWinner === actualWinner;
+
+                        if (isExact) scores[pred.user_email].points += 3;
+                        else if (isWinner) scores[pred.user_email].points += 1;
+                    }
+                });
+
+                const sorted = Object.values(scores).sort((a, b) => b.points - a.points);
+                setRanking(sorted);
+            } catch (err) {
+                console.error("Erro ao carregar ranking da liga:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchLeagueRanking();
+    }, [league, matches]);
+
+
+    const handleRemoveParticipant = async (email: string) => {
+        if (confirm(`Remover ${email} da liga?`)) {
+            const updatedParticipants = (league.participants || []).filter((p: string) => p !== email);
+            const { error } = await supabase
+                .from('leagues')
+                .update({ participants: updatedParticipants })
+                .eq('id', league.id);
+
+            if (!error) {
+                league.participants = updatedParticipants;
+                // Update local ranking to reflect removal
+                setRanking(prev => prev.filter(p => p.email !== email));
+                alert('Participante removido.');
+            }
+        }
+    };
+
+    const handleDeleteLeague = async () => {
+        if (confirm('Tem certeza que deseja excluir esta liga permanentemente?')) {
+            const { error } = await supabase.from('leagues').delete().eq('id', league.id);
+            if (!error) {
+                onClose();
+            }
+        }
+    };
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', zIndex: 3000, padding: '20px'
+        }}>
+            <div className="premium-card" style={{
+                width: '100%', maxWidth: '600px', maxHeight: '85vh',
+                display: 'flex', flexDirection: 'column', background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)', borderRadius: '20px', overflow: 'hidden'
+            }}>
+                {/* Header */}
+                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                            width: '48px', height: '48px', borderRadius: '12px',
+                            background: isSpecialLeague ? '#dc262615' : 'rgba(255,255,255,0.05)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                            <Trophy size={24} color={isSpecialLeague ? '#dc2626' : 'white'} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase' }}>{league.name}</h2>
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>{league.description}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{
+                        position: 'absolute', top: '16px', right: '16px', background: 'none',
+                        border: 'none', color: 'var(--text-secondary)', cursor: 'pointer'
+                    }}>
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                {isAdmin && (
+                    <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
+                        <button 
+                            onClick={() => setActiveTab('ranking')}
+                            style={{
+                                flex: 1, padding: '14px', background: 'none', border: 'none',
+                                color: activeTab === 'ranking' ? 'white' : 'var(--text-secondary)',
+                                fontWeight: 700, borderBottom: activeTab === 'ranking' ? '2px solid #dc2626' : 'none',
+                                cursor: 'pointer'
+                            }}
+                        >CLASSIFICAÇÃO</button>
+                        <button 
+                            onClick={() => setActiveTab('manage')}
+                            style={{
+                                flex: 1, padding: '14px', background: 'none', border: 'none',
+                                color: activeTab === 'manage' ? 'white' : 'var(--text-secondary)',
+                                fontWeight: 700, borderBottom: activeTab === 'manage' ? '2px solid #dc2626' : 'none',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                            }}
+                        >
+                            <Settings size={16} /> GERENCIAR
+                        </button>
+                    </div>
+                )}
+
+                {/* Content */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                    {activeTab === 'ranking' ? (
+                        <div style={{ width: '100%' }}>
+                            {loading ? (
+                                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Carregando ranking...</div>
+                            ) : (
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10 }}>
+                                        <tr style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                            <th style={{ padding: '15px 20px', textAlign: 'left', width: '60px' }}>Pos</th>
+                                            <th style={{ padding: '15px 20px', textAlign: 'left' }}>Membro</th>
+                                            <th style={{ padding: '15px 20px', textAlign: 'center', width: '80px' }}>Pontos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ranking.map((row, index) => (
+                                            <tr key={row.email} style={{ 
+                                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                background: row.email === currentUser?.email ? 'rgba(220, 38, 38, 0.05)' : 'transparent'
+                                            }}>
+                                                <td style={{ padding: '15px 20px', fontWeight: 800 }}>{index + 1}º</td>
+                                                <td style={{ padding: '15px 20px' }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '14px' }}>{row.name}</div>
+                                                    <div style={{ fontSize: '11px', color: '#dc2626' }}>{row.course}</div>
+                                                </td>
+                                                <td style={{ padding: '15px 20px', textAlign: 'center', fontSize: '16px', fontWeight: 900 }}>{row.points}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                            {/* Share Link */}
+                            <section>
+                                <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Plus size={16} color="#dc2626" /> Link de Convite
+                                </h3>
+                                <div style={{ 
+                                    background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px',
+                                    border: '1px solid var(--border-color)', display: 'flex',
+                                    alignItems: 'center', gap: '12px'
+                                }}>
+                                    <input 
+                                        readOnly 
+                                        value={`${window.location.origin}/?join=${league.id}`}
+                                        style={{ flex: 1, background: 'none', border: 'none', color: 'white', fontSize: '12px' }}
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(`${window.location.origin}/?join=${league.id}`);
+                                            alert('Link copiado!');
+                                        }}
+                                        style={{
+                                            background: '#dc2626', color: 'white', border: 'none',
+                                            padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >COPIAR</button>
+                                </div>
+                                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                                    Compartilhe este link para que novos participantes entrem na sua liga.
+                                </p>
+                            </section>
+
+                            {/* Participants List */}
+                            <section>
+                                <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Users size={16} color="#dc2626" /> Participantes ({league.participants?.length || 0})
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {league.participants?.map((email: string) => (
+                                        <div key={email} style={{
+                                            padding: '12px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                                        }}>
+                                            <span style={{ fontSize: '14px' }}>{email} {email === league.owner_email && <Shield size={12} style={{ display: 'inline', marginLeft: 4, color: '#ffd700' }} />}</span>
+                                            {email !== league.owner_email && (
+                                                <button onClick={() => handleRemoveParticipant(email)} style={{
+                                                    background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer'
+                                                }}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Danger Zone */}
+                            <section style={{ borderTop: '1px solid rgba(255,0,0,0.1)', paddingTop: '24px' }}>
+                                <button onClick={handleDeleteLeague} style={{
+                                    width: '100%', padding: '14px', borderRadius: '8px', border: '1px solid #ef4444',
+                                    background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', fontWeight: 700, cursor: 'pointer'
+                                }}>
+                                    EXCLUIR LIGA PERMANENTEMENTE
+                                </button>
+                            </section>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default LeagueDetailsModal;

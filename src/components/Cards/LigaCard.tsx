@@ -1,119 +1,108 @@
-import { type FC, useState } from 'react';
-import LeagueFormModal from '../Modals/LeagueFormModal';
-import { useAuth } from '../../context/AuthContext';
+import { type FC } from 'react';
+import { Trophy } from 'lucide-react';
 
-const LigaCard: FC = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const { user, openLoginModal } = useAuth();
+interface LigaCardProps {
+    name: string;
+    description?: string;
+    participantsCount?: number;
+    isAdmin?: boolean;
+    type?: 'global' | 'course' | 'private';
+    onClick: () => void;
+}
 
-    const handleCreateLeagueClick = () => {
-        if (!user) {
-            openLoginModal();
-        } else {
-            setIsModalOpen(true);
-        }
-    };
-
+const LigaCard: FC<LigaCardProps> = ({ name, description, participantsCount, isAdmin, type = 'private', onClick }) => {
     return (
-        <>
-            <div 
-                className="premium-card"
-                style={{
-                    background: 'var(--bg-card)',
-                    borderRadius: '12px',
-                    border: '1px solid var(--border-color)',
-                    width: '320px',
-                    padding: '24px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '16px',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                    transition: 'all 0.3s ease',
-                }}
-            >
-                <h3 style={{
-                    margin: 0,
-                    fontSize: '22px',
-                    fontWeight: 900,
-                    color: 'var(--text-primary)',
-                    textTransform: 'uppercase',
-                    textAlign: 'center',
-                    letterSpacing: '1px',
-                }}>
-                    LIGA CLÁSSICA
-                </h3>
-
-                <p style={{
-                    margin: 0,
-                    fontSize: '0.95rem',
-                    color: 'var(--text-secondary)',
-                    textAlign: 'center',
-                    lineHeight: 1.5,
-                    fontWeight: 500,
-                }}>
-                    Dispute o primeiro lugar do ranking de pontos corridos com seus amigos!
-                </p>
-
+        <div 
+            onClick={onClick}
+            className="premium-card hover-glow"
+            style={{
+                background: 'var(--bg-card)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-color)',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
+                height: '100%'
+            }}
+        >
+            {isAdmin && (
                 <div style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    background: '#dc2626',
+                    color: 'white',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    zIndex: 2
                 }}>
-                    <img
-                        src="/images/logo-liga.png"
-                        alt="Logo Liga Clássica"
-                        style={{
-                            maxWidth: '180px',
-                            width: '100%',
-                            height: 'auto',
-                            objectFit: 'contain',
-                        }}
-                    />
+                    Admin
                 </div>
+            )}
 
-                <button
-                    onClick={handleCreateLeagueClick}
-                    style={{
-                        width: '100%',
-                        backgroundColor: 'var(--accent-color)',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '14px 16px',
-                        fontSize: '14px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.2s',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        boxShadow: '0 4px 12px rgba(227, 6, 19, 0.3)',
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(227, 6, 19, 0.4)';
-                        e.currentTarget.style.filter = 'brightness(1.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(227, 6, 19, 0.3)';
-                        e.currentTarget.style.filter = 'brightness(1)';
-                    }}
-                >
-                    CRIAR LIGA
-                </button>
+            <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: type === 'global' ? '#ffd70015' : type === 'course' ? '#dc262615' : 'rgba(255,255,255,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: `1px solid ${type === 'global' ? '#ffd70030' : type === 'course' ? '#dc262630' : 'rgba(255,255,255,0.1)'}`
+            }}>
+                <Trophy size={20} color={type === 'global' ? '#ffd700' : type === 'course' ? '#dc2626' : 'white'} />
             </div>
 
-            <LeagueFormModal 
-                aberto={isModalOpen} 
-                setAberto={setIsModalOpen} 
-            />
-        </>
+            <div style={{ flex: 1 }}>
+                <h3 style={{
+                    margin: 0,
+                    fontSize: '18px',
+                    fontWeight: 800,
+                    color: 'var(--text-primary)',
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase'
+                }}>
+                    {name}
+                </h3>
+                <p style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                }}>
+                    {description || 'Sem descrição.'}
+                </p>
+            </div>
+
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: '12px',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                marginTop: '4px'
+            }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    {type === 'global' ? 'Todos os usuários' : type === 'course' ? 'Todos do curso' : `${participantsCount} participantes`}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--accent-color)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Ver Ranking →
+                </span>
+            </div>
+        </div>
     );
 };
 

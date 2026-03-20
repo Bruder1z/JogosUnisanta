@@ -9,7 +9,11 @@ import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
-import { CheckCircle, RotateCcw, Calendar, Zap } from 'lucide-react';
+import { CheckCircle, RotateCcw, Calendar, Zap, Plus } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
+import LeagueDetailsModal from '../components/Modals/LeagueDetailsModal.tsx';
+import LeagueFormModal from '../components/Modals/LeagueFormModal';
+import JoinLeagueModal from '../components/Modals/JoinLeagueModal';
 
 const EXCLUDED_SPORTS = ['Xadrez', 'Natação'];
 
@@ -30,8 +34,12 @@ const Simulator: FC = () => {
     const [activeTab, setActiveTab] = useState<'palpitar' | 'historico' | 'competicoes'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
+    const [leagues, setLeagues] = useState<any[]>([]);
+    const [isLeagueFormOpen, setIsLeagueFormOpen] = useState(false);
+    const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
+    const [joiningLeagueId, setJoiningLeagueId] = useState<string | null>(null);
 
-    const { userPredictions, saveUserPredictions } = useAuth();
+    const { user, openLoginModal, userPredictions, saveUserPredictions } = useAuth();
     const { matches } = useData();
 
     const getTeamEmblem = (teamName: string) => {
@@ -69,6 +77,50 @@ const Simulator: FC = () => {
     useEffect(() => {
         setPredictions(userPredictions);
     }, [userPredictions]);
+
+    const fetchLeagues = async () => {
+        if (!user?.email) return;
+
+        console.log("Fetching leagues for:", user.email);
+        // Try to fetch leagues where owner_email is user OR participants contains user
+        // Using a more standard approach for safety
+        const { data, error } = await supabase
+            .from('leagues')
+            .select('*');
+
+        if (error) {
+            console.error("Erro ao buscar ligas:", error);
+        } else if (data) {
+            // Filter in JS to avoid Supabase array filter confusion if schema is not exactly as expected
+            const userEmail = user.email.toLowerCase();
+            const userLeagues = data.filter(l => 
+                (l.owner_email && l.owner_email.toLowerCase() === userEmail) || 
+                (l.participants && Array.isArray(l.participants) && l.participants.some((p: string) => p.toLowerCase() === userEmail)) ||
+                (l.participants && typeof l.participants === 'string' && l.participants.toLowerCase().includes(userEmail))
+            );
+            console.log("Filtered leagues:", userLeagues.length);
+            setLeagues(userLeagues);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'competicoes') {
+            fetchLeagues();
+        }
+    }, [activeTab, user?.email]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const joinId = params.get('join');
+        if (joinId) {
+            setJoiningLeagueId(joinId);
+            // Optionally switch to 'competicoes' tab
+            setActiveTab('competicoes');
+            // Clean up the URL
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, []);
 
     const updatePrediction = (matchId: string, field: 'scoreA' | 'scoreB', value: string) => {
         const numVal = value === '' ? '' : Math.max(0, parseInt(value) || 0);
@@ -698,27 +750,114 @@ const Simulator: FC = () => {
                     {/* Competitions Tab */}
                     {activeTab === 'competicoes' && (
                         <div style={{ paddingTop: '16px' }}>
-                            <h2 style={{
-                                fontSize: '36px',
-                                fontWeight: 900,
-                                color: 'white',
-                                margin: '0 0 12px 0',
-                                letterSpacing: '0.5px',
-                            }}>
-                                Categoria de Liga
-                            </h2>
-                            <p style={{
-                                fontSize: '16px',
-                                color: 'var(--text-secondary)',
-                                margin: '0 0 24px 0',
-                                fontWeight: 400,
-                                lineHeight: 1.5,
-                            }}>
-                                Crie sua liga e comece a competir com a galera!
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <LigaCard />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px' }}>
+                                <div>
+                                    <h2 style={{
+                                        fontSize: '32px',
+                                        fontWeight: 900,
+                                        color: 'white',
+                                        margin: '0 0 8px 0',
+                                        letterSpacing: '0.5px',
+                                    }}>
+                                        Minhas Ligas
+                                    </h2>
+                                    <p style={{
+                                        fontSize: '15px',
+                                        color: 'var(--text-secondary)',
+                                        margin: 0,
+                                        fontWeight: 400,
+                                    }}>
+                                        Acompanhe seu desempenho nas ligas que você participa.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => user ? setIsLeagueFormOpen(true) : openLoginModal()}
+                                    style={{
+                                        padding: '10px 16px',
+                                        borderRadius: '8px',
+                                        background: 'var(--accent-color)',
+                                        color: 'white',
+                                        border: 'none',
+                                        fontSize: '13px',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    CRIAR LIGA
+                                </button>
                             </div>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '20px'
+                            }}>
+                                {/* Automatic Leagues */}
+                                <LigaCard 
+                                    name="LIGA GERAL" 
+                                    description="Todos os participantes do Bolão Unisanta"
+                                    type="global"
+                                    onClick={() => setSelectedLeague({ name: 'LIGA GERAL', type: 'global' })}
+                                />
+                                
+                                {user && user.preferredCourse && (
+                                    <LigaCard 
+                                        name={`LIGA ${user.preferredCourse.toUpperCase()}`}
+                                        description={`Ranking exclusivo de ${user.preferredCourse}`}
+                                        type="course"
+                                        onClick={() => setSelectedLeague({ 
+                                            name: `LIGA ${user.preferredCourse}`, 
+                                            type: 'course',
+                                            course: user.preferredCourse 
+                                        })}
+                                    />
+                                )}
+
+                                {/* Private Leagues */}
+                                {leagues.map(league => (
+                                    <LigaCard 
+                                        key={league.id}
+                                        name={league.name}
+                                        description={league.description}
+                                        participantsCount={league.participants?.length || 0}
+                                        isAdmin={league.owner_email === useAuth().user?.email}
+                                        onClick={() => setSelectedLeague(league)}
+                                    />
+                                ))}
+                            </div>
+
+                            <LeagueFormModal 
+                                aberto={isLeagueFormOpen} 
+                                setAberto={setIsLeagueFormOpen} 
+                                onCreated={() => fetchLeagues()}
+                            />
+
+                            {selectedLeague && (
+                                <LeagueDetailsModal 
+                                    league={selectedLeague}
+                                    onClose={() => {
+                                        setSelectedLeague(null);
+                                        fetchLeagues();
+                                    }}
+                                />
+                            )}
+
+                            {joiningLeagueId && (
+                                <JoinLeagueModal 
+                                    leagueId={joiningLeagueId}
+                                    onClose={() => setJoiningLeagueId(null)}
+                                    onJoined={() => {
+                                        setJoiningLeagueId(null);
+                                        fetchLeagues();
+                                    }}
+                                />
+                            )}
                         </div>
                     )}
 

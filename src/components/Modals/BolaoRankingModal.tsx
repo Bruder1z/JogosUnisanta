@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Medal, Crown, Eye } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../services/supabaseClient';
 
 interface BolaoRankingModalProps {
@@ -20,6 +21,7 @@ interface BolaoUserRanking {
 
 const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
     const { matches } = useData();
+    const { user: currentUser } = useAuth();
     const [ranking, setRanking] = useState<BolaoUserRanking[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -172,7 +174,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                             <Crown size={24} color="white" />
                         </div>
                         <div>
-                            <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0 }}>Ranking do Bolão</h2>
+                            <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0 }}>Ranking Geral</h2>
                             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Classificação geral dos usuários</p>
                         </div>
                     </div>
@@ -288,31 +290,33 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                                         color: isTop3 ? (highlightColor as string) : 'white',
                                                         fontVariantNumeric: 'tabular-nums'
                                                     }}>{user.points}</span>
-                                                    <button
-                                                        style={{
-                                                            background: selectedUser === user.email ? '#dc2626' : 'transparent',
-                                                            border: 'none',
-                                                            borderRadius: 4,
-                                                            padding: 4,
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            transition: 'background 0.2s',
-                                                        }}
-                                                        title={selectedUser === user.email ? 'Fechar partidas' : 'Ver partidas'}
-                                                        onClick={() => {
-                                                            if (selectedUser === user.email) {
-                                                                setSelectedUser(null);
-                                                                setUserPredictions([]);
-                                                            } else {
-                                                                setSelectedUser(user.email);
-                                                                fetchUserPredictions(user.email);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Eye size={20} color={selectedUser === user.email ? 'white' : '#dc2626'} />
-                                                    </button>
+                                                    {currentUser?.email === user.email && (
+                                                        <button
+                                                            style={{
+                                                                background: selectedUser === user.email ? '#dc2626' : 'transparent',
+                                                                border: 'none',
+                                                                borderRadius: 4,
+                                                                padding: 4,
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                transition: 'background 0.2s',
+                                                            }}
+                                                            title={selectedUser === user.email ? 'Fechar partidas' : 'Ver partidas'}
+                                                            onClick={() => {
+                                                                if (selectedUser === user.email) {
+                                                                    setSelectedUser(null);
+                                                                    setUserPredictions([]);
+                                                                } else {
+                                                                    setSelectedUser(user.email);
+                                                                    fetchUserPredictions(user.email);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Eye size={20} color={selectedUser === user.email ? 'white' : '#dc2626'} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
