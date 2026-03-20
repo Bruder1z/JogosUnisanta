@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Jogos Unisanta
 
-Currently, two official plugins are available:
+Plataforma web para gerenciamento, acompanhamento e interação com os Jogos da Unisanta, maior evento esportivo universitário do Estado de São Paulo.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## React Compiler
+## Sobre o Projeto
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O Jogos Unisanta é um sistema desenvolvido para centralizar informações e funcionalidades relacionadas ao evento esportivo universitário.
 
-## Expanding the ESLint configuration
+A aplicação permite acompanhar partidas, visualizar rankings, participar de bolões e gerenciar dados por meio de um painel administrativo.
+## Funcionalidades
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+#### Público Geral
+- Calendário de jogos
+- Visualização de partidas e resultados
+- Portal de notícias e atualizações
+- Rankings de atletas, cursos e instituições
+- Simulador de palpites (bolão)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+#### Área Administrativa
+- Cadastro e gerenciamento de jogos
+- Gestão de equipes e atletas
+- Atualização de resultados em tempo real
+- Controle geral dos dados do sistema
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Tecnologias Utilizadas
+
+- React 19 + TypeScript
+- Vite (build e HMR)
+- Supabase (backend e autenticação)
+- React Router DOM (navegação SPA)
+- Lucide React (ícones)
+
+
+
+## Estrutura de Pastas 
+```plaintext
+src/
+├── assets/        # Arquivos estáticos
+├── components/    # Componentes reutilizáveis (Admin, Match, Modals, Layout, etc.)
+├── context/       # Context API (estado global)
+├── pages/         # Páginas da aplicação
+├── services/      # Integrações e APIs
+```
+## Instalação e Uso
+
+#### Pré-requisitos
+- Node.js 18 ou superior
+- npm ou yarn
+
+#### Clone o repositório
+```plaintext
+git clone <url-do-repo>
+cd JogosUnisanta
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+#### Instale as dependências
+```plaintext
+npm install
 ```
+
+#### Configure o ambiente
+Crie um arquivo .env na raiz do projeto:
+```plaintext
+VITE_SUPABASE_URL=your_url_here
+VITE_SUPABASE_ANON_KEY=your_key_here
+```
+
+#### Executar em desenvolvimento
+```plaintext
+npm run dev
+```
+## Casos de Uso
+
+- Eventos universitários
+- Campeonatos esportivos
+- Ligas amadoras
+- Plataformas de bolão
+- Portais esportivos
+![Logo](https://www.serventuarios.org.br/wp-content/uploads/2022/03/unisanta.jpg)
+
