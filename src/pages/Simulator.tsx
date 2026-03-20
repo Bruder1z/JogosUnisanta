@@ -4,15 +4,12 @@ import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import ModalRegras from '../components/Modals/ModalRegras';
 import BolaoRankingModal from '../components/Modals/BolaoRankingModal';
-import SummaryPanel from '../components/Modals/SummaryPanel';
 import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
 import { 
-    X, Trophy, Users, Star, History, Layout, 
-    ArrowRight, ChevronLeft, ChevronRight, Share2, 
-    Copy, Plus, LogIn, Search, Filter,
+    Users, Plus,
     CheckCircle, RotateCcw, Calendar, Zap
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -239,42 +236,7 @@ const Simulator: FC = () => {
         setToasts(prev => [...prev, { ...data, id }]);
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3200);
     };
-
     const filledCount = Object.values(predictions).filter(p => p.scoreA !== '' && p.scoreB !== '').length;
-
-    // Calculate scoring stats
-    const scoringStats = useMemo(() => {
-        let totalPoints = 0;
-        let exactScores = 0;
-        let winners = 0;
-
-        matches.forEach(match => {
-            const pred = userPredictions[match.id];
-            if (pred && pred.scoreA !== '' && pred.scoreB !== '') {
-                const predScoreA = Number(pred.scoreA);
-                const predScoreB = Number(pred.scoreB);
-
-                // Check if it's an exact score match
-                if (match.status === 'finished') {
-                    if (predScoreA === match.scoreA && predScoreB === match.scoreB) {
-                        exactScores++;
-                        totalPoints += 3;
-                    }
-                    // Check if winner is correct (even if exact score is wrong)
-                    else {
-                        const predWinner = predScoreA > predScoreB ? 'A' : predScoreB > predScoreA ? 'B' : 'draw';
-                        const actualWinner = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
-                        if (predWinner === actualWinner) {
-                            winners++;
-                            totalPoints += 1;
-                        }
-                    }
-                }
-            }
-        });
-
-        return { totalPoints, exactScores, winners };
-    }, [userPredictions, matches]);
 
     // ── helpers ──────────────────────────────────────────────
     const msUntil = (dateStr: string, timeStr: string): number => {

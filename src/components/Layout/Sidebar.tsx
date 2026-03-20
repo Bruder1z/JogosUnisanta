@@ -5,8 +5,7 @@ import {
     ChevronRight,
     History,
     LayoutGrid,
-    Calendar,
-    Zap
+    Calendar
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
