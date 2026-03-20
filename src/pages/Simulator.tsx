@@ -9,9 +9,8 @@ import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
-import { CheckCircle, RotateCcw, Calendar, Info, Zap } from 'lucide-react';
+import { CheckCircle, RotateCcw, Calendar, Zap } from 'lucide-react';
 
-const SET_SPORTS = ['Vôlei', 'Vôlei de Praia', 'Beach Tennis', 'Tênis de Mesa', 'Futevôlei'];
 const EXCLUDED_SPORTS = ['Xadrez', 'Natação'];
 
 interface ToastData {
@@ -185,8 +184,6 @@ const Simulator: FC = () => {
         const [cardSaved, setCardSaved] = useState(false);
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
-        
-        const isSetSport = SET_SPORTS.includes(match.sport);
         
         const timeLeftMs = msUntil(match.date, match.time);
         const isTimeout = match.status !== 'finished' && timeLeftMs <= 3600000; // <= 1 hour
@@ -450,25 +447,6 @@ const Simulator: FC = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Set sport notice */}
-                {isSetSport && (
-                    <div style={{
-                        margin: '0 18px 14px',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(59,130,246,0.07)',
-                        border: '1px solid rgba(59,130,246,0.18)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        color: '#60a5fa',
-                    }}>
-                        <Info size={13} style={{ flexShrink: 0 }} />
-                        Placar em sets (ex: 3 × 1)
-                    </div>
-                )}
 
                 {/* ── Match Results History Indicator ── */}
                 {match.status === 'finished' && hasPrediction && (

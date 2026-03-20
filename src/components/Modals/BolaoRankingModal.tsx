@@ -28,7 +28,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
     // Função para buscar palpites do usuário
     const fetchUserPredictions = async (email: string) => {
         setLoadingPreds(true);
-        const { data: preds, error } = await supabase
+        const { data: preds } = await supabase
             .from('predictions')
             .select('*')
             .eq('user_email', email);
