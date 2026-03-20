@@ -31,13 +31,15 @@ const Simulator: FC = () => {
     const [showBolaoRanking, setShowBolaoRanking] = useState(false);
     const [aberto, setAberto] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-    const [activeTab, setActiveTab] = useState<'palpitar' | 'historico' | 'competicoes'>('palpitar');
+    const [activeTab, setActiveTab] = useState<'palpitar' | 'historico' | 'competicoes' | 'sugeridas'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
     const [leagues, setLeagues] = useState<any[]>([]);
+    const [allLeagues, setAllLeagues] = useState<any[]>([]);
     const [isLeagueFormOpen, setIsLeagueFormOpen] = useState(false);
     const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
     const [joiningLeagueId, setJoiningLeagueId] = useState<string | null>(null);
+    const [userRequests, setUserRequests] = useState<any[]>([]);
 
     const { user, openLoginModal, userPredictions, saveUserPredictions } = useAuth();
     const { matches } = useData();
@@ -82,8 +84,6 @@ const Simulator: FC = () => {
         if (!user?.email) return;
 
         console.log("Fetching leagues for:", user.email);
-        // Try to fetch leagues where owner_email is user OR participants contains user
-        // Using a more standard approach for safety
         const { data, error } = await supabase
             .from('leagues')
             .select('*');
@@ -91,7 +91,7 @@ const Simulator: FC = () => {
         if (error) {
             console.error("Erro ao buscar ligas:", error);
         } else if (data) {
-            // Filter in JS to avoid Supabase array filter confusion if schema is not exactly as expected
+            setAllLeagues(data);
             const userEmail = user.email.toLowerCase();
             const userLeagues = data.filter(l => 
                 (l.owner_email && l.owner_email.toLowerCase() === userEmail) || 
@@ -100,11 +100,43 @@ const Simulator: FC = () => {
             );
             console.log("Filtered leagues:", userLeagues.length);
             setLeagues(userLeagues);
+
+            // Fetch user requests
+            const { data: requestsData } = await supabase
+                .from('league_requests')
+                .select('*')
+                .eq('user_email', user.email);
+            
+            if (requestsData) {
+                setUserRequests(requestsData);
+            }
+        }
+    };
+
+    const handleRequestJoin = async (leagueId: string) => {
+        if (!user?.email) return;
+
+        try {
+            const { error } = await supabase
+                .from('league_requests')
+                .insert([
+                    {
+                        league_id: leagueId,
+                        user_email: user.email,
+                        user_name: user.name || user.email.split('@')[0],
+                        status: 'pending'
+                    }
+                ]);
+
+            if (error) throw error;
+            fetchLeagues();
+        } catch (err: any) {
+            console.error("Erro ao solicitar entrada:", err);
         }
     };
 
     useEffect(() => {
-        if (activeTab === 'competicoes') {
+        if (activeTab === 'competicoes' || activeTab === 'sugeridas') {
             fetchLeagues();
         }
     }, [activeTab, user?.email]);
@@ -660,7 +692,7 @@ const Simulator: FC = () => {
 
                         {/* Tab bar */}
                         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
-                            {(['palpitar', 'historico', 'competicoes'] as const).map((tab) => (
+                            {(['palpitar', 'historico', 'competicoes', 'sugeridas'] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -678,14 +710,14 @@ const Simulator: FC = () => {
                                         marginBottom: '-1px',
                                     }}
                                 >
-                                    {tab === 'palpitar' ? 'PALPITAR' : tab === 'historico' ? 'HISTÓRICO' : 'COMPETIÇÕES'}
+                                    {tab === 'palpitar' ? 'PALPITAR' : tab === 'historico' ? 'HISTÓRICO' : tab === 'competicoes' ? 'COMPETIÇÕES' : 'LIGAS SUGERIDAS'}
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     {/* Summary Panel */}
-                    {activeTab !== 'competicoes' && (
+                    {activeTab !== 'competicoes' && activeTab !== 'sugeridas' && (
                         <SummaryPanel
                             totalPoints={scoringStats.totalPoints}
                             exactScores={scoringStats.exactScores}
@@ -857,6 +889,51 @@ const Simulator: FC = () => {
                                         fetchLeagues();
                                     }}
                                 />
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'sugeridas' && (
+                        <div className="leagues-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                            {allLeagues
+                                .filter(l => !leagues.some(my => my.id === l.id) && l.name !== 'Liga Geral' && !l.name.startsWith('Liga '))
+                                .map(league => (
+                                    <div key={league.id} className="premium-card league-card" style={{ padding: '24px', position: 'relative' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
+                                            <div style={{ width: '50px', height: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                                                🏆
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>{league.name}</h3>
+                                                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>{league.description || 'Sem descrição'}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const hasRequest = userRequests.some(r => r.league_id === league.id);
+                                                if (!hasRequest) handleRequestJoin(league.id);
+                                            }}
+                                            className={userRequests.some(r => r.league_id === league.id) ? "" : "hover-glow"}
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px',
+                                                background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 'var(--accent-color)',
+                                                color: userRequests.some(r => r.league_id === league.id) ? 'var(--text-secondary)' : 'white',
+                                                border: userRequests.some(r => r.league_id === league.id) ? '1px solid var(--border-color)' : 'none',
+                                                borderRadius: '8px',
+                                                fontWeight: 700,
+                                                fontSize: '14px',
+                                                cursor: userRequests.some(r => r.league_id === league.id) ? 'default' : 'pointer'
+                                            }}
+                                        >
+                                            {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 'PEDIR PARA ENTRAR'}
+                                        </button>
+                                    </div>
+                                ))}
+                            {allLeagues.filter(l => !leagues.some(my => my.id === l.id) && l.name !== 'Liga Geral' && !l.name.startsWith('Liga ')).length === 0 && (
+                                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                    Nenhuma liga sugerida disponível no momento.
+                                </div>
                             )}
                         </div>
                     )}

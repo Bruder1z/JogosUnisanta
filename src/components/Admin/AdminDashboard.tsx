@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabaseClient';
 import { Link } from 'react-router-dom';
 import {
     Users,
@@ -174,6 +175,91 @@ const AdminDashboard: React.FC = () => {
         return foundKey ? COURSE_ICONS[foundKey] : '🎓';
     };
 
+    const [leagueRequests, setLeagueRequests] = useState<any[]>([]);
+
+    const fetchLeagueRequests = async () => {
+        const { data, error } = await supabase
+            .from('league_requests')
+            .select(`
+                *,
+                leagues (
+                    name
+                )
+            `)
+            .eq('status', 'pending');
+        
+        if (error) console.error("Erro ao buscar solicitações:", error);
+        else if (data) setLeagueRequests(data);
+    };
+
+    useEffect(() => {
+        if (activeTab === 'requests') {
+            fetchLeagueRequests();
+        }
+    }, [activeTab]);
+
+    const handleApproveRequest = async (request: any) => {
+        try {
+            const { data: league, error: lError } = await supabase
+                .from('leagues')
+                .select('participants')
+                .eq('id', request.league_id)
+                .single();
+            
+            if (lError) throw lError;
+
+            let participants: string[] = [];
+            if (Array.isArray(league.participants)) {
+                participants = league.participants;
+            } else if (typeof league.participants === 'string') {
+                try {
+                    participants = JSON.parse(league.participants);
+                } catch {
+                    participants = league.participants.split(',').map((s: string) => s.trim());
+                }
+            }
+
+            if (!participants.some(p => p.toLowerCase() === request.user_email.toLowerCase())) {
+                participants.push(request.user_email.toLowerCase());
+            }
+
+            const { error: uError } = await supabase
+                .from('leagues')
+                .update({ participants })
+                .eq('id', request.league_id);
+            
+            if (uError) throw uError;
+
+            const { error: rError } = await supabase
+                .from('league_requests')
+                .update({ status: 'approved' })
+                .eq('id', request.id);
+            
+            if (rError) throw rError;
+
+            showNotification("Solicitação aprovada!");
+            fetchLeagueRequests();
+        } catch (err) {
+            console.error("Erro ao aprovar:", err);
+            showNotification("Erro ao aprovar solicitação.");
+        }
+    };
+
+    const handleRejectRequest = async (requestId: string) => {
+        const { error } = await supabase
+            .from('league_requests')
+            .update({ status: 'rejected' })
+            .eq('id', requestId);
+        
+        if (error) {
+            console.error("Erro ao recusar:", error);
+            showNotification("Erro ao recusar solicitação.");
+        } else {
+            showNotification("Solicitação recusada.");
+            fetchLeagueRequests();
+        }
+    };
+
     const handleSaveNewCourse = () => {
         if (!newCourseForm.name || !newCourseForm.university) {
             showNotification('Preencha Nome e Faculdade!');
@@ -267,6 +353,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="admin-tabs-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
                         { id: 'overview', label: 'Visão Geral', icon: <Layout size={18} /> },
+                        { id: 'requests', label: 'Solicitações', icon: <PlusCircle size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
@@ -351,6 +438,91 @@ const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                    {activeTab === 'requests' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <PlusCircle size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Solicitações de Entrada</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Gerencie quem pode participar das ligas privadas</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>USUÁRIO</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>LIGA</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>DATA</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600, textAlign: 'center' }}>AÇÕES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {leagueRequests.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                                    Nenhuma solicitação pendente.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            leagueRequests.map(request => (
+                                                <tr key={request.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                    <td style={{ padding: '16px 20px' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{request.user_name}</div>
+                                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{request.user_email}</div>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
+                                                        {request.leagues?.name}
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
+                                                        {new Date(request.created_at).toLocaleDateString('pt-BR')}
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                                            <button
+                                                                onClick={() => handleApproveRequest(request)}
+                                                                style={{
+                                                                    padding: '6px 16px',
+                                                                    borderRadius: '6px',
+                                                                    background: 'var(--accent-color)',
+                                                                    color: 'white',
+                                                                    border: 'none',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '12px'
+                                                                }}
+                                                            >
+                                                                APROVAR
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleRejectRequest(request.id)}
+                                                                style={{
+                                                                    padding: '6px 16px',
+                                                                    borderRadius: '6px',
+                                                                    background: 'rgba(255,255,255,0.05)',
+                                                                    color: 'var(--text-secondary)',
+                                                                    border: '1px solid var(--border-color)',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '12px'
+                                                                }}
+                                                            >
+                                                                RECUSAR
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {activeTab === 'overview' && (
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>

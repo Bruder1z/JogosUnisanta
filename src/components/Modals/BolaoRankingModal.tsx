@@ -39,93 +39,90 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
     };
 
     useEffect(() => {
-        const fetchGlobalRanking = async () => {
-            // 1. Fetch users (exclude superadmin)
-            const { data: usersData, error: usersError } = await supabase
-                .from('users')
-                .select('email, name, surname, preferredcourse, role');
+        const fetchGlobalRanking = async (isInitial = false) => {
+            if (isInitial) setLoading(true);
+            try {
+                // 1. Fetch users (exclude superadmin)
+                const { data: usersData, error: usersError } = await supabase
+                    .from('users')
+                    .select('email, name, surname, preferredcourse, role');
 
-            if (usersError) {
-                console.error('Error fetching users:', usersError);
-                // Continue with empty array if error
-            }
+                if (usersError) console.error('Error fetching users:', usersError);
 
-            const validUsers = (usersData || []).filter(u => u.role !== 'superadmin');
+                const validUsers = (usersData || []).filter(u => u.role !== 'superadmin');
 
-            // 2. Fetch all predictions
-            const { data: predsData, error: predsError } = await supabase
-                .from('predictions')
-                .select('*');
+                // 2. Fetch all predictions
+                const { data: predsData, error: predsError } = await supabase
+                    .from('predictions')
+                    .select('*');
 
-            if (predsError) {
-                console.error('Error fetching predictions:', predsError);
-                // Continue with empty array if error
-            }
+                if (predsError) console.error('Error fetching predictions:', predsError);
 
-            const validPreds = predsData || [];
+                const validPreds = predsData || [];
 
-            // 3. Compute points
-            const finishedMatches = matches.filter(m => m.status === 'finished');
+                // 3. Compute points
+                const finishedMatches = matches.filter(m => m.status === 'finished');
+                const userScores: Record<string, BolaoUserRanking> = {};
 
-            const userScores: Record<string, BolaoUserRanking> = {};
-
-            validUsers.forEach(u => {
-                userScores[u.email] = {
-                    email: u.email,
-                    name: u.name || u.email,
-                    surname: u.surname,
-                    preferredCourse: u.preferredcourse,
-                    avatar: undefined,
-                    points: 0,
-                    exactMatches: 0,
-                    winnerMatches: 0,
-                };
-            });
-
-            // Fallback for predictions from users who might not be in validUsers (e.g. deleted or RLS blocked)
-            validPreds.forEach(pred => {
-                if (!userScores[pred.user_email]) {
-                    userScores[pred.user_email] = {
-                        email: pred.user_email,
-                        name: pred.user_email.split('@')[0],
+                validUsers.forEach(u => {
+                    userScores[u.email] = {
+                        email: u.email,
+                        name: u.name || u.email,
+                        surname: u.surname,
+                        preferredCourse: u.preferredcourse,
+                        avatar: undefined,
                         points: 0,
                         exactMatches: 0,
                         winnerMatches: 0,
                     };
-                }
-            });
+                });
 
-            validPreds.forEach(pred => {
-                const match = finishedMatches.find(m => m.id === pred.match_id);
-                if (match && userScores[pred.user_email] && pred.score_a !== null && pred.score_b !== null) {
-                    const predA = Number(pred.score_a);
-                    const predB = Number(pred.score_b);
-                    const actualA = match.scoreA;
-                    const actualB = match.scoreB;
-
-                    const isExact = predA === actualA && predB === actualB;
-                    const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
-                    const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
-                    const isWinner = predWinner === actualWinner;
-
-                    if (isExact) {
-                        userScores[pred.user_email].points += 3;
-                        userScores[pred.user_email].exactMatches += 1;
-                    } else if (isWinner) {
-                        userScores[pred.user_email].points += 1;
-                        userScores[pred.user_email].winnerMatches += 1;
+                validPreds.forEach(pred => {
+                    if (!userScores[pred.user_email]) {
+                        userScores[pred.user_email] = {
+                            email: pred.user_email,
+                            name: pred.user_email.split('@')[0],
+                            points: 0,
+                            exactMatches: 0,
+                            winnerMatches: 0,
+                        };
                     }
-                }
-            });
+                });
 
-            // 4. Sort ranking
-            const sortedRanking = Object.values(userScores).sort((a, b) => b.points - a.points);
-            setRanking(sortedRanking);
-            setLoading(false);
+                validPreds.forEach(pred => {
+                    const match = finishedMatches.find(m => m.id === pred.match_id);
+                    if (match && userScores[pred.user_email] && pred.score_a !== null && pred.score_b !== null) {
+                        const predA = Number(pred.score_a);
+                        const predB = Number(pred.score_b);
+                        const actualA = match.scoreA;
+                        const actualB = match.scoreB;
+
+                        const isExact = predA === actualA && predB === actualB;
+                        const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                        const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
+                        const isWinner = predWinner === actualWinner;
+
+                        if (isExact) {
+                            userScores[pred.user_email].points += 3;
+                            userScores[pred.user_email].exactMatches += 1;
+                        } else if (isWinner) {
+                            userScores[pred.user_email].points += 1;
+                            userScores[pred.user_email].winnerMatches += 1;
+                        }
+                    }
+                });
+
+                const sortedRanking = Object.values(userScores).sort((a, b) => b.points - a.points);
+                setRanking(sortedRanking);
+            } finally {
+                setLoading(false);
+            }
         };
 
-        fetchGlobalRanking();
-    }, [matches]);
+        fetchGlobalRanking(true);
+        const interval = setInterval(() => fetchGlobalRanking(false), 60000);
+        return () => clearInterval(interval);
+    }, []); // No context dependency for polling
 
     return (
         <div style={{

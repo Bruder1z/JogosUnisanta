@@ -18,10 +18,11 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
     const isAdmin = league.owner_email === currentUser?.email;
     const isSpecialLeague = league.type === 'global' || league.type === 'course';
+    const [leagueRequests, setLeagueRequests] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchLeagueRanking = async () => {
-            setLoading(true);
+        const fetchLeagueRanking = async (isInitial = false) => {
+            if (isInitial) setLoading(true);
             try {
                 // 1. Fetch users for this league
                 let usersQuery = supabase.from('users').select('email, name, surname, preferredcourse, role');
@@ -79,8 +80,32 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             }
         };
 
-        fetchLeagueRanking();
-    }, [league, matches]);
+        // Fetch immediately on mount
+        fetchLeagueRanking(true);
+
+        // Then poll every 60 seconds
+        const interval = setInterval(() => fetchLeagueRanking(false), 60000);
+
+        return () => clearInterval(interval);
+    }, [league.id]); // Apenas re-roda se trocar de liga
+
+    const fetchLeagueRequests = async () => {
+        if (!isAdmin) return;
+        const { data, error } = await supabase
+            .from('league_requests')
+            .select('*')
+            .eq('league_id', league.id)
+            .eq('status', 'pending');
+        
+        if (error) console.error("Erro ao buscar solicitações:", error);
+        else if (data) setLeagueRequests(data);
+    };
+
+    useEffect(() => {
+        if (activeTab === 'manage') {
+            fetchLeagueRequests();
+        }
+    }, [activeTab, league.id]);
 
 
     const handleRemoveParticipant = async (email: string) => {
@@ -106,6 +131,51 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             if (!error) {
                 onClose();
             }
+        }
+    };
+
+    const handleApproveRequest = async (request: any) => {
+        try {
+            const updatedParticipants = [...(league.participants || [])];
+            if (!updatedParticipants.some(p => p.toLowerCase() === request.user_email.toLowerCase())) {
+                updatedParticipants.push(request.user_email.toLowerCase());
+            }
+
+            const { error: uError } = await supabase
+                .from('leagues')
+                .update({ participants: updatedParticipants })
+                .eq('id', league.id);
+            
+            if (uError) throw uError;
+
+            const { error: rError } = await supabase
+                .from('league_requests')
+                .update({ status: 'approved' })
+                .eq('id', request.id);
+            
+            if (rError) throw rError;
+
+            league.participants = updatedParticipants;
+            setLeagueRequests(prev => prev.filter(r => r.id !== request.id));
+            alert("Solicitação aprovada!");
+        } catch (err) {
+            console.error("Erro ao aprovar:", err);
+            alert("Erro ao aprovar solicitação.");
+        }
+    };
+
+    const handleRejectRequest = async (requestId: string) => {
+        const { error } = await supabase
+            .from('league_requests')
+            .update({ status: 'rejected' })
+            .eq('id', requestId);
+        
+        if (error) {
+            console.error("Erro ao recusar:", error);
+            alert("Erro ao recusar solicitação.");
+        } else {
+            setLeagueRequests(prev => prev.filter(r => r.id !== requestId));
+            alert("Solicitação recusada.");
         }
     };
 
@@ -236,6 +306,47 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                     Compartilhe este link para que novos participantes entrem na sua liga.
                                 </p>
                             </section>
+
+                            {/* Pending Requests */}
+                            {leagueRequests.length > 0 && (
+                                <section>
+                                    <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Users size={16} color="#dc2626" /> Solicitações Pendentes ({leagueRequests.length})
+                                    </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {leagueRequests.map((request) => (
+                                            <div key={request.id} style={{
+                                                padding: '16px', borderRadius: '12px', background: 'rgba(220, 38, 38, 0.05)',
+                                                border: '1px solid rgba(220, 38, 38, 0.2)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{request.user_name}</div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{request.user_email}</div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <button 
+                                                        onClick={() => handleApproveRequest(request)}
+                                                        style={{
+                                                            background: '#dc2626', color: 'white', border: 'none',
+                                                            padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 800,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >ACEITAR</button>
+                                                    <button 
+                                                        onClick={() => handleRejectRequest(request.id)}
+                                                        style={{
+                                                            background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
+                                                            padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 800,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >RECUSAR</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Participants List */}
                             <section>
