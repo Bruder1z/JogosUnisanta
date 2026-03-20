@@ -79,5 +79,11 @@ npm run dev
 - Ligas amadoras
 - Plataformas de bolão
 - Portais esportivos
+
+## Colaboradores
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
 ![Logo](https://www.serventuarios.org.br/wp-content/uploads/2022/03/unisanta.jpg)
 
