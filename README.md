@@ -44,6 +44,12 @@ src/
 ├── pages/         # Páginas da aplicação
 ├── services/      # Integrações e APIs
 ```
+## Demonstração
+
+Aplicação disponível em produção:
+
+- 🌐 https://jogos-unisanta.vercel.app
+
 ## Instalação e Uso
 
 #### Pré-requisitos
@@ -82,8 +88,42 @@ npm run dev
 
 ## Colaboradores
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/DevGuivieiraa">
+        <img src="https://github.com/DevGuivieiraa.png" width="80" height="80" style="border-radius:50%;" /><br>
+        <sub><b>Guilherme Vieira</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Bruder1z">
+        <img src="https://github.com/Bruder1z.png" width="80" height="80" style="border-radius:50%;" /><br>
+        <sub><b>Lucas Bruder</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/MatheusCardoso013">
+        <img src="https://github.com/MatheusCardoso013.png" width="80" height="80" style="border-radius:50%;" /><br>
+        <sub><b>Matheus Cardoso</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/PatrickBucanero">
+        <img src="https://github.com/PatrickBucanero.png" width="80" height="80" style="border-radius:50%;" /><br>
+        <sub><b>Patrick Santos</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/figuedro">
+        <img src="https://github.com/figuedro.png" width="80" height="80" style="border-radius:50%;" /><br>
+        <sub><b>João Pedro Unger</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
 
-![Logo](https://www.serventuarios.org.br/wp-content/uploads/2022/03/unisanta.jpg)
+## Status
+
+Projeto acadêmico em desenvolvimento. Novas funcionalidades estão sendo adicionadas.
 
