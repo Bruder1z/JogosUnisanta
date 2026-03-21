@@ -27,12 +27,12 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 // 1. Fetch users for this league
                 let usersQuery = supabase.from('users').select('email, name, surname, preferredcourse, role');
                 
-                if (league.type === 'global') {
+                if (league?.type === 'global') {
                     usersQuery = usersQuery; // Fetch everyone
-                } else if (league.type === 'course') {
+                } else if (league?.type === 'course') {
                     usersQuery = usersQuery.eq('preferredcourse', league.course);
                 } else {
-                    usersQuery = usersQuery.in('email', league.participants || []);
+                    usersQuery = usersQuery.in('email', league?.participants || []);
                 }
 
                 const { data: usersData } = await usersQuery;
@@ -244,12 +244,38 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>{league.description}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{
-                        position: 'absolute', top: '16px', right: '16px', background: 'none',
-                        border: 'none', color: 'var(--text-secondary)', cursor: 'pointer'
-                    }}>
-                        <X size={24} />
-                    </button>
+                    <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {!isSpecialLeague && !isAdmin && (league.participants || []).some((p: string) => p.toLowerCase() === currentUser?.email?.toLowerCase()) && (
+                            <button 
+                                onClick={handleLeaveLeague}
+                                style={{
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                                    borderRadius: '6px',
+                                    padding: '6px 12px',
+                                    fontSize: '11px',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                            >
+                                DEIXAR LIGA
+                            </button>
+                        )}
+                        <button onClick={onClose} style={{
+                            background: 'none',
+                            border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tabs */}
@@ -310,38 +336,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                     </tbody>
                                 </table>
                             )}
+
                         </div>
                     ) : (
                         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                            {/* Exit League Action for Members */}
-                            {!isSpecialLeague && !isAdmin && (league.participants || []).some((p: string) => p.toLowerCase() === currentUser?.email?.toLowerCase()) && (
-                                <section style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
-                                    <button 
-                                        onClick={handleLeaveLeague}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px',
-                                            background: 'rgba(239, 68, 68, 0.1)',
-                                            color: '#ef4444',
-                                            border: '1px solid rgba(239, 68, 68, 0.2)',
-                                            borderRadius: '8px',
-                                            fontSize: '13px',
-                                            fontWeight: 700,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                                    >
-                                        <X size={16} /> SAIR DA LIGA
-                                    </button>
-                                </section>
-                            )}
-
                             {/* Share Link */}
                             <section>
                                 <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -140,8 +140,8 @@ const Simulator: FC = () => {
             console.log("Filtered leagues:", userLeagues.length);
             setLeagues(userLeagues);
 
-            // Count private leagues (exclude global/course)
-            const count = userLeagues.filter(l => l.type !== 'global' && l.type !== 'course').length;
+            // Count private leagues
+            const count = userLeagues.length;
             setUserPrivateLeaguesCount(count);
 
             // Fetch user requests

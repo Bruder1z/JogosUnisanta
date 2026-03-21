@@ -212,7 +212,7 @@ const AdminDashboard: React.FC = () => {
             // Check if user is already in 3 private leagues
             const { data: userLeagues, error: ulError } = await supabase
                 .from('leagues')
-                .select('id, type, participants, owner_email');
+                .select('id, participants, owner_email');
             
             if (ulError) throw ulError;
 
@@ -220,7 +220,7 @@ const AdminDashboard: React.FC = () => {
             const privateLeaguesCount = userLeagues.filter(l => {
                 const isOwner = l.owner_email?.toLowerCase() === userEmail;
                 const isParticipant = Array.isArray(l.participants) && l.participants.some((p: string) => p.toLowerCase() === userEmail);
-                return (isOwner || isParticipant) && l.type !== 'global' && l.type !== 'course';
+                return (isOwner || isParticipant);
             }).length;
 
             if (privateLeaguesCount >= 3) {
