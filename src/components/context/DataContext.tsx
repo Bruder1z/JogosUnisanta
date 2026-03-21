@@ -53,6 +53,8 @@ interface DataContextType {
   featuredAthletes: FeaturedAthlete[];
   addFeaturedAthlete: (athlete: FeaturedAthlete) => void;
   removeFeaturedAthlete: (id: string) => void;
+  resetRankingPoints: () => Promise<void>;
+  restoreOfficialRanking: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -175,9 +177,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         // Fetch Ranking
         const { data: rankingData, error: rankingError } = await supabase
           .from("ranking")
-          .select("*");
+          .select("*")
+          .order("points", { ascending: false })
+          .order("course", { ascending: true });
         if (rankingData && !rankingError) {
-          setRanking(rankingData);
+          const ranked = rankingData.map((e: any, idx: number) => ({ ...e, rank: idx + 1 }));
+          setRanking(ranked);
         }
       } catch (error) {
         console.error("Error fetching matches:", error);
@@ -312,38 +317,72 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateRankingPoints = useCallback(
     async (course: string, newPoints: number) => {
-      let updatedRanking: RankingEntry[] = [];
-      setRanking((prev) => {
-        const updated = prev.map((entry) =>
-          entry.course === course ? { ...entry, points: newPoints } : entry,
-        );
-        // Sort: points descending, then alphabetical on tie
-        updated.sort((a, b) => {
-          if (b.points !== a.points) return b.points - a.points;
-          return a.course.localeCompare(b.course);
-        });
-        // Re-assign ranks
-        updatedRanking = updated.map((entry, idx) => ({
-          ...entry,
-          rank: idx + 1,
-        }));
-        return updatedRanking;
+      const updated = ranking.map((entry) =>
+        entry.course === course ? { ...entry, points: newPoints } : entry,
+      );
+      // Sort: points descending, then alphabetical on tie
+      updated.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.course.localeCompare(b.course);
       });
+      // Re-assign ranks
+      const updatedRanking = updated.map((entry, idx) => ({
+        ...entry,
+        rank: idx + 1,
+      }));
+      setRanking(updatedRanking);
 
-      // Sync with Supabase (UPSERT)
+      // Sync with Supabase (UPDATE)
       const entry = updatedRanking.find((e) => e.course === course);
       if (entry) {
-        await supabase.from("ranking").upsert([
-          {
-            course: entry.course,
-            points: entry.points,
-            rank: entry.rank,
-          },
-        ]);
+        const { error } = await supabase
+          .from("ranking")
+          .update({
+            points: entry.points
+          })
+          .eq("course", entry.course);
+          
+        if (error) console.error("Erro na atualização do ranking:", error);
       }
     },
-    [],
+    [ranking],
   );
+
+  const resetRankingPoints = useCallback(async () => {
+    const reset = ranking.map((entry, index) => ({
+      ...entry,
+      points: 0,
+      rank: index + 1
+    }));
+    setRanking(reset);
+
+    const { error } = await supabase
+      .from("ranking")
+      .update({ points: 0 })
+      .neq("course", "xyz_never_match_this"); // atualiza todos
+
+    if (error) console.error("Error resetting points:", error);
+  }, [ranking]);
+
+  const restoreOfficialRanking = useCallback(async () => {
+    // 1. Atualizar Local
+    const official = [...initialRanking].map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+    setRanking(official);
+
+    // 2. Atualizar Banco de Dados
+    const updatePromises = official.map((entry) => 
+      supabase
+        .from("ranking")
+        .update({ points: entry.points })
+        .eq("course", entry.course)
+    );
+
+    const results = await Promise.all(updatePromises);
+    const errors = results.filter(r => r.error).map(r => r.error);
+    if (errors.length > 0) {
+      console.error("Erro ao restaurar a pontuação oficial:", errors);
+    }
+  }, []);
 
   return (
     <DataContext.Provider
@@ -362,6 +401,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteMatch,
         ranking,
         updateRankingPoints,
+        resetRankingPoints,
+        restoreOfficialRanking,
         featuredAthletes,
         addFeaturedAthlete: (athlete: FeaturedAthlete) =>
           setFeaturedAthletes((prev) => [athlete, ...prev]),

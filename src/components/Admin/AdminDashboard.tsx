@@ -49,7 +49,9 @@ const AdminDashboard: React.FC = () => {
         updateRankingPoints,
         featuredAthletes,
         addFeaturedAthlete,
-        removeFeaturedAthlete
+        removeFeaturedAthlete,
+        resetRankingPoints,
+        restoreOfficialRanking
     } = useData();
 
     // Ranking edit state: course -> pending points value
@@ -873,6 +875,70 @@ const AdminDashboard: React.FC = () => {
                                         <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Classificação Geral</h2>
                                         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Edite os pontos para atualizar o ranking público em tempo real</p>
                                     </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Tem certeza que deseja restaurar a pontuação oficial do ranking padrão?")) {
+                                                restoreOfficialRanking();
+                                                showNotification("Pontuação oficial restaurada com sucesso!");
+                                            }
+                                        }}
+                                        style={{
+                                            background: 'transparent',
+                                            color: '#10b981',
+                                            border: '1px solid #10b981',
+                                            padding: '8px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseOver={e => {
+                                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                                        }}
+                                        onMouseOut={e => {
+                                            e.currentTarget.style.background = 'transparent';
+                                        }}
+                                    >
+                                        <Trophy size={16} />
+                                        Pontuação Oficial
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Tem certeza que deseja zerar a pontuação de todos os cursos? Esta ação é irreversível e atualizará o ranking em tempo real.")) {
+                                                resetRankingPoints();
+                                                showNotification("Todas as pontuações foram zeradas com sucesso!");
+                                            }
+                                        }}
+                                        style={{
+                                            background: 'transparent',
+                                            color: '#ff4444',
+                                            border: '1px solid #ff4444',
+                                            padding: '8px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseOver={e => {
+                                            e.currentTarget.style.background = 'rgba(255, 68, 68, 0.1)';
+                                        }}
+                                        onMouseOut={e => {
+                                            e.currentTarget.style.background = 'transparent';
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                        Zerar Pontuação
+                                    </button>
                                 </div>
                             </div>
 
