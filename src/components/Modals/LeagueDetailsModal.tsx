@@ -26,6 +26,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
     const [editedDescription, setEditedDescription] = useState(league.description);
     const [isSaving, setIsSaving] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [focusedField, setFocusedField] = useState<'name' | 'desc' | null>(null);
 
     useEffect(() => {
         const fetchLeagueRanking = async (isInitial = false) => {
@@ -297,35 +298,44 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                         </div>
                         <div style={{ flex: 1 }}>
                             {isEditing ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                                     <input 
                                         value={editedName}
                                         onChange={(e) => setEditedName(e.target.value)}
+                                        onFocus={() => setFocusedField('name')}
+                                        onBlur={() => setFocusedField(null)}
+                                        placeholder="Nome da Liga"
                                         style={{
-                                            background: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '4px 8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            borderBottom: focusedField === 'name' ? '2px solid #dc2626' : '2px solid rgba(255,255,255,0.2)',
+                                            padding: '4px',
                                             color: 'white',
-                                            fontSize: '18px',
+                                            fontSize: '20px',
                                             fontWeight: 900,
+                                            textTransform: 'uppercase',
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
                                             width: '100%'
                                         }}
                                     />
-                                    <textarea 
+                                    <input 
                                         value={editedDescription}
                                         onChange={(e) => setEditedDescription(e.target.value)}
+                                        onFocus={() => setFocusedField('desc')}
+                                        onBlur={() => setFocusedField(null)}
+                                        placeholder="Descrição da Liga"
                                         style={{
-                                            background: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '4px 8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            borderBottom: focusedField === 'desc' ? '2px solid #dc2626' : '2px solid rgba(255,255,255,0.2)',
+                                            padding: '4px',
                                             color: 'var(--text-secondary)',
                                             fontSize: '13px',
-                                            width: '100%',
-                                            resize: 'vertical'
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
+                                            width: '100%'
                                         }}
-                                        rows={2}
                                     />
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                         <button 
@@ -334,8 +344,11 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                             style={{
                                                 background: '#dc2626', color: 'white', border: 'none',
                                                 padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
-                                                cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1
+                                                cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1,
+                                                transition: 'background 0.2s'
                                             }}
+                                            onMouseEnter={(e) => { if(!isSaving) e.currentTarget.style.background = '#b91c1c' }}
+                                            onMouseLeave={(e) => { if(!isSaving) e.currentTarget.style.background = '#dc2626' }}
                                         >
                                             {isSaving ? 'SALVANDO...' : 'SALVAR'}
                                         </button>
@@ -349,8 +362,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                             style={{
                                                 background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
                                                 padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
-                                                cursor: 'pointer'
+                                                cursor: 'pointer', transition: 'background 0.2s'
                                             }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                                         >
                                             CANCELAR
                                         </button>
@@ -359,7 +374,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             ) : (
                                 <>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase' }}>{league.name}</h2>
+                                        <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase', color: 'white' }}>{league.name}</h2>
                                         {isAdmin && (
                                             <button 
                                                 onClick={() => setIsEditing(true)}
@@ -371,8 +386,11 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                                     color: 'var(--text-secondary)',
                                                     fontSize: '10px',
                                                     fontWeight: 700,
-                                                    cursor: 'pointer'
+                                                    cursor: 'pointer',
+                                                    transition: 'background 0.2s'
                                                 }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                                             >
                                                 EDITAR
                                             </button>
