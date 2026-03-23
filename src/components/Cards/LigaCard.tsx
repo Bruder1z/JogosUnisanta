@@ -1,5 +1,5 @@
 import { type FC } from 'react';
-import { Trophy } from 'lucide-react';
+import { Trophy, Users } from 'lucide-react';
 
 interface LigaCardProps {
     name: string;
@@ -12,7 +12,7 @@ interface LigaCardProps {
 
 const LigaCard: FC<LigaCardProps> = ({ name, description, participantsCount, isAdmin, type = 'private', onClick }) => {
     return (
-        <div 
+        <div
             onClick={onClick}
             className="premium-card hover-glow"
             style={{
@@ -28,7 +28,9 @@ const LigaCard: FC<LigaCardProps> = ({ name, description, participantsCount, isA
                 cursor: 'pointer',
                 position: 'relative',
                 overflow: 'hidden',
-                height: '100%'
+                minWidth: '240px',
+                flex: '1 1 240px',
+                maxWidth: '340px',
             }}
         >
             {isAdmin && (
@@ -95,8 +97,14 @@ const LigaCard: FC<LigaCardProps> = ({ name, description, participantsCount, isA
                 borderTop: '1px solid rgba(255,255,255,0.05)',
                 marginTop: '4px'
             }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    {type === 'global' ? 'Todos os usuários' : type === 'course' ? 'Todos do curso' : `${participantsCount} participantes`}
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {type === 'global' ? (
+                        <><Users size={13} /> Todos os usuários</>
+                    ) : type === 'course' ? (
+                        <><Users size={13} /> Todos do curso</>
+                    ) : (
+                        <><Users size={13} /> {participantsCount} participantes</>
+                    )}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--accent-color)', fontWeight: 700, textTransform: 'uppercase' }}>
                     Ver Ranking →

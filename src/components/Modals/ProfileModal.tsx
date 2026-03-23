@@ -134,7 +134,6 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                         </div>
                         <div>
                             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#fff' }}>{user?.name}</h2>
-                            <span style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', display: 'block' }}>{user?.role}</span>
                             {(user?.preferredCourse || (user as any)?.preferredcourse) && (
                                 <span style={{ fontSize: '11px', color: '#aaa', marginTop: '2px', display: 'block' }}>
                                     {user?.preferredCourse || (user as any)?.preferredcourse}

@@ -9,7 +9,7 @@ import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
 import { 
-    Users, Plus,
+    Users,
     CheckCircle, RotateCcw, Calendar, Zap
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -812,14 +812,121 @@ const Simulator: FC = () => {
 
                     {/* Competitions Tab */}
                     {activeTab === 'competicoes' && (
-                        <div style={{ paddingTop: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px' }}>
+                        <div style={{ paddingTop: '0' }}>
+
+                            {/* ── Categoria de Liga ─────────────────────────── */}
+                            <div style={{ marginBottom: '32px' }}>
+                                <h2 style={{
+                                    fontSize: '22px',
+                                    fontWeight: 900,
+                                    color: 'white',
+                                    margin: '0 0 4px 0',
+                                }}>
+                                    Categoria de Liga
+                                </h2>
+                                <p style={{
+                                    fontSize: '13px',
+                                    color: 'var(--text-secondary)',
+                                    margin: '0 0 14px 0',
+                                }}>
+                                    Crie sua liga e comece a competir com a galera!
+                                </p>
+
+                                {/* White "LIGA CLÁSSICA" card */}
+                                <div style={{
+                                    background: '#ffffff',
+                                    borderRadius: '14px',
+                                    overflow: 'hidden',
+                                    width: '100%',
+                                    maxWidth: '260px',
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                }}>
+                                    {/* Card body */}
+                                    <div style={{
+                                        padding: '16px 16px 10px 16px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                    }}>
+                                        <h3 style={{
+                                            margin: 0,
+                                            fontSize: '15px',
+                                            fontWeight: 900,
+                                            color: '#111',
+                                            textTransform: 'uppercase',
+                                            textAlign: 'center',
+                                            letterSpacing: '0.5px',
+                                        }}>
+                                            LIGA CLÁSSICA
+                                        </h3>
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: '11px',
+                                            color: '#555',
+                                            textAlign: 'center',
+                                            lineHeight: 1.4,
+                                        }}>
+                                            Dispute o primeiro lugar do ranking de pontos corridos com seus amigos!
+                                        </p>
+                                        <img
+                                            src="/images/logo-liga.png"
+                                            alt="Logo Liga"
+                                            style={{
+                                                width: '100%',
+                                                maxWidth: '150px',
+                                                height: 'auto',
+                                                objectFit: 'contain',
+                                                margin: '4px 0',
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Red CRIAR LIGA button */}
+                                    <button
+                                        onClick={() => {
+                                            if (!user) { openLoginModal(); return; }
+                                            if (totalLeaguesCount >= 5) {
+                                                alert("Você atingiu o limite máximo de 5 ligas permitidas.");
+                                                return;
+                                            }
+                                            setIsLeagueFormOpen(true);
+                                        }}
+                                        disabled={totalLeaguesCount >= 5}
+                                        style={{
+                                            width: '100%',
+                                            padding: '16px',
+                                            background: totalLeaguesCount >= 5 ? '#ccc' : '#E51E2A',
+                                            color: 'white',
+                                            border: 'none',
+                                            fontSize: '15px',
+                                            fontWeight: 900,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '1px',
+                                            cursor: totalLeaguesCount >= 5 ? 'not-allowed' : 'pointer',
+                                            transition: 'background 0.2s',
+                                        }}
+                                        onMouseEnter={(e) => { if (totalLeaguesCount < 5) e.currentTarget.style.background = '#b91c1c'; }}
+                                        onMouseLeave={(e) => { if (totalLeaguesCount < 5) e.currentTarget.style.background = '#E51E2A'; }}
+                                    >
+                                        {totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'CRIAR LIGA'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ── Minhas Ligas ──────────────────────────────── */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
                                 <div>
                                     <h2 style={{
-                                        fontSize: '32px',
+                                        fontSize: '26px',
                                         fontWeight: 900,
                                         color: 'white',
-                                        margin: '0 0 8px 0',
+                                        margin: '0 0 4px 0',
                                         letterSpacing: '0.5px',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -827,12 +934,12 @@ const Simulator: FC = () => {
                                     }}>
                                         Minhas Ligas
                                         {user && (
-                                            <span style={{ 
-                                                fontSize: '14px', 
-                                                fontWeight: 800, 
-                                                background: totalLeaguesCount >= 5 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.1)', 
+                                            <span style={{
+                                                fontSize: '13px',
+                                                fontWeight: 800,
+                                                background: totalLeaguesCount >= 5 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.1)',
                                                 color: totalLeaguesCount >= 5 ? '#ef4444' : 'var(--text-secondary)',
-                                                padding: '4px 10px', 
+                                                padding: '3px 10px',
                                                 borderRadius: '20px',
                                                 letterSpacing: '0'
                                             }}>
@@ -840,78 +947,41 @@ const Simulator: FC = () => {
                                             </span>
                                         )}
                                     </h2>
-                                    <p style={{
-                                        fontSize: '15px',
-                                        color: 'var(--text-secondary)',
-                                        margin: 0,
-                                        fontWeight: 400,
-                                    }}>
+                                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
                                         Acompanhe seu desempenho nas ligas que você participa.
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        if (!user) {
-                                            openLoginModal();
-                                            return;
-                                        }
-                                        if (totalLeaguesCount >= 5) {
-                                            alert("Você atingiu o limite máximo de 5 ligas permitidas.");
-                                            return;
-                                        }
-                                        setIsLeagueFormOpen(true);
-                                    }}
-                                    disabled={totalLeaguesCount >= 5}
-                                    style={{
-                                        padding: '10px 16px',
-                                        borderRadius: '8px',
-                                        background: totalLeaguesCount >= 5 ? 'rgba(239, 68, 68, 0.05)' : 'var(--accent-color)',
-                                        color: totalLeaguesCount >= 5 ? '#ef4444' : 'white',
-                                        border: totalLeaguesCount >= 5 ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
-                                        fontSize: '13px',
-                                        fontWeight: 800,
-                                        cursor: totalLeaguesCount >= 5 ? 'not-allowed' : 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        transition: 'all 0.2s',
-                                        boxShadow: totalLeaguesCount >= 5 ? 'none' : '0 4px 12px rgba(220, 38, 38, 0.2)'
-                                    }}
-                                >
-                                    {totalLeaguesCount >= 5 ? <Users size={16} /> : <Plus size={16} />}
-                                    {totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'CRIAR LIGA'}
-                                </button>
                             </div>
 
                             <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                gap: '20px'
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                                gap: '20px',
                             }}>
                                 {/* Automatic Leagues */}
-                                <LigaCard 
-                                    name="LIGA GERAL" 
+                                <LigaCard
+                                    name="LIGA GERAL"
                                     description="Todos os participantes do Bolão Unisanta"
                                     type="global"
                                     onClick={() => setSelectedLeague({ name: 'LIGA GERAL', type: 'global' })}
                                 />
-                                
+
                                 {user && user.preferredCourse && (
-                                    <LigaCard 
+                                    <LigaCard
                                         name={`LIGA ${user.preferredCourse.toUpperCase()}`}
                                         description={`Ranking exclusivo de ${user.preferredCourse}`}
                                         type="course"
-                                        onClick={() => setSelectedLeague({ 
-                                            name: `LIGA ${user.preferredCourse}`, 
+                                        onClick={() => setSelectedLeague({
+                                            name: `LIGA ${user.preferredCourse}`,
                                             type: 'course',
-                                            course: user.preferredCourse 
+                                            course: user.preferredCourse
                                         })}
                                     />
                                 )}
 
                                 {/* Private Leagues */}
                                 {leagues.map(league => (
-                                    <LigaCard 
+                                    <LigaCard
                                         key={league.id}
                                         name={league.name}
                                         description={league.description}
@@ -922,14 +992,14 @@ const Simulator: FC = () => {
                                 ))}
                             </div>
 
-                            <LeagueFormModal 
-                                aberto={isLeagueFormOpen} 
-                                setAberto={setIsLeagueFormOpen} 
+                            <LeagueFormModal
+                                aberto={isLeagueFormOpen}
+                                setAberto={setIsLeagueFormOpen}
                                 onCreated={() => fetchLeagues()}
                             />
 
                             {selectedLeague && (
-                                <LeagueDetailsModal 
+                                <LeagueDetailsModal
                                     league={selectedLeague}
                                     onClose={() => {
                                         setSelectedLeague(null);
@@ -939,7 +1009,7 @@ const Simulator: FC = () => {
                             )}
 
                             {joiningLeagueId && (
-                                <JoinLeagueModal 
+                                <JoinLeagueModal
                                     leagueId={joiningLeagueId}
                                     onClose={() => setJoiningLeagueId(null)}
                                     onJoined={() => {
