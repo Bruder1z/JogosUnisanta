@@ -16,9 +16,16 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ranking' | 'manage'>('ranking');
 
-    const isAdmin = league.owner_email === currentUser?.email;
+    const isAdmin = league.owner_email === currentUser?.email || currentUser?.role === 'superadmin';
     const isSpecialLeague = league.type === 'global' || league.type === 'course';
     const [leagueRequests, setLeagueRequests] = useState<any[]>([]);
+    
+    // States for editing
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedName, setEditedName] = useState(league.name);
+    const [editedDescription, setEditedDescription] = useState(league.description);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
         const fetchLeagueRanking = async (isInitial = false) => {
@@ -126,29 +133,78 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
         }
     };
 
+    const handleUpdateLeague = async () => {
+        if (!editedName.trim()) {
+            alert("O nome da liga não pode estar vazio.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const { error } = await supabase
+                .from('leagues')
+                .update({
+                    name: editedName.trim(),
+                    description: editedDescription.trim()
+                })
+                .eq('id', league.id);
+
+            if (error) throw error;
+
+            league.name = editedName.trim();
+            league.description = editedDescription.trim();
+            setIsEditing(false);
+            alert("Informações da liga atualizadas com sucesso!");
+        } catch (err) {
+            console.error("Erro ao atualizar liga:", err);
+            alert("Erro ao atualizar informações da liga.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleDeleteLeague = async () => {
-        if (confirm('Tem certeza que deseja excluir esta liga permanentemente?')) {
-            try {
-                // Delete all requests first to avoid foreign key errors
-                const { error: reqError } = await supabase
-                    .from('league_requests')
-                    .delete()
-                    .eq('league_id', league.id);
-                
-                if (reqError) throw reqError;
+        if (!league.id) {
+            alert("Erro: ID da liga não encontrado.");
+            return;
+        }
 
-                const { error } = await supabase
-                    .from('leagues')
-                    .delete()
-                    .eq('id', league.id);
-
-                if (error) throw error;
-                
-                onClose();
-            } catch (err) {
-                console.error("Erro ao excluir liga:", err);
-                alert("Erro ao excluir liga. Verifique se há dependências ou tente novamente.");
+        setIsSaving(true);
+        try {
+            // 1. Delete all requests first to avoid foreign key errors
+            const { error: reqError } = await supabase
+                .from('league_requests')
+                .delete()
+                .eq('league_id', league.id);
+            
+            if (reqError) {
+                console.error("Erro ao excluir solicitações:", reqError);
+                throw new Error(`Erro ao excluir solicitações: ${reqError.message}`);
             }
+
+            // 2. Delete the league itself
+            const { error: leagueError, count } = await supabase
+                .from('leagues')
+                .delete({ count: 'exact' })
+                .eq('id', league.id);
+
+            if (leagueError) {
+                console.error("Erro ao excluir liga:", leagueError);
+                throw new Error(`Erro ao excluir liga: ${leagueError.message}`);
+            }
+
+            if (count === 0) {
+                throw new Error("A liga não foi excluída no banco de dados. Isso geralmente acontece quando as políticas de segurança (RLS) do Supabase não permitem a exclusão. Verifique se a tabela 'leagues' tem uma política (Policy) de DELETE configurada para o usuário autenticado.");
+            }
+            
+            setShowDeleteConfirm(false);
+            alert("Liga excluída com sucesso!");
+            onClose();
+        } catch (err: any) {
+            console.error("Falha total na exclusão:", err);
+            alert(err.message || "Erro desconhecido ao excluir liga. Verifique sua conexão ou permissões.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -240,8 +296,91 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             <Trophy size={24} color={isSpecialLeague ? '#dc2626' : 'white'} />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase' }}>{league.name}</h2>
-                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>{league.description}</p>
+                            {isEditing ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <input 
+                                        value={editedName}
+                                        onChange={(e) => setEditedName(e.target.value)}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.05)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '8px',
+                                            padding: '4px 8px',
+                                            color: 'white',
+                                            fontSize: '18px',
+                                            fontWeight: 900,
+                                            width: '100%'
+                                        }}
+                                    />
+                                    <textarea 
+                                        value={editedDescription}
+                                        onChange={(e) => setEditedDescription(e.target.value)}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.05)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '8px',
+                                            padding: '4px 8px',
+                                            color: 'var(--text-secondary)',
+                                            fontSize: '13px',
+                                            width: '100%',
+                                            resize: 'vertical'
+                                        }}
+                                        rows={2}
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                        <button 
+                                            onClick={handleUpdateLeague}
+                                            disabled={isSaving}
+                                            style={{
+                                                background: '#dc2626', color: 'white', border: 'none',
+                                                padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
+                                                cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1
+                                            }}
+                                        >
+                                            {isSaving ? 'SALVANDO...' : 'SALVAR'}
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setIsEditing(false);
+                                                setEditedName(league.name);
+                                                setEditedDescription(league.description);
+                                            }}
+                                            disabled={isSaving}
+                                            style={{
+                                                background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
+                                                padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            CANCELAR
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase' }}>{league.name}</h2>
+                                        {isAdmin && (
+                                            <button 
+                                                onClick={() => setIsEditing(true)}
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.05)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '4px',
+                                                    padding: '2px 8px',
+                                                    color: 'var(--text-secondary)',
+                                                    fontSize: '10px',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                EDITAR
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>{league.description}</p>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -437,14 +576,55 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                 </div>
                             </section>
 
-                            {/* Danger Zone */}
                             <section style={{ borderTop: '1px solid rgba(255,0,0,0.1)', paddingTop: '24px' }}>
-                                <button onClick={handleDeleteLeague} style={{
-                                    width: '100%', padding: '14px', borderRadius: '8px', border: '1px solid #ef4444',
-                                    background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', fontWeight: 700, cursor: 'pointer'
-                                }}>
-                                    EXCLUIR LIGA PERMANENTEMENTE
-                                </button>
+                                {showDeleteConfirm ? (
+                                    <div style={{ 
+                                        background: 'rgba(239, 68, 68, 0.1)', 
+                                        padding: '20px', 
+                                        borderRadius: '12px', 
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        textAlign: 'center'
+                                    }}>
+                                        <p style={{ color: 'white', fontWeight: 700, fontSize: '14px', marginBottom: '16px' }}>
+                                            TEM CERTEZA? ESTA AÇÃO NÃO PODE SER DESFEITA.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <button 
+                                                onClick={handleDeleteLeague}
+                                                disabled={isSaving}
+                                                style={{
+                                                    flex: 1, padding: '12px', borderRadius: '8px', 
+                                                    background: '#dc2626', color: 'white', border: 'none', 
+                                                    fontWeight: 800, cursor: 'pointer', fontSize: '12px',
+                                                    opacity: isSaving ? 0.7 : 1
+                                                }}
+                                            >
+                                                {isSaving ? 'EXCLUINDO...' : 'SIM, EXCLUIR'}
+                                            </button>
+                                            <button 
+                                                onClick={() => setShowDeleteConfirm(false)}
+                                                disabled={isSaving}
+                                                style={{
+                                                    flex: 1, padding: '12px', borderRadius: '8px', 
+                                                    background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', 
+                                                    fontWeight: 800, cursor: 'pointer', fontSize: '12px'
+                                                }}
+                                            >
+                                                CANCELAR
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        style={{
+                                            width: '100%', padding: '14px', borderRadius: '8px', border: '1px solid #ef4444',
+                                            background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', fontWeight: 700, cursor: 'pointer'
+                                        }}
+                                    >
+                                        EXCLUIR LIGA PERMANENTEMENTE
+                                    </button>
+                                )}
                             </section>
                         </div>
                     )}

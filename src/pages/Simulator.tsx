@@ -53,6 +53,7 @@ const Simulator: FC = () => {
 
     const { user, openLoginModal, userPredictions, saveUserPredictions } = useAuth();
     const { matches } = useData();
+    const totalLeaguesCount = userPrivateLeaguesCount + (user ? (user.preferredCourse ? 2 : 1) : 0);
 
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
@@ -820,8 +821,24 @@ const Simulator: FC = () => {
                                         color: 'white',
                                         margin: '0 0 8px 0',
                                         letterSpacing: '0.5px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
                                     }}>
                                         Minhas Ligas
+                                        {user && (
+                                            <span style={{ 
+                                                fontSize: '14px', 
+                                                fontWeight: 800, 
+                                                background: totalLeaguesCount >= 5 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.1)', 
+                                                color: totalLeaguesCount >= 5 ? '#ef4444' : 'var(--text-secondary)',
+                                                padding: '4px 10px', 
+                                                borderRadius: '20px',
+                                                letterSpacing: '0'
+                                            }}>
+                                                {totalLeaguesCount}/5
+                                            </span>
+                                        )}
                                     </h2>
                                     <p style={{
                                         fontSize: '15px',
@@ -833,25 +850,36 @@ const Simulator: FC = () => {
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => user ? setIsLeagueFormOpen(true) : openLoginModal()}
+                                    onClick={() => {
+                                        if (!user) {
+                                            openLoginModal();
+                                            return;
+                                        }
+                                        if (totalLeaguesCount >= 5) {
+                                            alert("Você atingiu o limite máximo de 5 ligas permitidas.");
+                                            return;
+                                        }
+                                        setIsLeagueFormOpen(true);
+                                    }}
+                                    disabled={totalLeaguesCount >= 5}
                                     style={{
                                         padding: '10px 16px',
                                         borderRadius: '8px',
-                                        background: 'var(--accent-color)',
-                                        color: 'white',
-                                        border: 'none',
+                                        background: totalLeaguesCount >= 5 ? 'rgba(239, 68, 68, 0.05)' : 'var(--accent-color)',
+                                        color: totalLeaguesCount >= 5 ? '#ef4444' : 'white',
+                                        border: totalLeaguesCount >= 5 ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
                                         fontSize: '13px',
                                         fontWeight: 800,
-                                        cursor: 'pointer',
+                                        cursor: totalLeaguesCount >= 5 ? 'not-allowed' : 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '8px',
                                         transition: 'all 0.2s',
-                                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'
+                                        boxShadow: totalLeaguesCount >= 5 ? 'none' : '0 4px 12px rgba(220, 38, 38, 0.2)'
                                     }}
                                 >
-                                    <Plus size={16} />
-                                    CRIAR LIGA
+                                    {totalLeaguesCount >= 5 ? <Users size={16} /> : <Plus size={16} />}
+                                    {totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'CRIAR LIGA'}
                                 </button>
                             </div>
 
@@ -888,7 +916,7 @@ const Simulator: FC = () => {
                                         name={league.name}
                                         description={league.description}
                                         participantsCount={league.participants?.length || 0}
-                                        isAdmin={league.owner_email === useAuth().user?.email}
+                                        isAdmin={league.owner_email === user?.email || user?.role === 'superadmin'}
                                         onClick={() => setSelectedLeague(league)}
                                     />
                                 ))}
@@ -934,7 +962,7 @@ const Simulator: FC = () => {
                                                 <Users size={16} />
                                                 <span>{league.participants?.length || 0} Membros</span>
                                             </div>
-                                            {userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id) && (
+                                            {totalLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id) && (
                                                 <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>
                                                     Limite de 5 ligas atingido
                                                 </div>
@@ -950,28 +978,28 @@ const Simulator: FC = () => {
                                             </div>
                                         </div>
                                         <button
-                                            disabled={userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)}
+                                            disabled={totalLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)}
                                             onClick={() => {
                                                 const hasRequest = userRequests.some(r => r.league_id === league.id);
-                                                if (!hasRequest && userPrivateLeaguesCount < 5) handleRequestJoin(league.id);
+                                                if (!hasRequest && totalLeaguesCount < 5) handleRequestJoin(league.id);
                                             }}
-                                            className={(userRequests.some(r => r.league_id === league.id) || (userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id))) ? "" : "hover-glow"}
+                                            className={(userRequests.some(r => r.league_id === league.id) || (totalLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id))) ? "" : "hover-glow"}
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
                                                 background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 
-                                                           (userPrivateLeaguesCount >= 5 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
-                                                color: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? 'var(--text-secondary)' : 'white',
-                                                border: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? '1px solid var(--border-color)' : 'none',
+                                                           (totalLeaguesCount >= 5 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
+                                                color: (userRequests.some(r => r.league_id === league.id) || totalLeaguesCount >= 5) ? 'var(--text-secondary)' : 'white',
+                                                border: (userRequests.some(r => r.league_id === league.id) || totalLeaguesCount >= 5) ? '1px solid var(--border-color)' : 'none',
                                                 borderRadius: '8px',
                                                 fontWeight: 700,
                                                 fontSize: '14px',
-                                                cursor: (userRequests.some(r => r.league_id === league.id) || userPrivateLeaguesCount >= 5) ? 'default' : 'pointer',
-                                                opacity: (userPrivateLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
+                                                cursor: (userRequests.some(r => r.league_id === league.id) || totalLeaguesCount >= 5) ? 'default' : 'pointer',
+                                                opacity: (totalLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
                                             }}
                                         >
                                             {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 
-                                             (userPrivateLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
+                                             (totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
                                         </button>
                                     </div>
                                 ))}
