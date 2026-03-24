@@ -1017,7 +1017,8 @@ const Simulator: FC = () => {
                                 gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
                                 gap: '20px',
                             }}>
-                                {/* Automatic Leagues */}
+
+                                {/* Automatic Leagues - LIGA GERAL visível para todos, mas só superadmin pode gerenciar */}
                                 <LigaCard
                                     name="LIGA GERAL"
                                     description="Todos os participantes do Bolão Unisanta"
