@@ -164,7 +164,11 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
     const isPraia = match.sport.includes('Praia');
     const isVolei = match.sport.includes('Vôlei') || match.sport.includes('Volei');
     const isTenisMesa = match.sport.includes('Tênis de Mesa') || match.sport.includes('Tenis de Mesa');
-    const maxScore = (match.sport === 'Basquete 3x3' || isPraia) ? 21 : isVolei ? 25 : isTenisMesa ? 3 : 99;
+    const isFutevolei = match.sport.toLowerCase().includes('futevôlei') || match.sport.toLowerCase().includes('futevolei');
+    const maxScore = (match.sport === 'Basquete 3x3' || isPraia) ? 21 : isFutevolei ? 18 : isVolei ? 25 : isTenisMesa ? 3 : 99;
+
+    const maxAllowedA = (pred?.scoreB !== '' && Number(pred?.scoreB) === maxScore) ? maxScore - 1 : maxScore;
+    const maxAllowedB = (pred?.scoreA !== '' && Number(pred?.scoreA) === maxScore) ? maxScore - 1 : maxScore;
 
     return (
         <div className="sim-match-card" style={{
@@ -175,6 +179,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
             display: 'flex',
             flexDirection: 'column',
             transition: 'all 0.3s',
+            height: '100%',
         }}>
             {/* Header */}
             <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -214,7 +219,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                     type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
                                     disabled={isCardDisabled} value={localA}
                                     onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
-                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalA(raw); if (raw === '') { updatePrediction(match.id,'scoreA',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxScore)); if (c !== raw) setLocalA(c); updatePrediction(match.id,'scoreA',c); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalA(raw); if (raw === '') { updatePrediction(match.id,'scoreA',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedA)); if (c !== raw) setLocalA(c); updatePrediction(match.id,'scoreA',c); }}
                                     onFocus={(e) => { focusedField.current = 'A'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
                                     style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
@@ -224,7 +229,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                         </div>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0; const n = String(Math.min(curr + 1, maxScore)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
+                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0; const n = String(Math.min(curr + 1, maxAllowedA)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&gt;</button>
@@ -273,7 +278,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                     type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
                                     disabled={isCardDisabled} value={localB}
                                     onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
-                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalB(raw); if (raw === '') { updatePrediction(match.id,'scoreB',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxScore)); if (c !== raw) setLocalB(c); updatePrediction(match.id,'scoreB',c); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalB(raw); if (raw === '') { updatePrediction(match.id,'scoreB',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedB)); if (c !== raw) setLocalB(c); updatePrediction(match.id,'scoreB',c); }}
                                     onFocus={(e) => { focusedField.current = 'B'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
                                     style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
@@ -283,7 +288,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                         </div>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0; const n = String(Math.min(curr + 1, maxScore)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
+                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0; const n = String(Math.min(curr + 1, maxAllowedB)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&gt;</button>
@@ -314,7 +319,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
 
             {/* Save button */}
             {match.status !== 'finished' && (
-                <div style={{ padding: '0 18px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '18px' }}>
+                <div style={{ padding: '0 18px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '18px', marginTop: 'auto' }}>
                     <button
                         onClick={saveThisCard}
                         disabled={(!hasPrediction && !cardSaved) || isCardDisabled}
