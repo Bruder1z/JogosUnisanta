@@ -51,8 +51,8 @@ interface DataContextType {
   ranking: RankingEntry[];
   updateRankingPoints: (course: string, newPoints: number) => void;
   featuredAthletes: FeaturedAthlete[];
-  addFeaturedAthlete: (athlete: FeaturedAthlete) => void;
-  removeFeaturedAthlete: (id: string) => void;
+  addFeaturedAthlete: (athlete: FeaturedAthlete) => Promise<void>;
+  removeFeaturedAthlete: (id: string) => Promise<void>;
   resetRankingPoints: () => Promise<void>;
   restoreOfficialRanking: () => Promise<void>;
 }
@@ -75,9 +75,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     });
     return sorted.map((e, idx) => ({ ...e, rank: idx + 1 }));
   });
-  const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>(
-    [],
-  );
+  const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   const pendingMatchIdsRef = useRef<Set<string>>(new Set());
@@ -184,8 +182,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           const ranked = rankingData.map((e: any, idx: number) => ({ ...e, rank: idx + 1 }));
           setRanking(ranked);
         }
+
+        // Fetch Featured Athletes
+        const { data: featuredData, error: featuredError } = await supabase
+          .from("featured_athletes")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (featuredData && !featuredError) {
+          setFeaturedAthletes(
+            featuredData.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              institution: a.institution,
+              course: a.course,
+              sport: a.sport,
+              reason: a.reason,
+            }))
+          );
+        }
       } catch (error) {
-        console.error("Error fetching matches:", error);
+        console.error("Error fetching data:", error);
       }
     };
 
@@ -404,10 +420,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         resetRankingPoints,
         restoreOfficialRanking,
         featuredAthletes,
-        addFeaturedAthlete: (athlete: FeaturedAthlete) =>
-          setFeaturedAthletes((prev) => [athlete, ...prev]),
-        removeFeaturedAthlete: (id: string) =>
-          setFeaturedAthletes((prev) => prev.filter((a) => a.id !== id)),
+        addFeaturedAthlete: async (athlete: FeaturedAthlete) => {
+          setFeaturedAthletes((prev) => [athlete, ...prev]);
+          const { error } = await supabase.from("featured_athletes").insert([{
+            id: athlete.id,
+            name: athlete.name,
+            institution: athlete.institution,
+            course: athlete.course,
+            sport: athlete.sport,
+            reason: athlete.reason,
+          }]);
+          if (error) console.error("Erro ao salvar atleta destaque:", error);
+        },
+        removeFeaturedAthlete: async (id: string) => {
+          setFeaturedAthletes((prev) => prev.filter((a) => a.id !== id));
+          const { error } = await supabase.from("featured_athletes").delete().match({ id });
+          if (error) console.error("Erro ao remover atleta destaque:", error);
+        },
       }}
     >
       {children}
