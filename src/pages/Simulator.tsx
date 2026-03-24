@@ -86,6 +86,7 @@ interface MatchCardProps {
 }
 
 const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction, saveUserPredictions, showToast }: MatchCardProps) => {
+    const { user, openLoginModal } = useAuth();
     const [cardSaved, setCardSaved] = useState(false);
     const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
 
@@ -141,6 +142,10 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
     };
 
     const saveThisCard = async () => {
+        if (!user) {
+            openLoginModal();
+            return;
+        }
         if (!hasPrediction || !pred) return;
         const success = await saveUserPredictions({ [match.id]: pred });
         if (!success) { alert('Erro ao salvar o palpite.'); return; }
@@ -239,8 +244,23 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
 
                 {/* Center */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', textAlign: 'center' }}>
-                        {match.sport} • {match.category}
+                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        {isTenisMesa && (
+                            <div style={{ position: 'absolute', bottom: '100%', paddingBottom: '4px', display: 'flex', justifyContent: 'center' }}>
+                                <div className="md5-tooltip-container" style={{ whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 800, color: 'white' }}>MD5</span>
+                                    <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
+                                        i
+                                    </div>
+                                    <div className="md5-tooltip-text">
+                                        Melhor de 5 (MD5) - Vence quem ganhar 3 partidas
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', textAlign: 'center' }}>
+                            {match.sport} • {match.category}
+                        </div>
                     </div>
                     {match.status === 'finished' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
@@ -523,6 +543,10 @@ const Simulator: FC = () => {
     };
 
     const savePredictions = async () => {
+        if (!user) {
+            openLoginModal();
+            return;
+        }
         setPredictionsFinalized(true);
         const success = await saveUserPredictions(predictions);
         if (success) {
