@@ -55,11 +55,26 @@ const Simulator: FC = () => {
     const { matches } = useData();
     const totalLeaguesCount = userPrivateLeaguesCount + (user ? (user.preferredCourse ? 2 : 1) : 0);
 
-    const getTeamEmblem = (teamName: string) => {
-        const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
-            courseKey.toLowerCase().includes(teamName.toLowerCase())
-        );
-        return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
+    const getTeamEmblem = (team: { name: string; course?: string; faculty?: string }) => {
+        const searchTerms = [];
+        if (team.course && team.faculty) searchTerms.push(`${team.course} - ${team.faculty}`);
+        if (team.course) searchTerms.push(team.course);
+        searchTerms.push(team.name);
+
+        for (const term of searchTerms) {
+            if (!term) continue;
+            const termLower = term.toLowerCase().trim();
+            // Try exact match first
+            let foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey => courseKey.toLowerCase() === termLower);
+            if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
+            
+            // Try includes
+            foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey => 
+                courseKey.toLowerCase().includes(termLower) || termLower.includes(courseKey.toLowerCase())
+            );
+            if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
+        }
+        return null;
     };
 
     // Helper to get date string for offset
@@ -246,12 +261,12 @@ const Simulator: FC = () => {
         return target.getTime() - Date.now();
     };
 
-    const TeamEmblem = ({ teamName, size = 72 }: { teamName: string; size?: number }) => {
-        const emblemUrl = getTeamEmblem(teamName);
+    const TeamEmblem = ({ team, size = 72 }: { team: { name: string; course?: string; faculty?: string }; size?: number }) => {
+        const emblemUrl = getTeamEmblem(team);
         return emblemUrl ? (
             <img
                 src={emblemUrl}
-                alt={teamName}
+                alt={team.name}
                 style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
@@ -277,6 +292,40 @@ const Simulator: FC = () => {
         const [cardSaved, setCardSaved] = useState(false);
         const pred = predictions[match.id];
         const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
+        
+        const renderTeamText = (team: any) => {
+            let courseName = team.course || team.name;
+            const institution = team.faculty;
+            
+            if (institution && courseName.toLowerCase().includes(institution.toLowerCase())) {
+                const parts = courseName.split(' - ');
+                if (parts.length > 1 && parts[parts.length - 1].toLowerCase() === institution.toLowerCase()) {
+                    courseName = parts.slice(0, -1).join(' - ');
+                } else {
+                    const regex = new RegExp(`\\s*-\\s*${institution}$`, 'i');
+                    courseName = courseName.replace(regex, '');
+                }
+            }
+
+            if (institution) {
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
+                            {courseName.trim()}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#E51E2A', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
+                            {institution}
+                        </span>
+                    </div>
+                );
+            }
+
+            return (
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2 }}>
+                    {courseName}
+                </span>
+            );
+        };
         
         const timeLeftMs = msUntil(match.date, match.time);
         const isTimeout = match.status !== 'finished' && timeLeftMs <= 3600000; // <= 1 hour
@@ -363,7 +412,12 @@ const Simulator: FC = () => {
                 }}>
                     {/* Team A and Score */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
-                        <TeamEmblem teamName={match.teamA.name} size={80} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <TeamEmblem team={match.teamA} size={80} />
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                                {renderTeamText(match.teamA)}
+                            </div>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {match.status !== 'finished' && (
                                 <button
@@ -473,7 +527,12 @@ const Simulator: FC = () => {
 
                     {/* Team B and Score */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
-                        <TeamEmblem teamName={match.teamB.name} size={80} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <TeamEmblem team={match.teamB} size={80} />
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                                {renderTeamText(match.teamB)}
+                            </div>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {match.status !== 'finished' && (
                                 <button
