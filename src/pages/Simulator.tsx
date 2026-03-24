@@ -1,4 +1,4 @@
-import { type FC, useState, useMemo, useEffect } from 'react';
+import { type FC, useState, useMemo, useEffect, useRef } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
@@ -28,6 +28,315 @@ interface ToastData {
     scoreB: number;
 }
 
+// ── Module-level pure helpers (stable references, no re-creation on parent re-render) ──
+
+const msUntil = (dateStr: string, timeStr: string): number => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const target = new Date(`${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
+    return target.getTime() - Date.now();
+};
+
+const getTeamEmblem = (team: { name: string; course?: string; faculty?: string }) => {
+    const searchTerms: string[] = [];
+    if (team.course && team.faculty) searchTerms.push(`${team.course} - ${team.faculty}`);
+    if (team.course) searchTerms.push(team.course);
+    searchTerms.push(team.name);
+    for (const term of searchTerms) {
+        if (!term) continue;
+        const termLower = term.toLowerCase().trim();
+        let foundCourse = Object.keys(COURSE_EMBLEMS).find(k => k.toLowerCase() === termLower);
+        if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
+        foundCourse = Object.keys(COURSE_EMBLEMS).find(k =>
+            k.toLowerCase().includes(termLower) || termLower.includes(k.toLowerCase())
+        );
+        if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
+    }
+    return null;
+};
+
+const TeamEmblem = ({ team, size = 72 }: { team: { name: string; course?: string; faculty?: string }; size?: number }) => {
+    const emblemUrl = getTeamEmblem(team);
+    return emblemUrl ? (
+        <img
+            src={emblemUrl}
+            alt={team.name}
+            style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+    ) : (
+        <div style={{
+            width: size, height: size, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)', border: '2px solid rgba(255,255,255,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: size * 0.42,
+        }}>
+            ⚽
+        </div>
+    );
+};
+
+interface MatchCardProps {
+    match: Match;
+    disabled?: boolean;
+    pred: import('../context/AuthContext').Prediction | undefined;
+    userPrediction: import('../context/AuthContext').Prediction | undefined;
+    updatePrediction: (matchId: string, field: 'scoreA' | 'scoreB', value: string) => void;
+    saveUserPredictions: (preds: Record<string, import('../context/AuthContext').Prediction>) => Promise<boolean>;
+    showToast: (data: Omit<ToastData, 'id'>) => void;
+}
+
+const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction, saveUserPredictions, showToast }: MatchCardProps) => {
+    const [cardSaved, setCardSaved] = useState(false);
+    const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
+
+    // ── Local input state (decoupled from global re-renders) ──
+    const toStr = (v: string | number | undefined) => (v === '' || v === undefined ? '' : String(v));
+    const [localA, setLocalA] = useState(() => toStr(pred?.scoreA));
+    const [localB, setLocalB] = useState(() => toStr(pred?.scoreB));
+    const focusedField = useRef<'A' | 'B' | null>(null);
+
+    // Sync from external changes (arrows, initial load) only when not focused
+    useEffect(() => {
+        if (focusedField.current !== 'A') setLocalA(toStr(pred?.scoreA));
+    }, [pred?.scoreA]);
+    useEffect(() => {
+        if (focusedField.current !== 'B') setLocalB(toStr(pred?.scoreB));
+    }, [pred?.scoreB]);
+
+    const isPreviouslySaved = userPrediction && userPrediction.scoreA !== '' && userPrediction.scoreB !== '';
+    const timeLeftMs = msUntil(match.date, match.time);
+    const isTimeout = match.status !== 'finished' && timeLeftMs <= 3600000;
+    const hours = Math.max(0, Math.floor(timeLeftMs / 3_600_000));
+    const isCardDisabled = disabled || isTimeout || !!isPreviouslySaved || match.status === 'finished';
+
+    const renderTeamText = (team: any) => {
+        let courseName = team.course || team.name;
+        const institution = team.faculty;
+        if (institution && courseName.toLowerCase().includes(institution.toLowerCase())) {
+            const parts = courseName.split(' - ');
+            if (parts.length > 1 && parts[parts.length - 1].toLowerCase() === institution.toLowerCase()) {
+                courseName = parts.slice(0, -1).join(' - ');
+            } else {
+                const regex = new RegExp(`\\s*-\\s*${institution}$`, 'i');
+                courseName = courseName.replace(regex, '');
+            }
+        }
+        if (institution) {
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
+                        {courseName.trim()}
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#E51E2A', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
+                        {institution}
+                    </span>
+                </div>
+            );
+        }
+        return (
+            <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2 }}>
+                {courseName}
+            </span>
+        );
+    };
+
+    const saveThisCard = async () => {
+        if (!hasPrediction || !pred) return;
+        const success = await saveUserPredictions({ [match.id]: pred });
+        if (!success) { alert('Erro ao salvar o palpite.'); return; }
+        setCardSaved(true);
+        setTimeout(() => setCardSaved(false), 3000);
+        showToast({
+            message: 'Palpite salvo!',
+            teamA: match.teamA.name.split(' - ')[0],
+            scoreA: Number(pred.scoreA),
+            teamB: match.teamB.name.split(' - ')[0],
+            scoreB: Number(pred.scoreB),
+        });
+    };
+
+    const formatFullDate = (dateStr: string) => {
+        const [year, month, day] = dateStr.split('-');
+        const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+        return `${day} DE ${months[parseInt(month) - 1]}. DE ${year}`;
+    };
+
+    const max21 = match.sport === 'Basquete 3x3';
+
+    return (
+        <div className="sim-match-card" style={{
+            background: '#1a1a1a',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            transition: 'all 0.3s',
+        }}>
+            {/* Header */}
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+                    {formatFullDate(match.date)}, {match.time}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: match.status === 'finished' ? '#4ade80' : isTimeout ? '#ef4444' : '#ffd700' }}>
+                    {match.status === 'finished' ? <>ENCERRADO</> : isTimeout ? <>TEMPO ESGOTADO</> : <><Zap size={14} /> {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}</>}
+                </div>
+            </div>
+
+            {/* Central Area */}
+            <div style={{ padding: '32px 18px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '16px' }}>
+                {/* Team A */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <TeamEmblem team={match.teamA} size={80} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                            {renderTeamText(match.teamA)}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {match.status !== 'finished' && (
+                            <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
+                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
+                                onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                            >&lt;</button>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            {match.status === 'finished' ? (
+                                <div style={{ width: '48px', height: '48px', border: '2px solid white', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 900, color: 'white', background: 'rgba(255,255,255,0.1)' }}>
+                                    {pred?.scoreA ?? '-'}
+                                </div>
+                            ) : (
+                                <input
+                                    type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
+                                    disabled={isCardDisabled} value={localA}
+                                    onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalA(raw); if (raw === '') { updatePrediction(match.id,'scoreA',''); return; } const n = parseInt(raw,10); const c = String(max21 ? Math.min(n,21) : Math.min(n,99)); if (c !== raw) setLocalA(c); updatePrediction(match.id,'scoreA',c); }}
+                                    onFocus={(e) => { focusedField.current = 'A'; e.target.select(); }}
+                                    onBlur={() => { focusedField.current = null; }}
+                                    style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
+                                />
+                            )}
+                            {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
+                        </div>
+                        {match.status !== 'finished' && (
+                            <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
+                                onClick={() => { if (isCardDisabled) return; const n = String((pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) + 1); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
+                                onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                            >&gt;</button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Center */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', textAlign: 'center' }}>
+                        {match.sport} • {match.category}
+                    </div>
+                    {match.status === 'finished' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ fontSize: '28px', fontWeight: 900, color: 'white', whiteSpace: 'nowrap' }}>{match.scoreA} × {match.scoreB}</div>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80' }}>RESULTADO FINAL</div>
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '28px', fontWeight: 300, color: 'rgba(255,255,255,0.4)' }}>×</div>
+                    )}
+                </div>
+
+                {/* Team B */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <TeamEmblem team={match.teamB} size={80} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                            {renderTeamText(match.teamB)}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {match.status !== 'finished' && (
+                            <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
+                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
+                                onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                            >&lt;</button>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            {match.status === 'finished' ? (
+                                <div style={{ width: '48px', height: '48px', border: '2px solid white', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 900, color: 'white', background: 'rgba(255,255,255,0.1)' }}>
+                                    {pred?.scoreB ?? '-'}
+                                </div>
+                            ) : (
+                                <input
+                                    type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
+                                    disabled={isCardDisabled} value={localB}
+                                    onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalB(raw); if (raw === '') { updatePrediction(match.id,'scoreB',''); return; } const n = parseInt(raw,10); const c = String(max21 ? Math.min(n,21) : Math.min(n,99)); if (c !== raw) setLocalB(c); updatePrediction(match.id,'scoreB',c); }}
+                                    onFocus={(e) => { focusedField.current = 'B'; e.target.select(); }}
+                                    onBlur={() => { focusedField.current = null; }}
+                                    style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
+                                />
+                            )}
+                            {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
+                        </div>
+                        {match.status !== 'finished' && (
+                            <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
+                                onClick={() => { if (isCardDisabled) return; const n = String((pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) + 1); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
+                                onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                                onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
+                            >&gt;</button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Result indicator */}
+            {match.status === 'finished' && hasPrediction && (() => {
+                const predA = Number(pred!.scoreA), predB = Number(pred!.scoreB);
+                const isExact = predA === match.scoreA && predB === match.scoreB;
+                const predW = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
+                const actW = match.scoreA > match.scoreB ? 'A' : match.scoreB > match.scoreA ? 'B' : 'draw';
+                const isWin = predW === actW;
+                const [dot, label, col] = isExact
+                    ? ['#4ade80', 'PLACAR EXATO (+3)', '#4ade80']
+                    : isWin
+                    ? ['#eab308', 'ACERTOU VENCEDOR (+1)', '#eab308']
+                    : ['#ef4444', 'ERROU (0)', '#ef4444'];
+                return (
+                    <div style={{ padding: '12px 18px', background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: dot }} />
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: col }}>{label}</span>
+                    </div>
+                );
+            })()}
+
+            {/* Save button */}
+            {match.status !== 'finished' && (
+                <div style={{ padding: '0 18px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '18px' }}>
+                    <button
+                        onClick={saveThisCard}
+                        disabled={(!hasPrediction && !cardSaved) || isCardDisabled}
+                        style={{
+                            width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
+                            background: isCardDisabled ? 'rgba(255,255,255,0.05)' : cardSaved || isPreviouslySaved ? '#1a7a3a' : hasPrediction ? '#dc2626' : 'rgba(255,255,255,0.08)',
+                            boxShadow: isCardDisabled || !hasPrediction ? 'none' : cardSaved || isPreviouslySaved ? '0 4px 20px rgba(26,122,58,0.45)' : '0 4px 20px rgba(220,38,38,0.45)',
+                            color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
+                            fontSize: '13px', fontWeight: 800, letterSpacing: '1.2px',
+                            cursor: (hasPrediction || cardSaved || isPreviouslySaved) && !isCardDisabled ? 'pointer' : 'not-allowed',
+                            opacity: isCardDisabled ? (isPreviouslySaved ? 1 : 0.5) : (!hasPrediction && !cardSaved ? 0.5 : 1),
+                            transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textTransform: 'uppercase',
+                        }}
+                        onMouseEnter={(e) => { if ((hasPrediction || cardSaved) && !isCardDisabled) { e.currentTarget.style.backgroundColor = cardSaved ? '#15803d' : '#b91c1c'; e.currentTarget.style.opacity = '0.9'; } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = cardSaved || isPreviouslySaved ? '#1a7a3a' : (hasPrediction && !isCardDisabled ? '#dc2626' : 'rgba(255,255,255,0.08)'); e.currentTarget.style.opacity = isCardDisabled ? (isPreviouslySaved ? '1' : '0.5') : (!hasPrediction && !cardSaved) ? '0.5' : '1'; }}
+                    >
+                        {isPreviouslySaved || cardSaved ? <><CheckCircle size={16} /> PALPITE CONFIRMADO</> : isTimeout || disabled ? <>PALPITES FECHADOS</> : <>SALVAR PALPITE</>}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     const [showBolaoRanking, setShowBolaoRanking] = useState(false);
@@ -55,27 +364,7 @@ const Simulator: FC = () => {
     const { matches } = useData();
     const totalLeaguesCount = userPrivateLeaguesCount + (user ? (user.preferredCourse ? 2 : 1) : 0);
 
-    const getTeamEmblem = (team: { name: string; course?: string; faculty?: string }) => {
-        const searchTerms = [];
-        if (team.course && team.faculty) searchTerms.push(`${team.course} - ${team.faculty}`);
-        if (team.course) searchTerms.push(team.course);
-        searchTerms.push(team.name);
 
-        for (const term of searchTerms) {
-            if (!term) continue;
-            const termLower = term.toLowerCase().trim();
-            // Try exact match first
-            let foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey => courseKey.toLowerCase() === termLower);
-            if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
-            
-            // Try includes
-            foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey => 
-                courseKey.toLowerCase().includes(termLower) || termLower.includes(courseKey.toLowerCase())
-            );
-            if (foundCourse) return `/emblemas/${COURSE_EMBLEMS[foundCourse]}`;
-        }
-        return null;
-    };
 
     // Helper to get date string for offset
     const getDateForOffset = (offset: number) => {
@@ -255,443 +544,8 @@ const Simulator: FC = () => {
     const filledCount = Object.values(predictions).filter(p => p.scoreA !== '' && p.scoreB !== '').length;
 
     // ── helpers ──────────────────────────────────────────────
-    const msUntil = (dateStr: string, timeStr: string): number => {
-        const [h, m] = timeStr.split(':').map(Number);
-        const target = new Date(`${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
-        return target.getTime() - Date.now();
-    };
-
-    const TeamEmblem = ({ team, size = 72 }: { team: { name: string; course?: string; faculty?: string }; size?: number }) => {
-        const emblemUrl = getTeamEmblem(team);
-        return emblemUrl ? (
-            <img
-                src={emblemUrl}
-                alt={team.name}
-                style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-        ) : (
-            <div style={{
-                width: size,
-                height: size,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.06)',
-                border: '2px solid rgba(255,255,255,0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: size * 0.42,
-            }}>
-                ⚽
-            </div>
-        );
-    };
 
     // +/- stepper control
-    const MatchSimCard = ({ match, disabled }: { match: Match; disabled?: boolean }) => {
-        const [cardSaved, setCardSaved] = useState(false);
-        const pred = predictions[match.id];
-        const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
-        
-        const renderTeamText = (team: any) => {
-            let courseName = team.course || team.name;
-            const institution = team.faculty;
-            
-            if (institution && courseName.toLowerCase().includes(institution.toLowerCase())) {
-                const parts = courseName.split(' - ');
-                if (parts.length > 1 && parts[parts.length - 1].toLowerCase() === institution.toLowerCase()) {
-                    courseName = parts.slice(0, -1).join(' - ');
-                } else {
-                    const regex = new RegExp(`\\s*-\\s*${institution}$`, 'i');
-                    courseName = courseName.replace(regex, '');
-                }
-            }
-
-            if (institution) {
-                return (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
-                            {courseName.trim()}
-                        </span>
-                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#E51E2A', wordWrap: 'break-word', lineHeight: 1.2, textAlign: 'center' }}>
-                            {institution}
-                        </span>
-                    </div>
-                );
-            }
-
-            return (
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'white', wordWrap: 'break-word', lineHeight: 1.2 }}>
-                    {courseName}
-                </span>
-            );
-        };
-        
-        const timeLeftMs = msUntil(match.date, match.time);
-        const isTimeout = match.status !== 'finished' && timeLeftMs <= 3600000; // <= 1 hour
-        const hours = Math.max(0, Math.floor(timeLeftMs / 3_600_000));
-
-        // Block if globally disabled, visually timeout, or already saved in userPredictions DB
-        const isPreviouslySaved = userPredictions[match.id] && userPredictions[match.id].scoreA !== '' && userPredictions[match.id].scoreB !== '';
-        const isCardDisabled = disabled || isTimeout || isPreviouslySaved || match.status === 'finished';
-
-        const saveThisCard = async () => {
-            if (!hasPrediction) return;
-            const next = { ...predictions };
-
-            const success = await saveUserPredictions({ [match.id]: next[match.id] });
-            if (!success) {
-                alert('Erro ao salvar o palpite.');
-                return;
-            }
-
-            setCardSaved(true);
-            setTimeout(() => setCardSaved(false), 3000);
-
-            showToast({
-                message: 'Palpite salvo!',
-                teamA: match.teamA.name.split(' - ')[0],
-                scoreA: Number(pred.scoreA),
-                teamB: match.teamB.name.split(' - ')[0],
-                scoreB: Number(pred.scoreB),
-            });
-        };
-
-        const formatFullDate = (dateStr: string) => {
-            const [year, month, day] = dateStr.split('-');
-            const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-            return `${day} DE ${months[parseInt(month) - 1]}. DE ${year}`;
-        };
-
-        return (
-            <div className="sim-match-card" style={{
-                background: '#1a1a1a',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'all 0.3s',
-            }}>
-                {/* ── Header: Date/Time + Countdown ── */}
-                <div style={{
-                    padding: '16px 18px',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
-                        {formatFullDate(match.date)}, {match.time}
-                    </div>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        color: match.status === 'finished' ? '#4ade80' : isTimeout ? '#ef4444' : '#ffd700',
-                    }}>
-                        {match.status === 'finished' ? (
-                            <>ENCERRADO</>
-                        ) : isTimeout ? (
-                            <>TEMPO ESGOTADO</>
-                        ) : (
-                            <><Zap size={14} /> {hours === 0 ? 'EM BREVE' : `FALTA ${hours}H`}</>
-                        )}
-                    </div>
-                </div>
-
-                {/* ── Central Area: Teams + Scoreboard ── */}
-                <div style={{
-                    padding: '32px 18px',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto 1fr',
-                    alignItems: 'center',
-                    gap: '16px',
-                }}>
-                    {/* Team A and Score */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                            <TeamEmblem team={match.teamA} size={80} />
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
-                                {renderTeamText(match.teamA)}
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {match.status !== 'finished' && (
-                                <button
-                                    disabled={isCardDisabled}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                        fontSize: '16px',
-                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
-                                        padding: '4px',
-                                        transition: 'color 0.2s',
-                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
-                                    }}
-                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreA', String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)))}
-                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
-                                >
-                                    &lt;
-                                </button>
-                            )}
-                            <div style={{
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
-                            }}>
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    border: '2px solid white',
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '24px',
-                                    fontWeight: 900,
-                                    color: 'white',
-                                    background: match.status === 'finished' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                }}>
-                                    {pred?.scoreA ?? '-'}
-                                </div>
-                                {match.status === 'finished' && (
-                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>
-                                )}
-                            </div>
-                            {match.status !== 'finished' && (
-                                <button
-                                    disabled={isCardDisabled}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                        fontSize: '16px',
-                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
-                                        padding: '4px',
-                                        transition: 'color 0.2s',
-                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
-                                    }}
-                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreA', String((pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) + 1))}
-                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
-                                >
-                                    &gt;
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Center: Category and X */}
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '12px',
-                        }}>
-                            <div style={{
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: 'rgba(255,255,255,0.7)',
-                                textTransform: 'uppercase',
-                                textAlign: 'center',
-                            }}>
-                                {match.sport} • {match.category}
-                            </div>
-                            {match.status === 'finished' ? (
-                                <div style={{
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
-                                }}>
-                                    <div style={{
-                                        fontSize: '28px',
-                                        fontWeight: 900,
-                                        color: 'white',
-                                        whiteSpace: 'nowrap',
-                                    }}>
-                                        {match.scoreA} × {match.scoreB}
-                                    </div>
-                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80' }}>RESULTADO FINAL</div>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    fontSize: '28px',
-                                    fontWeight: 300,
-                                    color: 'rgba(255,255,255,0.4)',
-                                }}>
-                                    ×
-                                </div>
-                            )}
-                        </div>
-
-                    {/* Team B and Score */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                            <TeamEmblem team={match.teamB} size={80} />
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
-                                {renderTeamText(match.teamB)}
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {match.status !== 'finished' && (
-                                <button
-                                    disabled={isCardDisabled}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                        fontSize: '16px',
-                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
-                                        padding: '4px',
-                                        transition: 'color 0.2s',
-                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
-                                    }}
-                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreB', String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)))}
-                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
-                                >
-                                    &lt;
-                                </button>
-                            )}
-                            <div style={{
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
-                            }}>
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    border: '2px solid white',
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '24px',
-                                    fontWeight: 900,
-                                    color: 'white',
-                                    background: match.status === 'finished' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                }}>
-                                    {pred?.scoreB ?? '-'}
-                                </div>
-                                {match.status === 'finished' && (
-                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>
-                                )}
-                            </div>
-                            {match.status !== 'finished' && (
-                                <button
-                                    disabled={isCardDisabled}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                        fontSize: '16px',
-                                        cursor: isCardDisabled ? 'not-allowed' : 'pointer',
-                                        padding: '4px',
-                                        transition: 'color 0.2s',
-                                        visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible',
-                                    }}
-                                    onClick={() => !isCardDisabled && updatePrediction(match.id, 'scoreB', String((pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) + 1))}
-                                    onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-                                    onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
-                                >
-                                    &gt;
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Match Results History Indicator ── */}
-                {match.status === 'finished' && hasPrediction && (
-                    <div style={{
-                        padding: '12px 18px',
-                        background: 'rgba(0,0,0,0.2)',
-                        borderTop: '1px solid rgba(255,255,255,0.06)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                    }}>
-                        {(() => {
-                            const predA = Number(pred.scoreA);
-                            const predB = Number(pred.scoreB);
-                            const actualA = match.scoreA;
-                            const actualB = match.scoreB;
-                            const isExact = predA === actualA && predB === actualB;
-                            const predWinner = predA > predB ? 'A' : predB > predA ? 'B' : 'draw';
-                            const actualWinner = actualA > actualB ? 'A' : actualB > actualA ? 'B' : 'draw';
-                            const isWinner = predWinner === actualWinner;
-
-                            if (isExact) {
-                                return (
-                                    <>
-                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#4ade80' }}></div>
-                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#4ade80' }}>PLACAR EXATO (+3)</span>
-                                    </>
-                                );
-                            } else if (isWinner) {
-                                return (
-                                    <>
-                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#eab308' }}></div>
-                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#eab308' }}>ACERTOU VENCEDOR (+1)</span>
-                                    </>
-                                );
-                            } else {
-                                return (
-                                    <>
-                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></div>
-                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#ef4444' }}>ERROU (0)</span>
-                                    </>
-                                );
-                            }
-                        })()}
-                    </div>
-                )}
-
-                {/* ── Save button ── */}
-                {match.status !== 'finished' && (
-                    <div style={{ padding: '18px' }}>
-                        <button
-                            onClick={saveThisCard}
-                            disabled={(!hasPrediction && !cardSaved) || isCardDisabled}
-                            style={{
-                                width: '100%',
-                                padding: '14px',
-                                borderRadius: '10px',
-                                border: 'none',
-                                background: isCardDisabled
-                                    ? 'rgba(255,255,255,0.05)'
-                                    : cardSaved || isPreviouslySaved
-                                        ? '#1a7a3a'
-                                        : hasPrediction
-                                            ? '#dc2626'
-                                            : 'rgba(255,255,255,0.08)',
-                                color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white',
-                                fontSize: '13px',
-                                fontWeight: 800,
-                                letterSpacing: '1.2px',
-                                cursor: (hasPrediction || cardSaved || isPreviouslySaved) && !isCardDisabled ? 'pointer' : 'not-allowed',
-                                opacity: isCardDisabled ? (isPreviouslySaved ? 1 : 0.5) : (!hasPrediction && !cardSaved ? 0.5 : 1),
-                                transition: 'all 0.3s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                textTransform: 'uppercase',
-                            }}
-                            onMouseEnter={(e) => { if ((hasPrediction || cardSaved) && !isCardDisabled) { e.currentTarget.style.backgroundColor = cardSaved ? '#15803d' : '#b91c1c'; e.currentTarget.style.opacity = '0.9'; } }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = cardSaved || isPreviouslySaved ? '#1a7a3a' : (hasPrediction && !isCardDisabled ? '#dc2626' : 'rgba(255,255,255,0.08)'); e.currentTarget.style.opacity = isCardDisabled ? (isPreviouslySaved ? '1' : '0.5') : (!hasPrediction && !cardSaved) ? '0.5' : '1'; }}
-                        >
-                            {isPreviouslySaved || cardSaved
-                                ? <><CheckCircle size={16} /> PALPITE CONFIRMADO</>
-                                : isTimeout || disabled
-                                ? <>PALPITES FECHADOS</>
-                                : <>SALVAR PALPITE</>}
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} className="simulator-root">
@@ -1261,7 +1115,16 @@ const Simulator: FC = () => {
                             alignItems: 'stretch',
                         }}>
                             {displayMatches.map(match => (
-                                <MatchSimCard key={match.id} match={match} disabled={predictionsFinalized} />
+                                <MatchSimCard
+                                    key={match.id}
+                                    match={match}
+                                    disabled={predictionsFinalized}
+                                    pred={predictions[match.id]}
+                                    userPrediction={userPredictions?.[match.id]}
+                                    updatePrediction={updatePrediction}
+                                    saveUserPredictions={saveUserPredictions}
+                                    showToast={showToast}
+                                />
                             ))}
                         </div>
                     )}
@@ -1389,6 +1252,16 @@ const Simulator: FC = () => {
                         .simulator-grid {
                             gap: 14px !important;
                         }
+                    }
+
+                    /* Hide native number spinners on score inputs */
+                    input[type=number]::-webkit-outer-spin-button,
+                    input[type=number]::-webkit-inner-spin-button {
+                        -webkit-appearance: none;
+                        margin: 0;
+                    }
+                    input[type=number] {
+                        -moz-appearance: textfield;
                     }
                 `}</style>
             </main>
