@@ -48,7 +48,16 @@ export interface MatchEvent {
     | "shootout_scored"
     | "shootout_missed"
     | "tie_break_start"
-    | "swimming_result";
+    | "swimming_result"
+    | "senshu"
+    | "chui"
+    | "hansoku"
+    | "waza_ari"
+    | "ippon"
+    | "shido"
+    | "hansoku_make"
+    | "osaekomi"
+    | "toketa";
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)

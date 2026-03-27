@@ -32,6 +32,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   } = useData();
   const navigate = useNavigate();
 
+  const finishMatch = (updatedMatch: Match) => {
+    updateMatch(updatedMatch);
+    setIsRunning(false);
+    setActiveMatchId(null);
+    navigate("/");
+  };
+
   // Helper to get team emblem with strict matching
   const getTeamEmblem = (teamName: string) => {
     // Only exact match - no fuzzy matching to avoid wrong emblems
@@ -116,6 +123,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const isSetSport = isVolleyball || isTableTennis;
   const isBasketball3x3 = selectedMatch?.sport === "Basquete 3x3";
   const isSwimming = selectedMatch?.sport === "Natação";
+  const isKarate = selectedMatch?.sport === "Caratê";
+  const isJudo = selectedMatch?.sport === "Judô";
   const isNoTimerSport = [
     "Vôlei",
     "Vôlei de Praia",
@@ -137,6 +146,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     {},
   );
   const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+  const [osaekomiTeam, setOsaekomiTeam] = useState<"A" | "B" | null>(null);
+  const [osaekomiSeconds, setOsaekomiSeconds] = useState(0);
+  const [isGoldenScore, setIsGoldenScore] = useState(false);
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
     if (!match) return 15 * 60;
@@ -283,12 +295,20 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (isRunning && !isNoTimerSport) {
       interval = window.setInterval(() => {
         setCurrentMinute((prev) => {
-          if (isBasketball) {
+          if (isBasketball || isKarate || (isJudo && !isGoldenScore)) {
             if (prev <= 0) {
+              if (isJudo && selectedMatch && selectedMatch.scoreA === selectedMatch.scoreB) {
+                setIsGoldenScore(true);
+                return 0;
+              }
               setIsRunning(false);
               return 0;
             }
-            return Math.max(0, prev - BASKETBALL_DECREMENT_SECONDS);
+            return Math.max(0, prev - (isKarate || isJudo ? 1 : BASKETBALL_DECREMENT_SECONDS));
+          }
+
+          if (isJudo && isGoldenScore) {
+            return prev + 1;
           }
 
           if (isFutebolX1) {
@@ -302,7 +322,63 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning, isBasketball, isFutebolX1, isNoTimerSport]);
+  }, [isRunning, isBasketball, isFutebolX1, isNoTimerSport, isKarate]);
+
+  useEffect(() => {
+    if (!selectedMatch || selectedMatch.status === "finished" || !isKarate) return;
+    if (selectedMatch.events?.some(e => e.type === "end")) return;
+
+    const diff = Math.abs(selectedMatch.scoreA - selectedMatch.scoreB);
+    if (diff >= 8) {
+      const winningTeam = selectedMatch.scoreA > selectedMatch.scoreB ? "A" : "B";
+      const winnerName = winningTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+
+      const endEvent: MatchEvent = {
+        id: `evt_${Date.now()}_end_sup`,
+        type: "end",
+        minute: getCurrentEventMinute(),
+        description: `Luta Encerrada por Superioridade Técnica (8 pontos). Vitória: ${winnerName}`,
+      };
+
+      const finishedMatch: Match = {
+        ...selectedMatch,
+        status: "finished",
+        events: [...(selectedMatch.events || []), endEvent],
+      };
+
+      finishMatch(finishedMatch);
+    }
+  }, [selectedMatch?.scoreA, selectedMatch?.scoreB, isKarate]);
+
+  useEffect(() => {
+    let interval: number | undefined;
+    if (osaekomiTeam && selectedMatch && selectedMatch.status !== "finished") {
+      interval = window.setInterval(() => {
+        setOsaekomiSeconds((prev) => {
+          const next = prev + 1;
+          
+          if (next === 10) {
+            handleJudoPoint(osaekomiTeam, "waza_ari", isGoldenScore ? "Waza-ari no Golden Score" : "Waza-ari por Osaekomi (10s)");
+            if (isGoldenScore) {
+              setOsaekomiTeam(null);
+              return 0;
+            }
+          } else if (next === 20) {
+            handleJudoPoint(osaekomiTeam, "ippon", "Ippon por Osaekomi (20s)");
+            setOsaekomiTeam(null);
+            return 0;
+          }
+          
+          return next;
+        });
+      }, 1000);
+    } else {
+       setOsaekomiSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [osaekomiTeam, selectedMatch?.status]);
 
   const handleSelectMatch = (match: Match) => {
     setActiveMatchId(match.id);
@@ -316,17 +392,17 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       return;
     }
 
-    if (match.sport === "Basquetebol" || match.sport === "Basquete 3x3") {
+    if (match.sport === "Basquetebol" || match.sport === "Basquete 3x3" || match.sport === "Caratê" || match.sport === "Judô") {
       const sortedEvents = [...(match.events || [])].sort(
         compareTimelineEventsAsc,
       );
       const lastEvent =
         sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
-      const quarterDurationSeconds = getBasketballQuarterDurationSeconds(match);
+      const durationSeconds = (match.sport === "Caratê" || match.sport === "Judô") ? 180 : getBasketballQuarterDurationSeconds(match);
       setCurrentMinute(
-        lastEvent
-          ? lastEvent.minute || quarterDurationSeconds
-          : quarterDurationSeconds,
+        lastEvent && lastEvent.minute !== undefined 
+          ? lastEvent.minute 
+          : durationSeconds,
       );
     } else {
       const lastMinute = (match.events || []).reduce(
@@ -395,8 +471,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           status: finalStatus as Match["status"],
         };
 
-        await updateMatch(finalMatch);
-        if (finalStatus === "finished") setIsRunning(false);
+        if (finalStatus === "finished") {
+          finishMatch(finalMatch);
+        } else {
+          await updateMatch(finalMatch);
+        }
         return;
       }
     }
@@ -787,8 +866,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleStartMatch = () => {
     if (!selectedMatch) return;
 
-    if (isBasketball && currentMinute <= 0) {
-      setCurrentMinute(getBasketballQuarterDurationSeconds(selectedMatch));
+    if (isJudo && currentMinute <= 0 && selectedMatch.scoreA === selectedMatch.scoreB) {
+      setIsGoldenScore(true);
+      setCurrentMinute(0);
+    }
+    
+    if ((isBasketball || isKarate || isJudo) && currentMinute <= 0 && !isGoldenScore) {
+      setCurrentMinute((isKarate || isJudo) ? 180 : getBasketballQuarterDurationSeconds(selectedMatch));
     }
 
     const hasStarted = selectedMatch.events?.some((e) => e.type === "start");
@@ -858,13 +942,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       events: [...(selectedMatch.events || []), finalEvent],
     };
 
-    // Persistir a mudança no banco de dados
-    updateMatch(finishedMatch);
-    setIsRunning(false);
-
-    // Deselecionar a partida e forçar navegação para os resultados
-    setActiveMatchId(null);
-    navigate("/");
+    finishMatch(finishedMatch);
   };
 
   const handleBasketballPoint = (team: "A" | "B", points: 1 | 2 | 3) => {
@@ -917,6 +995,350 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     updateMatch(updatedMatch);
+  };
+
+  const handleKaratePoint = (team: "A" | "B", points: 1 | 2 | 3, typeLabel: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({
+        type: "start",
+        minute: getCurrentEventMinute(),
+      });
+      if (started) {
+        selectedMatch.events = started.events;
+      }
+      setIsRunning(true);
+    }
+
+    const scoringTeamId =
+      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const currentA = selectedMatch.scoreA;
+    const currentB = selectedMatch.scoreB;
+    const nextA = team === "A" ? currentA + points : currentA;
+    const nextB = team === "B" ? currentB + points : currentB;
+
+    const description = `${typeLabel} (+${points}) conquistado por ${team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
+
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      scoreA: nextA,
+      scoreB: nextB,
+      status: "live",
+      events: [
+        ...(selectedMatch.events || []),
+        {
+          id: `evt_${Date.now()}_goal`,
+          type: "goal",
+          minute: getCurrentEventMinute(),
+          teamId: scoringTeamId,
+          description: description,
+        } as MatchEvent,
+      ],
+    };
+
+    updateMatch(updatedMatch);
+  };
+
+  const handleJudoPoint = (team: "A" | "B", type: "waza_ari" | "ippon", customDescription?: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({
+        type: "start",
+        minute: getCurrentEventMinute(),
+      });
+      if (started) {
+        selectedMatch.events = started.events;
+      }
+      setIsRunning(true);
+    }
+
+    const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+
+    if (type === "ippon" || isGoldenScore) {
+      const victoryType = isGoldenScore ? "Ponto de Ouro" : (type === "ippon" ? "IPPON" : "Waza-ari-awasete-Ippon");
+      const finalDesc = customDescription || `${victoryType}! Vitória para ${teamName}`;
+      
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        scoreA: team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA,
+        scoreB: team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB,
+        status: "finished",
+        events: [
+          ...(selectedMatch.events || []),
+          {
+            id: `evt_${Date.now()}_point`,
+            type: "goal",
+            minute: getCurrentEventMinute(),
+            teamId: scoringTeamId,
+            description: finalDesc,
+          } as MatchEvent,
+          {
+            id: `evt_${Date.now() + 1}_end`,
+            type: "end",
+            minute: getCurrentEventMinute(),
+            description: `Fim de Luta (${isGoldenScore ? "Golden Score" : type.toUpperCase()}) - Vencedor: ${teamName}`,
+          } as MatchEvent,
+        ],
+      };
+      finishMatch(updatedMatch);
+    } else {
+      const currentWazaAris = selectedMatch.events?.filter(e => e.description?.includes("Waza-ari") && e.teamId === scoringTeamId).length || 0;
+      
+      if (currentWazaAris >= 1) {
+        const updatedMatch: Match = {
+          ...selectedMatch,
+          scoreA: team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA,
+          scoreB: team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB,
+          status: "finished",
+          events: [
+            ...(selectedMatch.events || []),
+            {
+              id: `evt_${Date.now()}_waza_ari_2`,
+              type: "goal",
+              minute: getCurrentEventMinute(),
+              teamId: scoringTeamId,
+              description: customDescription || `Waza-ari-awasete-Ippon! Segundo Waza-ari para ${teamName}`,
+            } as MatchEvent,
+            {
+              id: `evt_${Date.now() + 1}_end`,
+              type: "end",
+              minute: getCurrentEventMinute(),
+              description: `Fim de Luta (Waza-ari-awasete-Ippon) - Vencedor: ${teamName}`,
+            } as MatchEvent,
+          ],
+        };
+        finishMatch(updatedMatch);
+      } else {
+        const updatedMatch: Match = {
+          ...selectedMatch,
+          scoreA: team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA,
+          scoreB: team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB,
+          events: [
+            ...(selectedMatch.events || []),
+            {
+              id: `evt_${Date.now()}_waza_ari`,
+              type: "goal",
+              minute: getCurrentEventMinute(),
+              teamId: scoringTeamId,
+              description: customDescription || `Waza-ari para ${teamName}`,
+            } as MatchEvent,
+          ],
+        };
+        updateMatch(updatedMatch);
+      }
+    }
+  };
+
+  const handleJudoShido = (team: "A" | "B") => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const opponentName = team === "A" ? selectedMatch.teamB.name.split(" - ")[0] : selectedMatch.teamA.name.split(" - ")[0];
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+
+    const currentShidos = selectedMatch.events?.filter(e => e.type === "shido" && e.teamId === teamId).length || 0;
+
+    if (currentShidos < 2) {
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        events: [
+          ...(selectedMatch.events || []),
+          {
+            id: `evt_${Date.now()}_shido`,
+            type: "shido",
+            minute: getCurrentEventMinute(),
+            teamId: teamId,
+            description: `Shido ${currentShidos + 1} para ${teamName}`,
+          } as MatchEvent,
+        ],
+      };
+      updateMatch(updatedMatch);
+    } else {
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        status: "finished",
+        events: [
+          ...(selectedMatch.events || []),
+          {
+            id: `evt_${Date.now()}_hansoku_make`,
+            type: "hansoku_make",
+            minute: getCurrentEventMinute(),
+            teamId: teamId,
+            description: `HANSOKU-MAKE! ${teamName} desclassificado (3 Shidos). Vitória para ${opponentName}`,
+          } as MatchEvent,
+          {
+            id: `evt_${Date.now() + 1}_end`,
+            type: "end",
+            minute: getCurrentEventMinute(),
+            description: `Fim de Luta por Hansoku-make - Vencedor: ${opponentName}`,
+          } as MatchEvent,
+        ],
+      };
+      finishMatch(updatedMatch);
+    }
+  };
+
+  const handleOsaekomi = (team: "A" | "B") => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (osaekomiTeam) return; // Prevent double Osaekomi
+    
+    setOsaekomiTeam(team);
+    setOsaekomiSeconds(0);
+    
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      events: [
+        ...(selectedMatch.events || []),
+        {
+          id: `evt_${Date.now()}_osaekomi`,
+          type: "osaekomi",
+          minute: getCurrentEventMinute(),
+          teamId: team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+          description: `Osaekomi iniciado por ${teamName}`,
+        } as MatchEvent
+      ]
+    };
+    updateMatch(updatedMatch);
+  };
+
+  const handleToketa = () => {
+    if (!osaekomiTeam || !selectedMatch) return;
+    
+    const teamName = osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    
+    setOsaekomiTeam(null);
+    setOsaekomiSeconds(0);
+    
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      events: [
+        ...(selectedMatch.events || []),
+        {
+          id: `evt_${Date.now()}_toketa`,
+          type: "toketa",
+          minute: getCurrentEventMinute(),
+          description: `Toketa! Imobilização interrompida (${teamName})`,
+        } as MatchEvent
+      ]
+    };
+    updateMatch(updatedMatch);
+  };
+
+  const handleSenshu = (team: "A" | "B") => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    
+    if (selectedMatch.events?.some(e => e.type === "senshu")) {
+       alert("O Senshu (vantagem do primeiro ponto) já foi concedido nesta partida.");
+       return;
+    }
+
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: [
+        ...(selectedMatch.events || []),
+        {
+          id: `evt_${Date.now()}_senshu`,
+          type: "senshu",
+          minute: getCurrentEventMinute(),
+          teamId: teamId,
+          description: `Senshu conquistado por ${teamName}`,
+        } as MatchEvent,
+      ],
+    };
+    updateMatch(updatedMatch);
+  };
+
+  const handleKaratePenalty = (team: "A" | "B") => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({
+        type: "start",
+        minute: getCurrentEventMinute(),
+      });
+      if (started) {
+        selectedMatch.events = started.events;
+      }
+      setIsRunning(true);
+    }
+
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const opponentName = team === "A" ? selectedMatch.teamB.name.split(" - ")[0] : selectedMatch.teamA.name.split(" - ")[0];
+
+    if (selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === teamId)) {
+        return;
+    }
+
+    const currentPenalties = selectedMatch.events?.filter(e => e.type === "chui" && e.teamId === teamId).length || 0;
+
+    if (currentPenalties < 3) {
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        events: [
+          ...(selectedMatch.events || []),
+          {
+            id: `evt_${Date.now()}_chui`,
+            type: "chui",
+            minute: getCurrentEventMinute(),
+            teamId: teamId,
+            description: `Advertência: Chui ${currentPenalties + 1} para ${teamName}`,
+          } as MatchEvent,
+        ],
+      };
+      updateMatch(updatedMatch);
+    } else {
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        status: "finished",
+        events: [
+          ...(selectedMatch.events || []),
+          {
+            id: `evt_${Date.now()}_hansoku`,
+            type: "hansoku",
+            minute: getCurrentEventMinute(),
+            teamId: teamId,
+            description: `HANSOKU! ${teamName} desclassificado. Vitória para ${opponentName}`,
+          } as MatchEvent,
+          {
+            id: `evt_${Date.now() + 1}_end`,
+            type: "end",
+            minute: getCurrentEventMinute(),
+            description: `Fim de Jogo por Hansoku - Vitória: ${opponentName}`,
+          } as MatchEvent,
+        ],
+      };
+      finishMatch(updatedMatch);
+    }
+  };
+
+  const handleHantei = (team: "A" | "B") => {
+    if (!selectedMatch) return;
+    const winnerName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    
+    const endEvent: MatchEvent = {
+        id: `evt_${Date.now()}_end_hantei`,
+        type: "end",
+        minute: getCurrentEventMinute(),
+        description: `Luta Encerrada (Hantei). Vitória por Decisão Arbitral: ${winnerName}`,
+    };
+
+    const finishedMatch: Match = {
+        ...selectedMatch,
+        status: "finished",
+        events: [...(selectedMatch.events || []), endEvent],
+    };
+
+    finishMatch(finishedMatch);
   };
 
   const handleGoal = (team: "A" | "B") => {
@@ -1071,6 +1493,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "goal":
         if (isBasketball) return "🏀";
         if (isVolleyball) return "🏐";
+        if (isKarate || isJudo) return "🥋";
         return "⚽";
       case "swimming_result":
         return "🏊";
@@ -1093,9 +1516,27 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "shootout_missed":
         return "❌";
       case "set_win":
-        return isBeachTennis ? "🎾☀️" : "•";
+        return isBeachTennis ? "🎾☀️" : "🎾";
       case "tie_break_start":
         return "🎾";
+      case "senshu":
+        return "⭐";
+      case "chui":
+        return "⚠️";
+      case "hansoku":
+        return "🛑";
+      case "waza_ari":
+        return "🟡";
+      case "ippon":
+        return "🔴";
+      case "shido":
+        return "⚠️";
+      case "hansoku_make":
+        return "🛑";
+      case "osaekomi":
+        return "⏲️";
+      case "toketa":
+        return "🔌";
       default:
         return "•";
     }
@@ -1186,6 +1627,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           label = `⚽ GOL! Placar no momento: ${currentScore} - ${athleteInfo}`;
           break;
         }
+        if (isKarate || isJudo) {
+          label = `Ponto para ${teamName.split(" - ")[0]}`;
+          break;
+        }
         label = `${isHandebol ? "GOL!" : "GOL!"} ${teamName}`;
         break;
       case "yellow_card":
@@ -1255,6 +1700,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         break;
       case "tie_break_start":
         label = "Início de Tie-break";
+        break;
+      case "waza_ari":
+        label = event.description || `Waza-ari para ${teamName}`;
+        break;
+      case "ippon":
+        label = event.description || `IPPON! Vitória para ${teamName}`;
+        break;
+      case "shido":
+        label = event.description || `Shido para ${teamName}`;
+        break;
+      case "hansoku_make":
+        label = event.description || `HANSOKU-MAKE! Vitória para ${teamName}`;
         break;
       case "start":
         label = "Início da partida";
@@ -1394,7 +1851,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           event.type === "penalty_scored" ||
           event.type === "shootout_scored"
         ) {
-          const increment = isBasketball
+          const increment = isBasketball || isKarate || isJudo
             ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
             : 1;
 
@@ -2560,11 +3017,19 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           ) : (
             <>
               <div style={styles.teamLeft}>
+                {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) && (
+                   <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                     DESCLASSIFICADO (HANSOKU)
+                   </div>
+                )}
                 <h2
-                  style={styles.teamName}
+                  style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
                   className="match-timeline-team-name"
                 >
                   {selectedMatch.teamA.name}
+                  {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamA.id) && (
+                    <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                  )}
                 </h2>
                 <div
                   style={{
@@ -2730,11 +3195,19 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               )}
 
               <div style={styles.teamRight}>
+                {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) && (
+                   <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                     DESCLASSIFICADO (HANSOKU)
+                   </div>
+                )}
                 <h2
-                  style={styles.teamName}
+                  style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
                   className="match-timeline-team-name"
                 >
                   {selectedMatch.teamB.name}
+                  {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamB.id) && (
+                    <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                  )}
                 </h2>
                 <div
                   style={{
@@ -3036,7 +3509,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </>
         )}
 
-        {!isBeachTennis && !isBasketball && !isSwimming && (
+        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && (
           <div style={styles.eventSection}>
             <h3 style={styles.sectionTitle}>
               {isSetSport
@@ -3248,7 +3721,311 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
-        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && (
+        {isKarate && (
+          <div style={styles.eventSection}>
+            <h3
+              style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}
+            >
+              🥋 Pontuação WKF
+            </h3>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: "15px",
+              }}
+            >
+              {[
+                { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0] },
+                { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0] }
+              ].map(({ teamKey, teamName }) => (
+                <div
+                  key={teamKey}
+                  style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                >
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      textAlign: "center",
+                      marginBottom: "4px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px"
+                    }}
+                  >
+                    {teamName}
+                  </div>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(100, 116, 139, 0.15)",
+                      borderColor: "#64748b",
+                      color: "#64748b",
+                    }}
+                    onClick={() => handleKaratePoint(teamKey as "A" | "B", 1, "Yuko")}
+                  >
+                    Yuko (+1)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(234, 179, 8, 0.15)",
+                      borderColor: "#eab308",
+                      color: "#eab308",
+                    }}
+                    onClick={() => handleKaratePoint(teamKey as "A" | "B", 2, "Waza-ari")}
+                  >
+                    Waza-ari (+2)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(239, 68, 68, 0.15)",
+                      borderColor: "#ef4444",
+                      color: "#ef4444",
+                    }}
+                    onClick={() => handleKaratePoint(teamKey as "A" | "B", 3, "Ippon")}
+                  >
+                    Ippon (+3)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(251, 191, 36, 0.15)",
+                      borderColor: "#f59e0b",
+                      color: "#f59e0b",
+                      marginTop: "8px"
+                    }}
+                    onClick={() => handleSenshu(teamKey as "A" | "B")}
+                  >
+                    Senshu (Vantagem)
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isKarate && (
+          <div style={styles.eventSection}>
+            <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)" }}>
+              ⚠️ Penalidades (Chui)
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: "15px",
+              }}
+            >
+              {[
+                { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0], teamId: selectedMatch.teamA.id },
+                { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0], teamId: selectedMatch.teamB.id }
+              ].map(({ teamKey, teamName, teamId }) => {
+                const isHansoku = selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === teamId);
+                const chuiCount = selectedMatch.events?.filter(e => e.type === "chui" && e.teamId === teamId).length || 0;
+                
+                let btnLabel = "Adicionar Penalidade";
+                if (isHansoku) btnLabel = "Hansoku (Desclassificado)";
+                else if (chuiCount > 0) btnLabel = `Chui ${chuiCount} - Próx: ${chuiCount === 3 ? "Hansoku" : `Chui ${chuiCount + 1}`}`;
+
+                return (
+                  <button
+                    key={teamKey}
+                    style={{
+                      ...styles.eventBtn,
+                      background: isHansoku ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
+                      borderColor: "var(--danger-color, #ef4444)",
+                      color: isHansoku ? "white" : "#ef4444",
+                      padding: "16px",
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      opacity: isHansoku ? 0.7 : 1,
+                      cursor: isHansoku ? "not-allowed" : "pointer"
+                    }}
+                    onClick={() => handleKaratePenalty(teamKey as "A" | "B")}
+                    disabled={isHansoku || selectedMatch.status === "finished"}
+                  >
+                    {btnLabel} ({teamName})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isKarate && currentMinute === 0 && !isRunning && selectedMatch.status !== "finished" && selectedMatch.scoreA === selectedMatch.scoreB && (
+          <div style={styles.eventSection}>
+            <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
+              ⚖️ Decisão de Hantei (Empate)
+            </h3>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                style={{ ...styles.eventBtn, background: "rgba(59, 130, 246, 0.15)", borderColor: "#3b82f6", color: "#3b82f6" }}
+                onClick={() => handleHantei("A")}
+              >
+                Hantei para {selectedMatch.teamA.name.split(" - ")[0]}
+              </button>
+              <button
+                style={{ ...styles.eventBtn, background: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", color: "#ef4444" }}
+                onClick={() => handleHantei("B")}
+              >
+                Hantei para {selectedMatch.teamB.name.split(" - ")[0]}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isJudo && (
+          <div style={styles.eventSection}>
+            <h3
+              style={{ ...styles.sectionTitle, color: isGoldenScore ? "var(--warning-color, #f59e0b)" : "var(--accent-color)" }}
+            >
+              🥋 Pontuação Judô {isGoldenScore && " (GOLDEN SCORE)"}
+            </h3>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: "15px",
+              }}
+            >
+              {[
+                { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0] },
+                { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0] }
+              ].map(({ teamKey, teamName }) => (
+                <div
+                  key={teamKey}
+                  style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                >
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      textAlign: "center",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {teamName}
+                  </div>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(234, 179, 8, 0.15)",
+                      borderColor: "#eab308",
+                      color: "#eab308",
+                    }}
+                    onClick={() => handleJudoPoint(teamKey as "A" | "B", "waza_ari")}
+                    disabled={selectedMatch.status === "finished"}
+                  >
+                    Waza-ari (+1)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "rgba(239, 68, 68, 0.15)",
+                      borderColor: "#ef4444",
+                      color: "#ef4444",
+                    }}
+                    onClick={() => handleJudoPoint(teamKey as "A" | "B", "ippon")}
+                    disabled={selectedMatch.status === "finished"}
+                  >
+                    Ippon (Vitória)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: osaekomiTeam === teamKey ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.15)",
+                      borderColor: "#22c55e",
+                      color: osaekomiTeam === teamKey ? "white" : "#22c55e",
+                      marginTop: "8px",
+                      opacity: (osaekomiTeam && osaekomiTeam !== teamKey) ? 0.5 : 1,
+                    }}
+                    onClick={() => osaekomiTeam === teamKey ? handleToketa() : handleOsaekomi(teamKey as "A" | "B")}
+                    disabled={selectedMatch.status === "finished" || !!(osaekomiTeam && osaekomiTeam !== teamKey)}
+                  >
+                    {osaekomiTeam === teamKey ? "Toketa (Sair)" : "Osaekomi (Solo)"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {osaekomiTeam && (
+               <div style={{
+                 marginTop: "20px",
+                 padding: "15px",
+                 background: "rgba(59, 130, 246, 0.1)",
+                 borderRadius: "12px",
+                 border: "2px solid #3b82f6",
+                 textAlign: "center",
+                 animation: "pulse 2s infinite"
+               }}>
+                 <div style={{ color: "#3b82f6", fontWeight: 800, fontSize: "14px", textTransform: "uppercase", marginBottom: "5px" }}>
+                    ⏲️ Imobilização em Curso ({osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]})
+                 </div>
+                 <div style={{ fontSize: "36px", fontWeight: 900, color: "#3b82f6" }}>
+                    {osaekomiSeconds}s
+                 </div>
+                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "5px" }}>
+                    10s = Waza-ari | 20s = Ippon
+                 </div>
+               </div>
+            )}
+
+            <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)", marginTop: "20px" }}>
+              ⚠️ Penalidades (Shido)
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: "15px",
+              }}
+            >
+              {[
+                { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0], teamId: selectedMatch.teamA.id },
+                { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0], teamId: selectedMatch.teamB.id }
+              ].map(({ teamKey, teamName, teamId }) => {
+                const isHansokuMake = selectedMatch.events?.some(e => e.type === "hansoku_make" && e.teamId === teamId);
+                const shidoCount = selectedMatch.events?.filter(e => e.type === "shido" && e.teamId === teamId).length || 0;
+                
+                let btnLabel = "Adicionar Shido";
+                if (isHansokuMake) btnLabel = "Hansoku-make (Desclassificado)";
+                else if (shidoCount > 0) btnLabel = `Shido ${shidoCount} - Próx: ${shidoCount === 2 ? "Hansoku-make" : `Shido ${shidoCount + 1}`}`;
+
+                return (
+                  <button
+                    key={teamKey}
+                    style={{
+                      ...styles.eventBtn,
+                      background: isHansokuMake ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
+                      borderColor: "var(--danger-color, #ef4444)",
+                      color: isHansokuMake ? "white" : "#ef4444",
+                      padding: "16px",
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      opacity: isHansokuMake ? 0.7 : 1,
+                      cursor: isHansokuMake ? "not-allowed" : "pointer"
+                    }}
+                    onClick={() => handleJudoShido(teamKey as "A" | "B")}
+                    disabled={isHansokuMake || selectedMatch.status === "finished"}
+                  >
+                    {btnLabel} ({teamName})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && (
           <>
             <div style={styles.eventSection}>
               <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
@@ -3421,7 +4198,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           <div style={styles.modal}>
             <div style={styles.modalContentLarge}>
               <h3 style={styles.modalTitle}>
-                {showPlayerInput.type === "goal" && "⚽ Quem fez o gol?"}
+                {showPlayerInput.type === "goal" && (isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?")}
                 {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
                 {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
                 {showPlayerInput.type === "penalty_scored" &&
