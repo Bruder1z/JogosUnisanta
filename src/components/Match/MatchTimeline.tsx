@@ -125,6 +125,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const isSwimming = selectedMatch?.sport === "Natação";
   const isKarate = selectedMatch?.sport === "Caratê";
   const isJudo = selectedMatch?.sport === "Judô";
+  const isXadrez = selectedMatch?.sport === "Xadrez";
   const isNoTimerSport = [
     "Vôlei",
     "Vôlei de Praia",
@@ -149,6 +150,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [osaekomiTeam, setOsaekomiTeam] = useState<"A" | "B" | null>(null);
   const [osaekomiSeconds, setOsaekomiSeconds] = useState(0);
   const [isGoldenScore, setIsGoldenScore] = useState(false);
+  const [chessWinner, setChessWinner] = useState<"A" | "B" | "Draw" | null>(null);
+  const [chessReason, setChessReason] = useState<string>("");
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
     if (!match) return 15 * 60;
@@ -1340,6 +1343,45 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     finishMatch(finishedMatch);
   };
+
+  const handleChessResult = (result: "A" | "B", reason: string) => {
+    if (!selectedMatch) return;
+    
+    let scoreA = result === "A" ? 1 : 0;
+    let scoreB = result === "B" ? 1 : 0;
+    
+    const winningTeamName = result === "A" 
+        ? selectedMatch.teamA.name.split(" - ")[0] 
+        : selectedMatch.teamB.name.split(" - ")[0];
+
+    const events: MatchEvent[] = [...(selectedMatch.events || [])];
+
+    events.push({
+      id: `evt_${Date.now()}_chess_win`,
+      type: "chess_result",
+      minute: getCurrentEventMinute(),
+      teamId: result === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+      description: `${reason} (+1.0 pts) - Vitória de ${winningTeamName}`,
+    } as MatchEvent);
+
+    const endEvent: MatchEvent = {
+        id: `evt_${Date.now() + 2}_end_chess`,
+        type: "end",
+        minute: getCurrentEventMinute(),
+        description: `Fim de Jogo (${reason}). Resultado: ${winningTeamName}`,
+    };
+
+    const finishedMatch: Match = {
+        ...selectedMatch,
+        scoreA,
+        scoreB,
+        status: "finished",
+        events: [...events, endEvent],
+    };
+
+    finishMatch(finishedMatch);
+  };
+
 
   const handleGoal = (team: "A" | "B") => {
     if (isBeachTennis) {
@@ -3293,61 +3335,94 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 style={styles.controlButtons}
                 className="match-timeline-control-grid"
               >
-                <button
-                  style={{ ...styles.controlBtn, ...styles.startBtn }}
-                  onClick={handleStartMatch}
-                  disabled={
-                    (isNoTimerSport
-                      ? selectedMatch.status === "live"
-                      : isRunning) || selectedMatch.status === "finished"
-                  }
-                >
-                  <Play size={20} />
-                  Iniciar Jogo
-                </button>
-                {!isNoTimerSport && (
+                {isXadrez ? (
+                   <button
+                     style={{
+                       ...styles.controlBtn,
+                       background: isRunning ? "rgba(245, 158, 11, 0.2)" : "var(--success-color, #10b981)",
+                       color: isRunning ? "#f59e0b" : "white",
+                       border: `1px solid ${isRunning ? "#f59e0b" : "var(--success-color, #10b981)"}`,
+                       gridColumn: "1 / -1",
+                       padding: "24px",
+                       fontSize: "20px",
+                       fontWeight: 800,
+                       boxShadow: isRunning ? "none" : "0 4px 15px rgba(16, 185, 129, 0.3)"
+                     }}
+                     onClick={() => {
+                        if (isRunning) {
+                           setIsRunning(false);
+                        } else {
+                           if (!selectedMatch.events?.some((e) => e.type === "start")) {
+                              handleStartMatch();
+                           } else {
+                              setIsRunning(true);
+                           }
+                        }
+                     }}
+                     disabled={selectedMatch.status === "finished"}
+                   >
+                     {isRunning ? <Pause size={28} /> : <Play size={28} />}
+                     {isRunning ? "Pausar Relógio" : selectedMatch.events?.some((e) => e.type === "start") ? "Retomar Relógio" : "Iniciar Relógio de Xadrez"}
+                   </button>
+                ) : (
+                <>
                   <button
-                    style={{ ...styles.controlBtn, ...styles.pauseBtn }}
-                    onClick={
-                      isBasketball ? () => setIsRunning(false) : handleHalfTime
-                    }
-                    disabled={!isRunning}
-                  >
-                    <Pause size={20} />
-                    {isBasketball ? "Pausar Tempo" : "Intervalo"}
-                  </button>
-                )}
-                {!isNoTimerSport && (
-                  <button
-                    style={{ ...styles.controlBtn, ...styles.resumeBtn }}
+                    style={{ ...styles.controlBtn, ...styles.startBtn }}
                     onClick={handleStartMatch}
                     disabled={
-                      isRunning ||
-                      !selectedMatch.events?.some((e) => e.type === "start")
+                      (isNoTimerSport
+                        ? selectedMatch.status === "live"
+                        : isRunning) || selectedMatch.status === "finished"
                     }
                   >
                     <Play size={20} />
-                    Retomar
+                    Iniciar Jogo
                   </button>
+                  {!isNoTimerSport && (
+                    <button
+                      style={{ ...styles.controlBtn, ...styles.pauseBtn }}
+                      onClick={
+                        isBasketball ? () => setIsRunning(false) : handleHalfTime
+                      }
+                      disabled={!isRunning}
+                    >
+                      <Pause size={20} />
+                      {isBasketball ? "Pausar Tempo" : "Intervalo"}
+                    </button>
+                  )}
+                  {!isNoTimerSport && (
+                    <button
+                      style={{ ...styles.controlBtn, ...styles.resumeBtn }}
+                      onClick={handleStartMatch}
+                      disabled={
+                        isRunning ||
+                        !selectedMatch.events?.some((e) => e.type === "start")
+                      }
+                    >
+                      <Play size={20} />
+                      Retomar
+                    </button>
+                  )}
+                  <button
+                    style={{
+                      ...styles.controlBtn,
+                      ...styles.endBtn,
+                      ...(isBasketball3x3 &&
+                      (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
+                        ? {
+                            boxShadow: "0 0 15px var(--danger-color)",
+                            animation: "pulse 1.5s infinite",
+                          }
+                        : {}),
+                    }}
+                    onClick={handleEndMatch}
+                    disabled={selectedMatch.status === "finished"}
+                  >
+                    <StopCircle size={20} />
+                    Fim de Jogo
+                  </button>
+                </>
                 )}
-                <button
-                  style={{
-                    ...styles.controlBtn,
-                    ...styles.endBtn,
-                    ...(isBasketball3x3 &&
-                    (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
-                      ? {
-                          boxShadow: "0 0 15px var(--danger-color)",
-                          animation: "pulse 1.5s infinite",
-                        }
-                      : {}),
-                  }}
-                  onClick={handleEndMatch}
-                  disabled={selectedMatch.status === "finished"}
-                >
-                  <StopCircle size={20} />
-                  Fim de Jogo
-                </button>
               </div>
 
               {isBasketball && !isNoTimerSport && (
@@ -3509,7 +3584,107 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </>
         )}
 
-        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && (
+        {isXadrez && (
+          <div style={{ ...styles.eventSection, background: "rgba(30, 30, 30, 0.4)", padding: "24px", borderRadius: "16px", border: "1px solid #333" }}>
+            <h3 style={{ ...styles.sectionTitle, color: "var(--text-primary)", fontSize: "20px", marginBottom: "20px" }}>
+              ♟️ Resultado Final
+            </h3>
+            
+            {!chessWinner ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                <button
+                  style={{
+                    ...styles.eventBtn,
+                    background: "rgba(255, 255, 255, 0.05)",
+                    borderColor: "#666",
+                    color: "white",
+                    padding: "24px",
+                    fontWeight: 800,
+                    fontSize: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                  onClick={() => setChessWinner("A")}
+                >
+                  <Trophy size={24} color="#aaa" />
+                  Vitória
+                  <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatch.teamA.name.split(" - ")[0]}</span>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.eventBtn,
+                    background: "rgba(255, 255, 255, 0.05)",
+                    borderColor: "#666",
+                    color: "white",
+                    padding: "24px",
+                    fontWeight: 800,
+                    fontSize: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                  onClick={() => setChessWinner("B")}
+                >
+                  <Trophy size={24} color="#aaa" />
+                  Vitória
+                  <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatch.teamB.name.split(" - ")[0]}</span>
+                </button>
+              </div>
+            ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
+                    Selecione o motivo da Vitória de {chessWinner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+                    {chessWinner !== "Draw" ? (
+                      ["Xeque-mate", "Tempo Esgotado", "Abandono", "Falta (W.O.)"].map(reason => (
+                        <button
+                          key={reason}
+                          style={{
+                            padding: "12px 20px",
+                            borderRadius: "8px",
+                            background: chessReason === reason ? "var(--bg-hover)" : "rgba(0,0,0,0.2)",
+                            border: `1px solid ${chessReason === reason ? "#fff" : "#444"}`,
+                            color: "white",
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                          onClick={() => setChessReason(reason)}
+                        >
+                          {reason}
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: "12px", color: "#aaa" }}>Motivo: Acordo Mútuo / Afogado</div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                    <button
+                      style={{ ...styles.controlBtn, background: "rgba(255,255,255,0.1)", flex: 1 }}
+                      onClick={() => { setChessWinner(null); setChessReason(""); }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      style={{ ...styles.controlBtn, background: "white", color: "black", flex: 2 }}
+                      disabled={!chessReason}
+                      onClick={() => handleChessResult(chessWinner, chessReason)}
+                    >
+                      Confirmar {chessWinner === "Draw" ? "Empate" : "Vitória"} e Encerrar
+                    </button>
+                  </div>
+                </div>
+            )}
+          </div>
+        )}
+
+        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && (
           <div style={styles.eventSection}>
             <h3 style={styles.sectionTitle}>
               {isSetSport
@@ -4025,7 +4200,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
-        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && (
+        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && (
           <>
             <div style={styles.eventSection}>
               <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>

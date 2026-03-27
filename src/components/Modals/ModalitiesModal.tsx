@@ -39,8 +39,8 @@ const ModalitiesModal: FC<ModalitiesModalProps> = ({ onClose, onSelectSport }) =
             <div className="premium-card" style={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: '800px',
-                maxHeight: '80vh',
+                maxWidth: '900px',
+                maxHeight: '90vh',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
@@ -48,7 +48,7 @@ const ModalitiesModal: FC<ModalitiesModalProps> = ({ onClose, onSelectSport }) =
             }}>
                 {/* Header */}
                 <div style={{
-                    padding: '25px',
+                    padding: '20px 25px',
                     borderBottom: '1px solid var(--border-color)',
                     display: 'flex',
                     alignItems: 'center',
@@ -81,13 +81,13 @@ const ModalitiesModal: FC<ModalitiesModalProps> = ({ onClose, onSelectSport }) =
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: '30px',
+                    padding: '20px 25px',
                     background: 'var(--bg-primary)'
                 }}>
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                        gap: '15px'
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '12px'
                     }}>
                         {AVAILABLE_SPORTS.map((sport) => (
                             <div
@@ -100,20 +100,26 @@ const ModalitiesModal: FC<ModalitiesModalProps> = ({ onClose, onSelectSport }) =
                                 style={{
                                     background: 'var(--bg-card)',
                                     border: '1px solid var(--border-color)',
-                                    padding: '20px',
+                                    padding: '15px 10px',
                                     borderRadius: '12px',
                                     textAlign: 'center',
                                     cursor: 'pointer',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minHeight: '100px'
                                 }}
                             >
-                                <div style={{ fontSize: '32px', marginBottom: '10px' }}>
+                                <div style={{ fontSize: '28px', marginBottom: '8px' }}>
                                     {SPORT_ICONS[sport] || '🏆'}
                                 </div>
                                 <div style={{
-                                    fontSize: '14px',
+                                    fontSize: '13px',
                                     fontWeight: 700,
-                                    color: 'var(--text-primary)'
+                                    color: 'var(--text-primary)',
+                                    lineHeight: '1.2'
                                 }}>
                                     {sport}
                                 </div>

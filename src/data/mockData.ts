@@ -57,7 +57,9 @@ export interface MatchEvent {
     | "shido"
     | "hansoku_make"
     | "osaekomi"
-    | "toketa";
+    | "toketa"
+    | "draw"
+    | "chess_result";
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)
