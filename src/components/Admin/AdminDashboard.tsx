@@ -86,7 +86,7 @@ const AdminDashboard: React.FC = () => {
 
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
-        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: '', time: '', location: ''
+        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', phase: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
     const [settingsForm, setSettingsForm] = useState({
@@ -123,6 +123,7 @@ const AdminDashboard: React.FC = () => {
             scoreB: 0,
             sport: newMatchForm.sport,
             category: newMatchForm.category,
+            phase: newMatchForm.phase,
             status: 'scheduled',
             date: newMatchForm.date,
             time: newMatchForm.time,
@@ -130,7 +131,7 @@ const AdminDashboard: React.FC = () => {
         };
         addMatch(newMatch);
         setIsNewMatchOpen(false);
-        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', date: '', time: '', location: '' });
+        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', phase: 'Fase de Classificação', date: '', time: '', location: '' });
         showNotification("Partida criada com sucesso!");
     };
 
@@ -1403,15 +1404,21 @@ const AdminDashboard: React.FC = () => {
                                 ))}
                             </select>
                         </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <select style={inputStyle} value={newMatchForm.phase} onChange={e => setNewMatchForm({ ...newMatchForm, phase: e.target.value as 'Fase de Classificação' | 'Fase Final' })}>
+                                <option value="Fase de Classificação">Fase de Classificação</option>
+                                <option value="Fase Final">Fase Final</option>
+                            </select>
+                            <select style={inputStyle} value={newMatchForm.category} onChange={e => setNewMatchForm({ ...newMatchForm, category: e.target.value as 'Masculino' | 'Feminino' })}>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
+                        </div>
                         <select style={inputStyle} value={newMatchForm.sport} onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}>
                             <option value="">Selecione a Modalidade</option>
                             {AVAILABLE_SPORTS.map(sport => (
                                 <option key={sport} value={sport}>{sport}</option>
                             ))}
-                        </select>
-                        <select style={inputStyle} value={newMatchForm.category} onChange={e => setNewMatchForm({ ...newMatchForm, category: e.target.value as 'Masculino' | 'Feminino' })}>
-                            <option value="Masculino">Masculino</option>
-                            <option value="Feminino">Feminino</option>
                         </select>
                         <div className="admin-form-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <input type="date" style={inputStyle} value={newMatchForm.date} onChange={e => setNewMatchForm({ ...newMatchForm, date: e.target.value })} />

@@ -60,13 +60,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [filterLocation, setFilterLocation] = useState<string>("Todos");
   const [filterCategory, setFilterCategory] = useState<string>("Todos");
 
-  // New Match Form
   const [newMatchForm, setNewMatchForm] = useState({
     teamA: "",
     teamB: "",
     swimmingTeams: Array(8).fill(""),
     sport: "",
     category: "Masculino" as "Masculino" | "Feminino",
+    phase: "Fase de Classificação" as "Fase de Classificação" | "Fase Final",
     date: new Date().toISOString().split("T")[0],
     time: "",
     location: "",
@@ -1546,6 +1546,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         id: crypto.randomUUID(),
         sport: newMatchForm.sport,
         category: newMatchForm.category,
+        phase: newMatchForm.phase || "Fase de Classificação",
         status: "scheduled",
         date: newMatchForm.date,
         time: newMatchForm.time,
@@ -1589,6 +1590,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         scoreB: 0,
         sport: newMatchForm.sport,
         category: newMatchForm.category,
+        phase: newMatchForm.phase || "Fase de Classificação",
         status: "scheduled",
         date: newMatchForm.date,
         time: newMatchForm.time,
@@ -1607,6 +1609,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       swimmingTeams: Array(10).fill(""),
       sport: "",
       category: "Masculino",
+      phase: "Fase de Classificação",
       date: new Date().toISOString().split("T")[0],
       time: "",
       location: "",
@@ -2330,27 +2333,57 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   </>
                 )}
 
-                <select
-                  value={newMatchForm.category}
-                  onChange={(e) =>
-                    setNewMatchForm({
-                      ...newMatchForm,
-                      category: e.target.value as any,
-                    })
-                  }
+                <div
                   style={{
-                    width: "100%",
-                    padding: "14px",
-                    borderRadius: "8px",
-                    background: "#222",
-                    border: "1px solid #333",
-                    color: "white",
-                    fontSize: "14px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
                   }}
                 >
-                  <option value="Masculino">Masculino</option>
-                  <option value="Feminino">Feminino</option>
-                </select>
+                  <select
+                    value={newMatchForm.phase}
+                    onChange={(e) =>
+                      setNewMatchForm({
+                        ...newMatchForm,
+                        phase: e.target.value as "Fase de Classificação" | "Fase Final",
+                      })
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      borderRadius: "8px",
+                      background: "#222",
+                      border: "1px solid #333",
+                      color: "white",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <option value="Fase de Classificação">Fase de Classificação</option>
+                    <option value="Fase Final">Fase Final</option>
+                  </select>
+
+                  <select
+                    value={newMatchForm.category}
+                    onChange={(e) =>
+                      setNewMatchForm({
+                        ...newMatchForm,
+                        category: e.target.value as any,
+                      })
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      borderRadius: "8px",
+                      background: "#222",
+                      border: "1px solid #333",
+                      color: "white",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <option value="Masculino">Masculino</option>
+                    <option value="Feminino">Feminino</option>
+                  </select>
+                </div>
 
                 <div
                   style={{
