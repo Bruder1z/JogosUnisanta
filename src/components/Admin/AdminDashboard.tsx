@@ -76,9 +76,21 @@ const AdminDashboard: React.FC = () => {
         gender: ''
     });
 
+    // Filter states for athlete forms
+    const [athleteFacultyFilter, setAthleteFacultyFilter] = useState('');
+    const [featuredFacultyFilter, setFeaturedFacultyFilter] = useState('');
+
+    // Helpers derived from coursesList
+    const uniqueFaculties = [...new Set(coursesList.map(c => c.split(' - ')[1]).filter(Boolean))].sort();
+    const coursesForFaculty = (faculty: string) =>
+        coursesList
+            .filter(c => c.split(' - ')[1] === faculty)
+            .map(c => c.split(' - ')[0])
+            .sort();
+
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
-        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', date: '', time: '', location: ''
+        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', phase: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
     const [settingsForm, setSettingsForm] = useState({
@@ -115,6 +127,7 @@ const AdminDashboard: React.FC = () => {
             scoreB: 0,
             sport: newMatchForm.sport,
             category: newMatchForm.category,
+            phase: newMatchForm.phase,
             status: 'scheduled',
             date: newMatchForm.date,
             time: newMatchForm.time,
@@ -122,7 +135,7 @@ const AdminDashboard: React.FC = () => {
         };
         addMatch(newMatch);
         setIsNewMatchOpen(false);
-        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', date: '', time: '', location: '' });
+        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', phase: 'Fase de Classificação', date: '', time: '', location: '' });
         showNotification("Partida criada com sucesso!");
     };
 
@@ -1554,15 +1567,21 @@ const AdminDashboard: React.FC = () => {
                                 ))}
                             </select>
                         </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <select style={inputStyle} value={newMatchForm.phase} onChange={e => setNewMatchForm({ ...newMatchForm, phase: e.target.value as 'Fase de Classificação' | 'Fase Final' })}>
+                                <option value="Fase de Classificação">Fase de Classificação</option>
+                                <option value="Fase Final">Fase Final</option>
+                            </select>
+                            <select style={inputStyle} value={newMatchForm.category} onChange={e => setNewMatchForm({ ...newMatchForm, category: e.target.value as 'Masculino' | 'Feminino' })}>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
+                        </div>
                         <select style={inputStyle} value={newMatchForm.sport} onChange={e => setNewMatchForm({ ...newMatchForm, sport: e.target.value })}>
                             <option value="">Selecione a Modalidade</option>
                             {AVAILABLE_SPORTS.map(sport => (
                                 <option key={sport} value={sport}>{sport}</option>
                             ))}
-                        </select>
-                        <select style={inputStyle} value={newMatchForm.category} onChange={e => setNewMatchForm({ ...newMatchForm, category: e.target.value as 'Masculino' | 'Feminino' })}>
-                            <option value="Masculino">Masculino</option>
-                            <option value="Feminino">Feminino</option>
                         </select>
                         <div className="admin-form-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <input type="date" style={inputStyle} value={newMatchForm.date} onChange={e => setNewMatchForm({ ...newMatchForm, date: e.target.value })} />
@@ -1629,23 +1648,45 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {isNewAthleteOpen && (
-                <ModalOverlay onClose={() => setIsNewAthleteOpen(false)}>
+                <ModalOverlay onClose={() => { setIsNewAthleteOpen(false); setAthleteFacultyFilter(''); }}>
                     <h2 style={{ marginBottom: '16px' }}>Cadastrar Novo Atleta</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Nome Completo</label>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Nome Completo *</label>
                             <input type="text" placeholder="Ex: João da Silva" style={inputStyle} value={newAthleteForm.name} onChange={e => setNewAthleteForm({ ...newAthleteForm, name: e.target.value })} />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade (Ex: Unisanta)</label>
-                            <input type="text" placeholder="Ex: Unisanta" style={inputStyle} value={newAthleteForm.university} onChange={e => setNewAthleteForm({ ...newAthleteForm, university: e.target.value })} />
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
+                            <select
+                                style={inputStyle}
+                                value={athleteFacultyFilter}
+                                onChange={e => {
+                                    setAthleteFacultyFilter(e.target.value);
+                                    setNewAthleteForm({ ...newAthleteForm, university: e.target.value, course: '' });
+                                }}
+                            >
+                                <option value="">Selecione a Faculdade...</option>
+                                {uniqueFaculties.map(fac => (
+                                    <option key={fac} value={fac}>{fac}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso (Ex: Engenharia)</label>
-                            <input type="text" placeholder="Ex: Engenharia de Produção" style={inputStyle} value={newAthleteForm.course} onChange={e => setNewAthleteForm({ ...newAthleteForm, course: e.target.value })} />
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso *</label>
+                            <select
+                                style={inputStyle}
+                                value={newAthleteForm.course}
+                                onChange={e => setNewAthleteForm({ ...newAthleteForm, course: e.target.value })}
+                                disabled={!athleteFacultyFilter}
+                            >
+                                <option value="">{athleteFacultyFilter ? 'Selecione o Curso...' : 'Selecione a Faculdade primeiro'}</option>
+                                {coursesForFaculty(athleteFacultyFilter).map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade Principal</label>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade Principal *</label>
                             <select style={inputStyle} value={newAthleteForm.sport} onChange={e => setNewAthleteForm({ ...newAthleteForm, sport: e.target.value })}>
                                 <option value="">Selecione a Modalidade...</option>
                                 <option value="Futsal">Futsal</option>
@@ -1663,14 +1704,14 @@ const AdminDashboard: React.FC = () => {
 
                         <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                             <button onClick={handleSaveNewAthlete} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Atleta</button>
-                            <button onClick={() => setIsNewAthleteOpen(false)} style={modalButtonStyle}>Cancelar</button>
+                            <button onClick={() => { setIsNewAthleteOpen(false); setAthleteFacultyFilter(''); }} style={modalButtonStyle}>Cancelar</button>
                         </div>
                     </div>
                 </ModalOverlay>
             )}
 
             {isAddingFeatured && (
-                <ModalOverlay onClose={() => setIsAddingFeatured(false)}>
+                <ModalOverlay onClose={() => { setIsAddingFeatured(false); setFeaturedFacultyFilter(''); }}>
                     <h2 style={{ marginBottom: '16px' }}>Adicionar Melhor Atleta</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
@@ -1687,16 +1728,32 @@ const AdminDashboard: React.FC = () => {
                             </select>
                         </div>
                         <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
+                            <select
+                                style={inputStyle}
+                                value={featuredFacultyFilter}
+                                onChange={e => {
+                                    setFeaturedFacultyFilter(e.target.value);
+                                    setNewFeatured({ ...newFeatured, institution: e.target.value, course: '' });
+                                }}
+                            >
+                                <option value="">Selecione a Faculdade...</option>
+                                {uniqueFaculties.map(fac => (
+                                    <option key={fac} value={fac}>{fac}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso *</label>
                             <select
                                 style={inputStyle}
                                 value={newFeatured.course}
-                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value, sport: '', name: '' })}
-                                disabled={!newFeatured.institution}
+                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value, gender: '', sport: '', name: '' })}
+                                disabled={!featuredFacultyFilter}
                             >
-                                <option value="">Selecione o curso...</option>
-                                {Array.from(new Set(coursesList.filter(c => c.split(' - ')[1] === newFeatured.institution).map(c => c.split(' - ')[0]))).sort().map(course => (
-                                    <option key={course} value={course}>{course}</option>
+                                <option value="">{featuredFacultyFilter ? 'Selecione o Curso...' : 'Selecione a Faculdade primeiro'}</option>
+                                {coursesForFaculty(featuredFacultyFilter).map(c => (
+                                    <option key={c} value={c}>{c}</option>
                                 ))}
                             </select>
                         </div>
@@ -1771,6 +1828,7 @@ const AdminDashboard: React.FC = () => {
                                         reason: newFeatured.reason
                                     });
                                     setIsAddingFeatured(false);
+                                    setFeaturedFacultyFilter('');
                                     setNewFeatured({ athleteId: '', name: '', institution: '', course: '', sport: '', reason: '', gender: '' });
                                     showNotification('Atleta destaque salvo com sucesso!');
                                 }}
@@ -1778,7 +1836,7 @@ const AdminDashboard: React.FC = () => {
                             >
                                 Salvar Atleta
                             </button>
-                            <button onClick={() => setIsAddingFeatured(false)} style={modalButtonStyle}>Cancelar</button>
+                            <button onClick={() => { setIsAddingFeatured(false); setFeaturedFacultyFilter(''); }} style={modalButtonStyle}>Cancelar</button>
                         </div>
                     </div>
                 </ModalOverlay>

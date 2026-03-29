@@ -44,8 +44,38 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
 
         setIsJoining(true);
         try {
-            console.log("League object before join:", league);
             const userEmail = user.email.toLowerCase();
+
+            // ── Count how many leagues the user already participates in ──
+            const { data: allLeagues, error: countError } = await supabase
+                .from('leagues')
+                .select('id, participants');
+
+            if (countError) {
+                console.error('Erro ao contar ligas:', countError);
+            } else {
+                const privateLeagueCount = (allLeagues || []).filter((l: any) => {
+                    const parts: string[] = Array.isArray(l.participants)
+                        ? l.participants
+                        : typeof l.participants === 'string'
+                            ? (() => { try { return JSON.parse(l.participants); } catch { return l.participants.split(',').map((p: string) => p.trim()); } })()
+                            : [];
+                    return parts.some((p: string) => p.toLowerCase() === userEmail);
+                }).length;
+
+                // Automatic leagues: 1 global + 1 course (if user has a preferred course)
+                const automaticCount = 1 + (user.preferredCourse ? 1 : 0);
+                const totalCount = privateLeagueCount + automaticCount;
+
+                if (totalCount >= 5) {
+                    alert('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de entrar em outra.');
+                    setIsJoining(false);
+                    return;
+                }
+            }
+
+            // ── Proceed with join ──
+            console.log("League object before join:", league);
             let currentParticipants: string[] = [];
             
             if (Array.isArray(league.participants)) {

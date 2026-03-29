@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
 import Home from './pages/Home';
 import News from './pages/News';
 import Participants from './pages/Participants';
@@ -15,6 +15,26 @@ import { DataProvider } from './components/context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
 import Login from './pages/Login';
 
+type ProtectedRouteProps = {
+  children: ReactNode;
+  requiredRole: string;
+};
+
+const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+  const { user } = useAuth();
+  console.log(user);
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (user.role !== requiredRole) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+};
+
 const AppContent = () => {
   const { isLoginModalOpen, closeLoginModal } = useAuth();
   const navigate = useNavigate();
@@ -23,9 +43,9 @@ const AppContent = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const joinId = params.get('join');
-    if (joinId && location.pathname !== '/simulador') {
-      // Se tiver join e não estiver no simulador, redireciona
-      navigate(`/simulador?join=${joinId}`, { replace: true });
+    if (joinId && location.pathname !== '/bolao') {
+      // Se tiver join e não estiver no bolao, redireciona
+      navigate(`/bolao?join=${joinId}`, { replace: true });
     }
   }, [location, navigate]);
 
@@ -39,8 +59,12 @@ const AppContent = () => {
         <Route path="/estatisticas" element={<Estatisticas />} />
         <Route path="/historia" element={<History />} />
         <Route path="/transmissao" element={<Transmissao />} />
-        <Route path="/simulador" element={<Simulator />} />
-        <Route path="/controle-partida" element={<MatchControl />} />
+        <Route path="/bolao" element={<Simulator />} />
+        <Route path='/controle-partida' element={
+          <ProtectedRoute requiredRole="superadmin">
+            <MatchControl />
+          </ProtectedRoute>
+        } />
         <Route path="/calendario" element={<Calendario />} />
       </Routes>
       {isLoginModalOpen && <Login onClose={closeLoginModal} />}

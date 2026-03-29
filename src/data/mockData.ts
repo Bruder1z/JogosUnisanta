@@ -48,7 +48,18 @@ export interface MatchEvent {
     | "shootout_scored"
     | "shootout_missed"
     | "tie_break_start"
-    | "swimming_result";
+    | "swimming_result"
+    | "senshu"
+    | "chui"
+    | "hansoku"
+    | "waza_ari"
+    | "ippon"
+    | "shido"
+    | "hansoku_make"
+    | "osaekomi"
+    | "toketa"
+    | "draw"
+    | "chess_result";
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)
@@ -212,15 +223,19 @@ export const AVAILABLE_SPORTS = [
   "Basquete 3x3",
   "Basquetebol",
   "Beach Tennis",
-  "Futsal",
+  "Caratê",
   "Futebol Society",
   "Futebol X1",
   "Futevôlei",
+  "Futsal",
   "Handebol",
+  "Judô",
   "Natação",
+  "Tamboréu",
   "Tênis de Mesa",
   "Vôlei",
   "Vôlei de Praia",
+  "Xadrez",
 ];
 
 export const SPORT_ICONS: Record<string, string> = {
@@ -229,7 +244,7 @@ export const SPORT_ICONS: Record<string, string> = {
   Handebol: "🤾",
   Vôlei: "🏐",
   Natação: "🏊",
-  Karatê: "🥋",
+  Caratê: "🥋",
   Judô: "🥋",
   Tamboréu: "🎾",
   Xadrez: "♟️",

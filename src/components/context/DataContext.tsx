@@ -51,8 +51,8 @@ interface DataContextType {
   ranking: RankingEntry[];
   updateRankingPoints: (course: string, newPoints: number) => void;
   featuredAthletes: FeaturedAthlete[];
-  addFeaturedAthlete: (athlete: FeaturedAthlete) => void;
-  removeFeaturedAthlete: (id: string) => void;
+  addFeaturedAthlete: (athlete: FeaturedAthlete) => Promise<void>;
+  removeFeaturedAthlete: (id: string) => Promise<void>;
   resetRankingPoints: () => Promise<void>;
   restoreOfficialRanking: () => Promise<void>;
 }
@@ -75,9 +75,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     });
     return sorted.map((e, idx) => ({ ...e, rank: idx + 1 }));
   });
-  const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>(
-    [],
-  );
+  const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   const pendingMatchIdsRef = useRef<Set<string>>(new Set());
@@ -174,10 +172,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         }
 
+        // Fetch Ranking
+        const { data: rankingData, error: rankingError } = await supabase
+          .from("ranking")
+          .select("*")
+          .order("points", { ascending: false })
+          .order("course", { ascending: true });
+        if (rankingData && !rankingError) {
+          const ranked = rankingData.map((e: any, idx: number) => ({ ...e, rank: idx + 1 }));
+          setRanking(ranked);
+        }
+
         // Fetch Featured Athletes
         const { data: featuredData, error: featuredError } = await supabase
           .from("featured_athletes")
-          .select("*");
+          .select("*")
+          .order("created_at", { ascending: false });
         if (featuredData && !featuredError) {
           setFeaturedAthletes(
             featuredData.map((a: any) => ({
@@ -190,19 +200,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             }))
           );
         }
-
-        // Fetch Ranking
-        const { data: rankingData, error: rankingError } = await supabase
-          .from("ranking")
-          .select("*")
-          .order("points", { ascending: false })
-          .order("course", { ascending: true });
-        if (rankingData && !rankingError) {
-          const ranked = rankingData.map((e: any, idx: number) => ({ ...e, rank: idx + 1 }));
-          setRanking(ranked);
-        }
       } catch (error) {
-        console.error("Error fetching matches:", error);
+        console.error("Error fetching data:", error);
       }
     };
 

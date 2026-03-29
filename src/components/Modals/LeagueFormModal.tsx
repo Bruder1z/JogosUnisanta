@@ -30,40 +30,66 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto, onCreate
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (name.trim()) {
-            setIsLoading(true);
-            try {
-                const creator = user?.email || 'anonymous';
+        if (!name.trim()) return;
 
-                const { data, error } = await supabase
-                    .from('leagues')
-                    .insert([
-                        {
-                            name: name.trim(),
-                            description: description.trim(),
-                            owner_email: creator,
-                            participants: [creator]
-                        }
-                    ])
-                    .select('id')
-                    .single();
+        setIsLoading(true);
+        try {
+            const creator = user?.email?.toLowerCase() || 'anonymous';
 
-                if (error) {
-                    console.error("Erro ao criar liga:", error);
-                    alert("Erro ao salvar liga no banco de dados. Verifique a tabela 'leagues'.");
+            // ── Check league limit (max 5 including automatic leagues) ──
+            const { data: allLeagues, error: countError } = await supabase
+                .from('leagues')
+                .select('id, participants');
+
+            if (!countError && allLeagues) {
+                const privateLeagueCount = allLeagues.filter((l: any) => {
+                    const parts: string[] = Array.isArray(l.participants)
+                        ? l.participants
+                        : typeof l.participants === 'string'
+                            ? (() => { try { return JSON.parse(l.participants); } catch { return l.participants.split(',').map((p: string) => p.trim()); } })()
+                            : [];
+                    return parts.some((p: string) => p.toLowerCase() === creator);
+                }).length;
+
+                const automaticCount = 1 + (user?.preferredCourse ? 1 : 0);
+                const totalCount = privateLeagueCount + automaticCount;
+
+                if (totalCount >= 5) {
+                    alert('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de criar uma nova.');
+                    setIsLoading(false);
                     return;
                 }
-                
-                if (data) {
-                    setCreatedLeagueId(data.id);
-                }
-                
-                if (onCreated) onCreated();
-            } catch (err) {
-                console.error("Exception ao criar liga:", err);
-            } finally {
-                setIsLoading(false);
             }
+
+            // ── Create the league ──
+            const { data, error } = await supabase
+                .from('leagues')
+                .insert([
+                    {
+                        name: name.trim(),
+                        description: description.trim(),
+                        owner_email: creator,
+                        participants: [creator]
+                    }
+                ])
+                .select('id')
+                .single();
+
+            if (error) {
+                console.error("Erro ao criar liga:", error);
+                alert("Erro ao salvar liga no banco de dados. Verifique a tabela 'leagues'.");
+                return;
+            }
+            
+            if (data) {
+                setCreatedLeagueId(data.id);
+            }
+            
+            if (onCreated) onCreated();
+        } catch (err) {
+            console.error("Exception ao criar liga:", err);
+        } finally {
+            setIsLoading(false);
         }
     };
 

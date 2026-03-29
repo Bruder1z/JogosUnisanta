@@ -18,14 +18,16 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
     const isAdmin = league.owner_email === currentUser?.email || currentUser?.role === 'superadmin';
     const isSpecialLeague = league.type === 'global' || league.type === 'course';
+    const canManage = currentUser?.role === 'superadmin' || league.owner_email === currentUser?.email;
     const [leagueRequests, setLeagueRequests] = useState<any[]>([]);
-    
+
     // States for editing
     const [isEditing, setIsEditing] = useState(false);
     const [editedName, setEditedName] = useState(league.name);
     const [editedDescription, setEditedDescription] = useState(league.description);
     const [isSaving, setIsSaving] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [focusedField, setFocusedField] = useState<'name' | 'desc' | null>(null);
 
     useEffect(() => {
         const fetchLeagueRanking = async (isInitial = false) => {
@@ -33,7 +35,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             try {
                 // 1. Fetch users for this league
                 let usersQuery = supabase.from('users').select('email, name, surname, preferredcourse, role');
-                
+
                 if (league?.type === 'global') {
                     usersQuery = usersQuery; // Fetch everyone
                 } else if (league?.type === 'course') {
@@ -104,7 +106,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             .select('*')
             .eq('league_id', league.id)
             .eq('status', 'pending');
-        
+
         if (error) console.error("Erro ao buscar solicitações:", error);
         else if (data) setLeagueRequests(data);
     };
@@ -176,7 +178,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 .from('league_requests')
                 .delete()
                 .eq('league_id', league.id);
-            
+
             if (reqError) {
                 console.error("Erro ao excluir solicitações:", reqError);
                 throw new Error(`Erro ao excluir solicitações: ${reqError.message}`);
@@ -196,7 +198,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             if (count === 0) {
                 throw new Error("A liga não foi excluída no banco de dados. Isso geralmente acontece quando as políticas de segurança (RLS) do Supabase não permitem a exclusão. Verifique se a tabela 'leagues' tem uma política (Policy) de DELETE configurada para o usuário autenticado.");
             }
-            
+
             setShowDeleteConfirm(false);
             alert("Liga excluída com sucesso!");
             onClose();
@@ -219,14 +221,14 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 .from('leagues')
                 .update({ participants: updatedParticipants })
                 .eq('id', league.id);
-            
+
             if (uError) throw uError;
 
             const { error: rError } = await supabase
                 .from('league_requests')
                 .update({ status: 'approved' })
                 .eq('id', request.id);
-            
+
             if (rError) throw rError;
 
             league.participants = updatedParticipants;
@@ -248,7 +250,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                     .eq('id', league.id);
 
                 if (error) throw error;
-                
+
                 alert('Você saiu da liga.');
                 onClose(); // Close modal and let Simulator refresh
             } catch (err) {
@@ -263,7 +265,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             .from('league_requests')
             .update({ status: 'rejected' })
             .eq('id', requestId);
-        
+
         if (error) {
             console.error("Erro ao recusar:", error);
             alert("Erro ao recusar solicitação.");
@@ -297,49 +299,61 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                         </div>
                         <div style={{ flex: 1 }}>
                             {isEditing ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <input 
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                                    <input
                                         value={editedName}
                                         onChange={(e) => setEditedName(e.target.value)}
+                                        onFocus={() => setFocusedField('name')}
+                                        onBlur={() => setFocusedField(null)}
+                                        placeholder="Nome da Liga"
                                         style={{
-                                            background: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '4px 8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            borderBottom: focusedField === 'name' ? '2px solid #dc2626' : '2px solid rgba(255,255,255,0.2)',
+                                            padding: '4px',
                                             color: 'white',
-                                            fontSize: '18px',
+                                            fontSize: '20px',
                                             fontWeight: 900,
+                                            textTransform: 'uppercase',
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
                                             width: '100%'
                                         }}
                                     />
-                                    <textarea 
+                                    <input
                                         value={editedDescription}
                                         onChange={(e) => setEditedDescription(e.target.value)}
+                                        onFocus={() => setFocusedField('desc')}
+                                        onBlur={() => setFocusedField(null)}
+                                        placeholder="Descrição da Liga"
                                         style={{
-                                            background: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            padding: '4px 8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            borderBottom: focusedField === 'desc' ? '2px solid #dc2626' : '2px solid rgba(255,255,255,0.2)',
+                                            padding: '4px',
                                             color: 'var(--text-secondary)',
                                             fontSize: '13px',
-                                            width: '100%',
-                                            resize: 'vertical'
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
+                                            width: '100%'
                                         }}
-                                        rows={2}
                                     />
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                        <button 
+                                        <button
                                             onClick={handleUpdateLeague}
                                             disabled={isSaving}
                                             style={{
                                                 background: '#dc2626', color: 'white', border: 'none',
                                                 padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
-                                                cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1
+                                                cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1,
+                                                transition: 'background 0.2s'
                                             }}
+                                            onMouseEnter={(e) => { if (!isSaving) e.currentTarget.style.background = '#b91c1c' }}
+                                            onMouseLeave={(e) => { if (!isSaving) e.currentTarget.style.background = '#dc2626' }}
                                         >
                                             {isSaving ? 'SALVANDO...' : 'SALVAR'}
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setIsEditing(false);
                                                 setEditedName(league.name);
@@ -349,8 +363,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                             style={{
                                                 background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
                                                 padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
-                                                cursor: 'pointer'
+                                                cursor: 'pointer', transition: 'background 0.2s'
                                             }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                                         >
                                             CANCELAR
                                         </button>
@@ -359,9 +375,9 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             ) : (
                                 <>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase' }}>{league.name}</h2>
+                                        <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0, textTransform: 'uppercase', color: 'white' }}>{league.name}</h2>
                                         {isAdmin && (
-                                            <button 
+                                            <button
                                                 onClick={() => setIsEditing(true)}
                                                 style={{
                                                     background: 'rgba(255,255,255,0.05)',
@@ -371,8 +387,11 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                                     color: 'var(--text-secondary)',
                                                     fontSize: '10px',
                                                     fontWeight: 700,
-                                                    cursor: 'pointer'
+                                                    cursor: 'pointer',
+                                                    transition: 'background 0.2s'
                                                 }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                                             >
                                                 EDITAR
                                             </button>
@@ -385,7 +404,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                     </div>
                     <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {!isSpecialLeague && !isAdmin && (league.participants || []).some((p: string) => p.toLowerCase() === currentUser?.email?.toLowerCase()) && (
-                            <button 
+                            <button
                                 onClick={handleLeaveLeague}
                                 style={{
                                     background: 'rgba(239, 68, 68, 0.1)',
@@ -418,9 +437,9 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 </div>
 
                 {/* Tabs */}
-                {isAdmin && (
+                {canManage ? (
                     <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
-                        <button 
+                        <button
                             onClick={() => setActiveTab('ranking')}
                             style={{
                                 flex: 1, padding: '14px', background: 'none', border: 'none',
@@ -429,7 +448,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                 cursor: 'pointer'
                             }}
                         >CLASSIFICAÇÃO</button>
-                        <button 
+                        <button
                             onClick={() => setActiveTab('manage')}
                             style={{
                                 flex: 1, padding: '14px', background: 'none', border: 'none',
@@ -440,6 +459,18 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                         >
                             <Settings size={16} /> GERENCIAR
                         </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
+                        <button
+                            onClick={() => setActiveTab('ranking')}
+                            style={{
+                                flex: 1, padding: '14px', background: 'none', border: 'none',
+                                color: 'white',
+                                fontWeight: 700, borderBottom: '2px solid #dc2626',
+                                cursor: 'pointer'
+                            }}
+                        >CLASSIFICAÇÃO</button>
                     </div>
                 )}
 
@@ -460,11 +491,23 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                     </thead>
                                     <tbody>
                                         {ranking.map((row, index) => (
-                                            <tr key={row.email} style={{ 
+                                            <tr key={row.email} style={{
                                                 borderBottom: '1px solid rgba(255,255,255,0.05)',
                                                 background: row.email === currentUser?.email ? 'rgba(220, 38, 38, 0.05)' : 'transparent'
                                             }}>
-                                                <td style={{ padding: '15px 20px', fontWeight: 800 }}>{index + 1}º</td>
+                                                <td style={{
+                                                    padding: '15px 20px', fontWeight: 800,
+                                                    color: index === 0 ? '#fbbf24' : index === 1 ? '#e5e7eb' : index === 2 ? '#cd7f32' : 'var(--text-secondary)',
+                                                    background:
+                                                        index === 0
+                                                            ? 'rgba(255,215,0,0.1)'
+                                                            : index === 1
+                                                                ? 'rgba(192,192,192,0.1)'
+                                                                : index === 2
+                                                                    ? 'rgba(205,127,50,0.1)'
+                                                                    : 'transparent',
+                                                    textAlign: 'center'
+                                                }}>{index + 1}º</td>
                                                 <td style={{ padding: '15px 20px' }}>
                                                     <div style={{ fontWeight: 700, fontSize: '14px' }}>{row.name}</div>
                                                     <div style={{ fontSize: '11px', color: '#dc2626' }}>{row.course}</div>
@@ -484,17 +527,17 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                 <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Plus size={16} color="#dc2626" /> Link de Convite
                                 </h3>
-                                <div style={{ 
+                                <div style={{
                                     background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px',
                                     border: '1px solid var(--border-color)', display: 'flex',
                                     alignItems: 'center', gap: '12px'
                                 }}>
-                                    <input 
-                                        readOnly 
+                                    <input
+                                        readOnly
                                         value={`${window.location.origin}/?join=${league.id}`}
                                         style={{ flex: 1, background: 'none', border: 'none', color: 'white', fontSize: '12px' }}
                                     />
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             navigator.clipboard.writeText(`${window.location.origin}/?join=${league.id}`);
                                             alert('Link copiado!');
@@ -529,7 +572,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{request.user_email}</div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleApproveRequest(request)}
                                                         style={{
                                                             background: '#dc2626', color: 'white', border: 'none',
@@ -537,7 +580,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                                             cursor: 'pointer'
                                                         }}
                                                     >ACEITAR</button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleRejectRequest(request.id)}
                                                         style={{
                                                             background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
@@ -555,7 +598,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             {/* Participants List */}
                             <section>
                                 <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Users size={16} color="#dc2626" /> Participantes ({league.participants?.length || 0})
+                                    <Users size={16} color="#dc2626" /> Participantes ({league.participants?.length || '-'})
                                 </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {league.participants?.map((email: string) => (
@@ -578,10 +621,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
                             <section style={{ borderTop: '1px solid rgba(255,0,0,0.1)', paddingTop: '24px' }}>
                                 {showDeleteConfirm ? (
-                                    <div style={{ 
-                                        background: 'rgba(239, 68, 68, 0.1)', 
-                                        padding: '20px', 
-                                        borderRadius: '12px', 
+                                    <div style={{
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        padding: '20px',
+                                        borderRadius: '12px',
                                         border: '1px solid rgba(239, 68, 68, 0.3)',
                                         textAlign: 'center'
                                     }}>
@@ -589,24 +632,24 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                             TEM CERTEZA? ESTA AÇÃO NÃO PODE SER DESFEITA.
                                         </p>
                                         <div style={{ display: 'flex', gap: '10px' }}>
-                                            <button 
+                                            <button
                                                 onClick={handleDeleteLeague}
                                                 disabled={isSaving}
                                                 style={{
-                                                    flex: 1, padding: '12px', borderRadius: '8px', 
-                                                    background: '#dc2626', color: 'white', border: 'none', 
+                                                    flex: 1, padding: '12px', borderRadius: '8px',
+                                                    background: '#dc2626', color: 'white', border: 'none',
                                                     fontWeight: 800, cursor: 'pointer', fontSize: '12px',
                                                     opacity: isSaving ? 0.7 : 1
                                                 }}
                                             >
                                                 {isSaving ? 'EXCLUINDO...' : 'SIM, EXCLUIR'}
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setShowDeleteConfirm(false)}
                                                 disabled={isSaving}
                                                 style={{
-                                                    flex: 1, padding: '12px', borderRadius: '8px', 
-                                                    background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', 
+                                                    flex: 1, padding: '12px', borderRadius: '8px',
+                                                    background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
                                                     fontWeight: 800, cursor: 'pointer', fontSize: '12px'
                                                 }}
                                             >
@@ -615,7 +658,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                         </div>
                                     </div>
                                 ) : (
-                                    <button 
+                                    <button
                                         onClick={() => setShowDeleteConfirm(true)}
                                         style={{
                                             width: '100%', padding: '14px', borderRadius: '8px', border: '1px solid #ef4444',

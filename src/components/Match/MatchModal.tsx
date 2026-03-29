@@ -149,6 +149,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     currentMatch.sport === "Basquetebol" ||
     currentMatch.sport === "Basquete 3x3";
   const isSwimming = currentMatch.sport === "Natação";
+  const isKarate = currentMatch.sport === "Caratê";
+  const isJudo = currentMatch.sport === "Judô";
+  const isXadrez = currentMatch.sport === "Xadrez";
   const hideTimelineMinute = [
     "Vôlei",
     "Vôlei de Praia",
@@ -156,6 +159,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     "Futevôlei",
     "Beach Tennis",
     "Natação",
+    "Caratê",
+    "Judô",
+    "Xadrez",
   ].includes(currentMatch.sport);
   const isResultBreakdownSport = isSetSport || isBeachTennis;
 
@@ -390,6 +396,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "goal":
         if (isBasketball) return <div style={{ fontSize: "16px" }}>🏀</div>;
         if (isBeachTennis) return <div style={{ fontSize: "16px" }}>🎾</div>;
+        if (isKarate || isJudo) return <div style={{ fontSize: "16px" }}>🥋</div>;
         if (isSoccerSport) return <div style={{ fontSize: "16px" }}>⚽</div>;
         if (isVolleyball) return <div style={{ fontSize: "16px" }}>🏐</div>;
         return <div style={{ fontSize: "16px" }}>⚽</div>;
@@ -433,6 +440,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return <Pause size={16} color="#f59e0b" />;
       case "end":
         return <CheckCircle size={16} color="#44ff44" />;
+      case "draw":
+        return <div style={{ fontSize: "16px" }}>½</div>;
+      case "chess_result":
+        return <Trophy size={16} color="#ffd700" />;
       default:
         return null;
     }
@@ -441,6 +452,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const getEventLabel = (type: MatchEvent["type"]) => {
     switch (type) {
       case "goal":
+        if (isKarate || isJudo) return "PONTO!";
         return isVolleyballFamilySport ? "PONTO!" : "GOL!";
       case "set_win":
         return "Fim do Set";
@@ -462,6 +474,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return "Intervalo";
       case "end":
         return "Fim da Partida";
+      case "draw":
+        return "Empate (Tabuada)";
+      case "chess_result":
+        return "Resultado";
       case "swimming_result":
         return "Resultado da Prova";
       default:
@@ -508,7 +524,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           : "Jogo";
 
     if (event.type === "goal") {
-      if (isBeachTennis || isVolleyballFamilySport) {
+      if (isBeachTennis || isVolleyballFamilySport || isKarate || isJudo) {
         return `Ponto para ${teamName}`;
       }
       if (event.player) {
@@ -540,6 +556,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       return event.player
         ? `Cartão Vermelho - ${event.player}`
         : "Cartão Vermelho";
+    }
+
+    if (event.type === "draw") {
+      return "Empate (Tabuada)";
+    }
+
+    if (event.type === "chess_result") {
+      return event.description || "Vitória";
     }
 
     return stripLeadingEmoji(getSafeEventDescription(event));
@@ -669,13 +693,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       if (
         event.type === "goal" ||
         event.type === "penalty_scored" ||
-        event.type === "shootout_scored"
+        event.type === "shootout_scored" ||
+        event.type === "draw" ||
+        event.type === "chess_result"
       ) {
-        const increment =
-          currentMatch.sport === "Basquetebol" ||
-          currentMatch.sport === "Basquete 3x3"
-            ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
-            : 1;
+        const increment = (isBasketball || isKarate || isJudo || isXadrez)
+          ? parseFloat(event.description?.match(/\+([\d.]+)/)?.[1] || "1")
+          : 1;
 
         if (event.teamId === currentMatch.teamA.id) regularScoreA += increment;
         if (event.teamId === currentMatch.teamB.id) regularScoreB += increment;
@@ -683,7 +707,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
       const mappedEvent: TimelineEvent = {
         ...event,
-        timelineScore: `${regularScoreA}x${regularScoreB}`,
+        timelineScore: isXadrez 
+          ? `${regularScoreA.toFixed(1)}x${regularScoreB.toFixed(1)}`
+          : `${regularScoreA}x${regularScoreB}`,
         timelineQuarter,
       };
 
