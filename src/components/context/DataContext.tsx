@@ -174,6 +174,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         }
 
+        // Fetch Featured Athletes
+        const { data: featuredData, error: featuredError } = await supabase
+          .from("featured_athletes")
+          .select("*");
+        if (featuredData && !featuredError) {
+          setFeaturedAthletes(
+            featuredData.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              institution: a.institution,
+              course: a.course,
+              sport: a.sport,
+              reason: a.reason,
+            }))
+          );
+        }
+
         // Fetch Ranking
         const { data: rankingData, error: rankingError } = await supabase
           .from("ranking")
@@ -230,6 +247,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeAthlete = async (id: string) => {
     setAthletes((prev) => prev.filter((a) => a.id !== id));
     await supabase.from("athletes").delete().match({ id });
+  };
+
+  const addFeaturedAthlete = async (athlete: FeaturedAthlete) => {
+    setFeaturedAthletes((prev) => [athlete, ...prev]);
+    await supabase.from("featured_athletes").insert([
+      {
+        id: athlete.id,
+        name: athlete.name,
+        institution: athlete.institution,
+        course: athlete.course,
+        sport: athlete.sport,
+        reason: athlete.reason,
+      },
+    ]);
+  };
+
+  const removeFeaturedAthlete = async (id: string) => {
+    setFeaturedAthletes((prev) => prev.filter((a) => a.id !== id));
+    await supabase.from("featured_athletes").delete().match({ id });
   };
 
   const addCustomEmblem = (course: string, base64: string) => {
@@ -404,10 +440,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         resetRankingPoints,
         restoreOfficialRanking,
         featuredAthletes,
-        addFeaturedAthlete: (athlete: FeaturedAthlete) =>
-          setFeaturedAthletes((prev) => [athlete, ...prev]),
-        removeFeaturedAthlete: (id: string) =>
-          setFeaturedAthletes((prev) => prev.filter((a) => a.id !== id)),
+        addFeaturedAthlete,
+        removeFeaturedAthlete,
       }}
     >
       {children}

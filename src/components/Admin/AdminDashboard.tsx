@@ -13,7 +13,9 @@ import {
     Edit3,
     Check,
     Award,
-    Plus
+    Plus,
+    Upload,
+    Info
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -31,6 +33,7 @@ const AdminDashboard: React.FC = () => {
     const [isNewCourseOpen, setIsNewCourseOpen] = useState(false);
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
+    const [importStatus, setImportStatus] = useState<{current: number, total: number, message: string, errors: string[]} | null>(null);
     // DataContext
     const { 
         courses: coursesList, 
@@ -69,7 +72,8 @@ const AdminDashboard: React.FC = () => {
         institution: '',
         course: '',
         sport: '',
-        reason: ''
+        reason: '',
+        gender: ''
     });
 
     // Form States
@@ -154,6 +158,103 @@ const AdminDashboard: React.FC = () => {
             deleteMatch(matchId);
             showNotification("Partida excluída com sucesso!");
         }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setImportStatus({ current: 0, total: 0, message: 'Lendo arquivo...', errors: [] });
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target?.result as string;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            const delimiter = text.indexOf(';') !== -1 ? ';' : ',';
+            
+            const validCoursesLower = coursesList.map(c => {
+                const [name, inst] = c.split(' - ');
+                return { name: name.trim().toLowerCase(), inst: inst.trim().toLowerCase() };
+            });
+            const validSportsLower = AVAILABLE_SPORTS.map(s => s.toLowerCase());
+            
+            let successCount = 0;
+            let errors: string[] = [];
+            const validLinesCount = lines.length - 1; // Header ignorado
+            setImportStatus({ current: 0, total: validLinesCount, message: 'Validando dados...', errors: [] });
+            
+            const addedAthletes = new Set<string>();
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
+                if (cols.length >= 6) {
+                    const [firstName, lastName, institution, course, gender, sportsStr] = cols;
+                    
+                    // Validação de Curso e Instituição
+                    const isCourseValid = validCoursesLower.some(vc => vc.name === course.trim().toLowerCase() && vc.inst === institution.trim().toLowerCase());
+                    if (!isCourseValid) {
+                        errors.push(`Linha ${i+1} (${firstName}): Curso/Inst. ou de digitação ("${course}").`);
+                        setImportStatus(prev => prev ? { ...prev, current: prev.current + 1, errors } : null);
+                        continue;
+                    }
+                    
+                    // Validação de Esportes
+                    const sports = sportsStr.split(/[,\/|-]/).map(s => s.trim()).filter(Boolean);
+                    const invalidSports = sports.filter(s => !validSportsLower.includes(s.toLowerCase()));
+                    
+                    if (invalidSports.length > 0) {
+                        errors.push(`Linha ${i+1} (${firstName}): Esporte inválido (${invalidSports.join(', ')}).`);
+                        setImportStatus(prev => prev ? { ...prev, current: prev.current + 1, errors } : null);
+                        continue;
+                    }
+                    
+                    // Validação de Duplicata (Banco atual + planilha atual)
+                    const uniqueKey = `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${course.trim().toLowerCase()}`;
+                    const isDuplicate = athletesList.some(a => 
+                        a.firstName.trim().toLowerCase() === firstName.trim().toLowerCase() && 
+                        a.lastName.trim().toLowerCase() === lastName.trim().toLowerCase() &&
+                        a.course.trim().toLowerCase() === course.trim().toLowerCase()
+                    );
+
+                    if (isDuplicate || addedAthletes.has(uniqueKey)) {
+                        errors.push(`Linha ${i+1} (${firstName}): Atleta já cadastrado(a) neste curso.`);
+                        setImportStatus(prev => prev ? { ...prev, current: prev.current + 1, errors } : null);
+                        continue;
+                    }
+                    addedAthletes.add(uniqueKey);
+                    
+                    const newAthlete = {
+                        id: crypto.randomUUID(),
+                        firstName,
+                        lastName,
+                        institution,
+                        course,
+                        sex: (gender.trim().toLowerCase() === 'feminino' ? 'Feminino' : 'Masculino') as ('Masculino' | 'Feminino'),
+                        sports
+                    };
+                    
+                    setImportStatus(prev => prev ? { ...prev, message: `Adicionando: ${firstName} ${lastName}...` } : null);
+                    await addAthlete(newAthlete);
+                    successCount++;
+                    setImportStatus(prev => prev ? { ...prev, current: prev.current + 1, errors } : null);
+                } else {
+                    errors.push(`Linha ${i+1}: Formato inválido.`);
+                    setImportStatus(prev => prev ? { ...prev, current: prev.current + 1, errors } : null);
+                }
+            }
+            
+            if (successCount > 0) {
+                setImportStatus(prev => prev ? { ...prev, message: 'Concluído!' } : null);
+                showNotification(`${successCount} atletas importados com sucesso!`);
+            } else {
+                setImportStatus(prev => prev ? { ...prev, message: 'Importação finalizada sem sucesso.' } : null);
+            }
+            
+            if (errors.length === 0 && successCount > 0) {
+                 setTimeout(() => setImportStatus(null), 2500);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
     };
 
     const filteredMatches = matches.filter(match => {
@@ -771,29 +872,54 @@ const AdminDashboard: React.FC = () => {
                                     <Users size={24} color="var(--accent-color)" />
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Atletas</h2>
                                 </div>
-                                <button
-                                    className="admin-primary-action"
-                                    onClick={() => setIsNewAthleteOpen(true)}
-                                    style={{
-                                        background: 'var(--accent-color)',
-                                        color: 'white',
-                                        padding: '8px 16px',
-                                        borderRadius: '6px',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        border: 'none',
-                                        transition: 'background 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.background = '#c10510'}
-                                    onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
-                                >
-                                    <PlusCircle size={16} />
-                                    Cadastrar Novo Atleta
-                                </button>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative' }}>
+                                        <button
+                                            title="Como importar planilha?"
+                                            onClick={() => window.alert('Salvar planilha Excel como .CSV!\nOrdem das Colunas:\n1. Primeiro Nome\n2. Sobrenome\n3. Instituição (Ex: Unisanta)\n4. Curso (Ex: Direito)\n5. Gênero (Masculino ou Feminino)\n6. Modalidades (separadas por "/")')}
+                                            style={{
+                                                background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
+                                                borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                            }}
+                                        >
+                                            <Info size={16} />
+                                        </button>
+                                    </div>
+                                    <label style={{
+                                        background: 'transparent', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
+                                        fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-color)',
+                                        transition: 'all 0.2s'
+                                    }} 
+                                    onMouseOver={e => { e.currentTarget.style.color = 'var(--accent-color)'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }} 
+                                    onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                                    >
+                                        <Upload size={16} /> Importar CSV
+                                        <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+                                    </label>
+                                    <button
+                                        className="admin-primary-action"
+                                        onClick={() => setIsNewAthleteOpen(true)}
+                                        style={{
+                                            background: 'var(--accent-color)',
+                                            color: 'white',
+                                            padding: '8px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            border: 'none',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = '#c10510'}
+                                        onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
+                                    >
+                                        <PlusCircle size={16} />
+                                        Cadastrar Novo Atleta
+                                    </button>
+                                </div>
                             </div>
 
                             <div style={{ padding: '20px' }}>
@@ -1308,6 +1434,43 @@ const AdminDashboard: React.FC = () => {
                 </div>
             )}
 
+            {importStatus && (
+                <ModalOverlay onClose={() => { if (importStatus.message === 'Concluído!' || importStatus.message.includes('sem sucesso')) setImportStatus(null); }}>
+                    <h2 style={{ marginBottom: '16px' }}>Importando Atletas</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '10px' }}>{importStatus.message}</p>
+                    
+                    {importStatus.total > 0 && (
+                        <div style={{ background: '#222', borderRadius: '8px', height: '10px', overflow: 'hidden', marginBottom: '16px' }}>
+                            <div style={{ 
+                                width: `${(importStatus.current / importStatus.total) * 100}%`, 
+                                background: 'var(--accent-color)', 
+                                height: '100%', 
+                                transition: 'width 0.3s ease' 
+                            }}></div>
+                        </div>
+                    )}
+                    
+                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '20px' }}>
+                        Processados: {importStatus.current} de {importStatus.total}
+                    </div>
+
+                    {importStatus.errors.length > 0 && (
+                        <div style={{ maxHeight: '200px', overflowY: 'auto', background: 'rgba(255,68,68,0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,68,68,0.2)' }}>
+                            <p style={{ color: '#ff4444', fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>Inconsistências Encontradas:</p>
+                            <ul style={{ margin: 0, paddingLeft: '20px', color: '#ff4444', fontSize: '12px' }}>
+                                {importStatus.errors.map((err, idx) => (
+                                    <li key={idx} style={{ marginBottom: '4px' }}>{err}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    
+                    {(importStatus.message === 'Concluído!' || importStatus.message.includes('sem sucesso')) && (
+                        <button onClick={() => setImportStatus(null)} style={{ ...modalButtonStyle, marginTop: '20px', width: '100%' }}>Fechar</button>
+                    )}
+                </ModalOverlay>
+            )}
+
             {/* Modals */}
             {selectedStat && (
                 <ModalOverlay onClose={() => setSelectedStat(null)}>
@@ -1511,53 +1674,74 @@ const AdminDashboard: React.FC = () => {
                     <h2 style={{ marginBottom: '16px' }}>Adicionar Melhor Atleta</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Nome do Atleta *</label>
-                            <input
-                                type="text"
-                                placeholder="Ex: Gabriel Silva"
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Instuição / Faculdade *</label>
+                            <select
                                 style={inputStyle}
-                                value={newFeatured.name}
-                                onChange={e => setNewFeatured({ ...newFeatured, name: e.target.value })}
-                            />
+                                value={newFeatured.institution}
+                                onChange={e => setNewFeatured({ ...newFeatured, institution: e.target.value, course: '', sport: '', name: '' })}
+                            >
+                                <option value="">Selecione a instituição...</option>
+                                {Array.from(new Set(coursesList.map(c => c.split(' - ')[1]))).filter(Boolean).sort().map(inst => (
+                                    <option key={inst} value={inst}>{inst}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Curso *</label>
-                            <input
-                                type="text"
-                                placeholder="Ex: Educação Física"
+                            <select
                                 style={inputStyle}
                                 value={newFeatured.course}
-                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value })}
-                            />
+                                onChange={e => setNewFeatured({ ...newFeatured, course: e.target.value, sport: '', name: '' })}
+                                disabled={!newFeatured.institution}
+                            >
+                                <option value="">Selecione o curso...</option>
+                                {Array.from(new Set(coursesList.filter(c => c.split(' - ')[1] === newFeatured.institution).map(c => c.split(' - ')[0]))).sort().map(course => (
+                                    <option key={course} value={course}>{course}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
-                            <input
-                                type="text"
-                                placeholder="Ex: Unisanta"
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Gênero *</label>
+                            <select
                                 style={inputStyle}
-                                value={newFeatured.institution}
-                                onChange={e => setNewFeatured({ ...newFeatured, institution: e.target.value })}
-                            />
+                                value={newFeatured.gender}
+                                onChange={e => setNewFeatured({ ...newFeatured, gender: e.target.value, sport: '', name: '' })}
+                                disabled={!newFeatured.course}
+                            >
+                                <option value="">Selecione o gênero...</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Modalidade *</label>
                             <select
                                 style={inputStyle}
                                 value={newFeatured.sport}
-                                onChange={e => setNewFeatured({ ...newFeatured, sport: e.target.value })}
+                                onChange={e => setNewFeatured({ ...newFeatured, sport: e.target.value, name: '' })}
+                                disabled={!newFeatured.gender}
                             >
                                 <option value="">Selecione a modalidade...</option>
-                                <option value="Futsal">Futsal</option>
-                                <option value="Futebol Society">Futebol Society</option>
-                                <option value="Handebol">Handebol</option>
-                                <option value="Vôlei">Vôlei</option>
-                                <option value="Natação">Natação</option>
-                                <option value="Tênis de Mesa">Tênis de Mesa</option>
-                                <option value="Futevôlei">Futevôlei</option>
-                                <option value="Beach Tennis">Beach Tennis</option>
-                                <option value="Vôlei de Praia">Vôlei de Praia</option>
-                                <option value="Basquete 3x3">Basquete 3x3</option>
+                                {AVAILABLE_SPORTS.map(sport => (
+                                    <option key={sport} value={sport}>{sport}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Atleta *</label>
+                            <select
+                                style={inputStyle}
+                                value={newFeatured.name}
+                                onChange={e => setNewFeatured({ ...newFeatured, name: e.target.value })}
+                                disabled={!newFeatured.sport}
+                            >
+                                <option value="">Selecione o atleta...</option>
+                                {athletesList
+                                    .filter(a => a.institution === newFeatured.institution && a.course === newFeatured.course && a.sex === newFeatured.gender && a.sports.includes(newFeatured.sport))
+                                    .sort((a, b) => a.firstName.localeCompare(b.firstName))
+                                    .map(a => (
+                                        <option key={a.id} value={`${a.firstName} ${a.lastName}`}>{a.firstName} {a.lastName}</option>
+                                    ))}
                             </select>
                         </div>
                         <div>
@@ -1587,7 +1771,7 @@ const AdminDashboard: React.FC = () => {
                                         reason: newFeatured.reason
                                     });
                                     setIsAddingFeatured(false);
-                                    setNewFeatured({ athleteId: '', name: '', institution: '', course: '', sport: '', reason: '' });
+                                    setNewFeatured({ athleteId: '', name: '', institution: '', course: '', sport: '', reason: '', gender: '' });
                                     showNotification('Atleta destaque salvo com sucesso!');
                                 }}
                                 style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}

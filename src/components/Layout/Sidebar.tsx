@@ -193,6 +193,9 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     <Link to="/melhores-atletas" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                         <span style={{ fontSize: '16px' }}>🎖️</span> Melhores Atletas
                     </Link>
+                    <Link to="/estatisticas" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                        <span style={{ fontSize: '16px' }}>📊</span> Estatísticas
+                    </Link>
                     <Link to="/historia" onClick={close} className="sidebar-link" style={{ padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
                         <span style={{ fontSize: '16px' }}>📖</span> História dos Jogos
                     </Link>
