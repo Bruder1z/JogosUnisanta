@@ -779,12 +779,12 @@ const Simulator: FC = () => {
 
                                 {/* White "LIGA CLÁSSICA" card */}
                                 <div style={{
-                                    background: '#ffffff',
+                                    background: 'rgba(255,255,255,0.05)',
                                     borderRadius: '14px',
                                     overflow: 'hidden',
                                     width: '100%',
                                     maxWidth: '260px',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+                                    border: '1.5px solid rgba(255,255,255,0.08)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
@@ -803,7 +803,7 @@ const Simulator: FC = () => {
                                             margin: 0,
                                             fontSize: '15px',
                                             fontWeight: 900,
-                                            color: '#111',
+                                            color: 'white',
                                             textTransform: 'uppercase',
                                             textAlign: 'center',
                                             letterSpacing: '0.5px',
@@ -813,7 +813,7 @@ const Simulator: FC = () => {
                                         <p style={{
                                             margin: 0,
                                             fontSize: '11px',
-                                            color: '#555',
+                                            color: 'rgba(255,255,255,0.6)',
                                             textAlign: 'center',
                                             lineHeight: 1.4,
                                         }}>
