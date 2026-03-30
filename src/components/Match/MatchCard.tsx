@@ -176,7 +176,13 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                             </div>
                             {match.status === 'live' && (
                                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                                    Pontos: {BEACH_POINT_LABELS[Math.min(beachSummary.pointsA, 3)]} - {BEACH_POINT_LABELS[Math.min(beachSummary.pointsB, 3)]}
+                                    {(() => {
+                                        const isTieBreak = (match.stage === "Fase de Classificação" && match.scoreA === 6 && match.scoreB === 6) ||
+                                                           (match.stage === "Fase Final" && match.scoreA === 8 && match.scoreB === 8);
+                                        return isTieBreak 
+                                            ? `Pontos: ${beachSummary.pointsA} - ${beachSummary.pointsB}`
+                                            : `Pontos: ${BEACH_POINT_LABELS[Math.min(beachSummary.pointsA, 3)]} - ${BEACH_POINT_LABELS[Math.min(beachSummary.pointsB, 3)]}`;
+                                    })()}
                                 </div>
                             )}
                             {beachSummary.setResults.length > 0 && (

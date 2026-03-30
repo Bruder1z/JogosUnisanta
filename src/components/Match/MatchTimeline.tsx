@@ -622,6 +622,19 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
     const nextGamesB =
       team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+    
+    // Condição de Fim de Partida no Beach Tennis
+    const isClassificacao = selectedMatch.stage === "Fase de Classificação";
+    const targetGames = isClassificacao ? 6 : 8;
+
+    let isMatchOver = false;
+    if ((nextGamesA >= targetGames && nextGamesA - nextGamesB >= 2) ||
+        (nextGamesB >= targetGames && nextGamesB - nextGamesA >= 2) ||
+        (nextGamesA === targetGames + 1) || 
+        (nextGamesB === targetGames + 1)) {
+        isMatchOver = true;
+    }
+
     const gameWinEvent: MatchEvent = {
       id: `evt_${Date.now()}_setwin`,
       type: "set_win",
@@ -629,21 +642,39 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       teamId,
       description: `Game para ${gameWinnerName}`,
     };
+    
     const baseEvents = [
       ...(selectedMatch.events || []),
       ...(pointEvent ? [pointEvent] : []),
       gameWinEvent,
     ];
 
-    const updatedMatch: Match = {
-      ...selectedMatch,
-      scoreA: nextGamesA,
-      scoreB: nextGamesB,
-      status: "live",
-      events: baseEvents,
-    };
-
-    updateMatch(updatedMatch);
+    if (isMatchOver) {
+      const finalScoreLabel = `${nextGamesA} x ${nextGamesB} (Games)`;
+      const finalEvent: MatchEvent = {
+        id: `evt_${Date.now() + 1}`,
+        type: "end",
+        minute: getCurrentEventMinute(),
+        description: `Fim de Jogo - Placar Final: ${finalScoreLabel}`,
+      };
+      const finishedMatch: Match = {
+        ...selectedMatch,
+        scoreA: nextGamesA,
+        scoreB: nextGamesB,
+        status: "finished",
+        events: [...baseEvents, finalEvent],
+      };
+      finishMatch(finishedMatch);
+    } else {
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        scoreA: nextGamesA,
+        scoreB: nextGamesB,
+        status: "live",
+        events: baseEvents,
+      };
+      updateMatch(updatedMatch);
+    }
   };
 
   const handleBeachSetWin = (team: "A" | "B") => {
@@ -832,15 +863,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       ],
     };
 
-    // For Vôlei and Tênis de Mesa, we don't auto-finish based on points anymore
-    // Only for Beach Tennis or if it's not a set sport (though this function is only for volley/table tennis)
-    if (selectedMatch.sport === "Vôlei de Praia") {
-      const targetScore = 21;
-      if (
-        (nextA >= targetScore || nextB >= targetScore) &&
-        Math.abs(nextA - nextB) >= 2
-      ) {
+    // Lógica para Fase de Classificação no Vôlei
+    const currentPhase = selectedMatch.stage || "Fase de Classificação";
+    if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase de Classificação") {
+      if (nextPtsA >= 25 || nextPtsB >= 25) {
         updatedMatch.status = "finished";
+        const winner = nextPtsA >= 25 ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        
         updatedMatch.events = [
           ...(updatedMatch.events || []),
           {
@@ -848,18 +878,252 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             type: "set_win",
             minute: getCurrentEventMinute(),
             teamId: scoringTeamId,
-            description: `Fim de Jogo para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`,
+            description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`,
+            score: winner === "A" ? "1x0" : "0x1",
           } as MatchEvent,
           {
             id: `evt_${Date.now() + 2}`,
             type: "end",
             minute: getCurrentEventMinute(),
-            description: `Fim de Jogo - Placar Final: ${nextA} x ${nextB}`,
+            description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}`,
           } as MatchEvent,
         ];
-        updateMatch(updatedMatch);
-        setIsRunning(false);
+        
+        updatedMatch.scoreA = winner === "A" ? 1 : 0;
+        updatedMatch.scoreB = winner === "B" ? 1 : 0;
+
+        finishMatch(updatedMatch);
         return;
+      }
+    }
+
+    // Lógica para Fase Final no Vôlei
+    if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase Final") {
+      const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+      const targetScore = currentSet <= 2 ? 25 : 15;
+      
+      if (
+        (nextPtsA >= targetScore || nextPtsB >= targetScore) && 
+        Math.abs(nextPtsA - nextPtsB) >= 2
+      ) {
+        const winner = nextPtsA > nextPtsB ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        
+        const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+        const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+        
+        const isMatchOver = newScoreA === 2 || newScoreB === 2;
+        
+        updatedMatch.scoreA = newScoreA;
+        updatedMatch.scoreB = newScoreB;
+        
+        updatedMatch.events = [
+          ...(updatedMatch.events || []),
+          {
+            id: `evt_${Date.now() + 1}`,
+            type: "set_win",
+            minute: getCurrentEventMinute(),
+            teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+            description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`,
+            score: `${newScoreA}x${newScoreB}`,
+          } as MatchEvent
+        ];
+        
+        if (isMatchOver) {
+          updatedMatch.status = "finished";
+          updatedMatch.events.push({
+            id: `evt_${Date.now() + 2}`,
+            type: "end",
+            minute: getCurrentEventMinute(),
+            description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets`,
+          } as MatchEvent);
+          
+          finishMatch(updatedMatch);
+          return;
+        } else {
+          updatedMatch.status = "live";
+          updateMatch(updatedMatch);
+          setIsRunning(false);
+          return;
+        }
+      }
+    }
+
+    // Lógica para Vôlei de Praia
+    if (selectedMatch.sport === "Vôlei de Praia") {
+      const currentPhaseBeach = selectedMatch.stage || "Fase de Classificação";
+      if (currentPhaseBeach === "Fase de Classificação") {
+        const targetScore = 21;
+        // 1 set de 21 pontos ao chegar (sem obrigação de 2 de diferença)
+        if (nextPtsA >= targetScore || nextPtsB >= targetScore) {
+          updatedMatch.status = "finished";
+          const winner = nextPtsA >= targetScore ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            {
+              id: `evt_${Date.now() + 1}`,
+              type: "set_win",
+              minute: getCurrentEventMinute(),
+              teamId: scoringTeamId,
+              description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`,
+              score: winner === "A" ? "1x0" : "0x1",
+            } as MatchEvent,
+            {
+              id: `evt_${Date.now() + 2}`,
+              type: "end",
+              minute: getCurrentEventMinute(),
+              description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}`,
+            } as MatchEvent,
+          ];
+          
+          updatedMatch.scoreA = winner === "A" ? 1 : 0;
+          updatedMatch.scoreB = winner === "B" ? 1 : 0;
+
+          finishMatch(updatedMatch);
+          return;
+        }
+      } else if (currentPhaseBeach === "Fase Final") {
+        // Melhor de 3 sets. Primeiros dois = 18. Terceiro = 15.
+        const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+        const targetScore = currentSet <= 2 ? 18 : 15;
+        
+        if (
+          (nextPtsA >= targetScore || nextPtsB >= targetScore) && 
+          Math.abs(nextPtsA - nextPtsB) >= 2
+        ) {
+          const winner = nextPtsA > nextPtsB ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          
+          const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+          const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+          
+          const isMatchOver = newScoreA === 2 || newScoreB === 2;
+          
+          updatedMatch.scoreA = newScoreA;
+          updatedMatch.scoreB = newScoreB;
+          
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            {
+              id: `evt_${Date.now() + 1}`,
+              type: "set_win",
+              minute: getCurrentEventMinute(),
+              teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+              description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`,
+              score: `${newScoreA}x${newScoreB}`,
+            } as MatchEvent
+          ];
+          
+          if (isMatchOver) {
+            updatedMatch.status = "finished";
+            updatedMatch.events.push({
+              id: `evt_${Date.now() + 2}`,
+              type: "end",
+              minute: getCurrentEventMinute(),
+              description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets`,
+            } as MatchEvent);
+            
+            finishMatch(updatedMatch);
+            return;
+          } else {
+            updatedMatch.status = "live";
+            updateMatch(updatedMatch);
+            setIsRunning(false);
+            return;
+          }
+        }
+      }
+    }
+
+    // Lógica para Futevôlei
+    if (selectedMatch.sport === "Futevôlei") {
+      const currentPhaseFoot = selectedMatch.stage || "Fase de Classificação";
+      if (currentPhaseFoot === "Fase de Classificação") {
+        const targetScore = 18;
+        if (
+          (nextPtsA >= targetScore || nextPtsB >= targetScore) && 
+          Math.abs(nextPtsA - nextPtsB) >= 2
+        ) {
+          updatedMatch.status = "finished";
+          const winner = nextPtsA > nextPtsB ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            {
+              id: `evt_${Date.now() + 1}`,
+              type: "set_win",
+              minute: getCurrentEventMinute(),
+              teamId: scoringTeamId,
+              description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`,
+              score: winner === "A" ? "1x0" : "0x1",
+            } as MatchEvent,
+            {
+              id: `evt_${Date.now() + 2}`,
+              type: "end",
+              minute: getCurrentEventMinute(),
+              description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}`,
+            } as MatchEvent,
+          ];
+          
+          updatedMatch.scoreA = winner === "A" ? 1 : 0;
+          updatedMatch.scoreB = winner === "B" ? 1 : 0;
+
+          finishMatch(updatedMatch);
+          return;
+        }
+      } else if (currentPhaseFoot === "Fase Final") {
+        // Melhor de 3 sets. Primeiros dois = 18. Terceiro = 15.
+        const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+        const targetScore = currentSet <= 2 ? 18 : 15;
+        
+        if (
+          (nextPtsA >= targetScore || nextPtsB >= targetScore) && 
+          Math.abs(nextPtsA - nextPtsB) >= 2
+        ) {
+          const winner = nextPtsA > nextPtsB ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          
+          const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+          const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+          
+          const isMatchOver = newScoreA === 2 || newScoreB === 2;
+          
+          updatedMatch.scoreA = newScoreA;
+          updatedMatch.scoreB = newScoreB;
+          
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            {
+              id: `evt_${Date.now() + 1}`,
+              type: "set_win",
+              minute: getCurrentEventMinute(),
+              teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
+              description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`,
+              score: `${newScoreA}x${newScoreB}`,
+            } as MatchEvent
+          ];
+          
+          if (isMatchOver) {
+            updatedMatch.status = "finished";
+            updatedMatch.events.push({
+              id: `evt_${Date.now() + 2}`,
+              type: "end",
+              minute: getCurrentEventMinute(),
+              description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets`,
+            } as MatchEvent);
+            
+            finishMatch(updatedMatch);
+            return;
+          } else {
+            updatedMatch.status = "live";
+            updateMatch(updatedMatch);
+            setIsRunning(false);
+            return;
+          }
+        }
       }
     }
 

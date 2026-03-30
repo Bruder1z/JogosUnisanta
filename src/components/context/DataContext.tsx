@@ -122,6 +122,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             scoreB: m.score_b,
             sport: m.sport,
             category: m.category,
+            stage: m.stage,
             status: m.status,
             date: m.date,
             time: m.time,
