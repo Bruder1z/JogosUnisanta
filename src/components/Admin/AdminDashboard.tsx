@@ -90,7 +90,7 @@ const AdminDashboard: React.FC = () => {
 
     // Form States
     const [newMatchForm, setNewMatchForm] = useState({
-        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', phase: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
+        teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', stage: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
     const [settingsForm, setSettingsForm] = useState({
@@ -127,7 +127,7 @@ const AdminDashboard: React.FC = () => {
             scoreB: 0,
             sport: newMatchForm.sport,
             category: newMatchForm.category,
-            phase: newMatchForm.phase,
+            stage: newMatchForm.stage,
             status: 'scheduled',
             date: newMatchForm.date,
             time: newMatchForm.time,
@@ -135,7 +135,7 @@ const AdminDashboard: React.FC = () => {
         };
         addMatch(newMatch);
         setIsNewMatchOpen(false);
-        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', phase: 'Fase de Classificação', date: '', time: '', location: '' });
+        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', stage: 'Fase de Classificação', date: '', time: '', location: '' });
         showNotification("Partida criada com sucesso!");
     };
 
@@ -889,7 +889,7 @@ const AdminDashboard: React.FC = () => {
                                     <div style={{ position: 'relative' }}>
                                         <button
                                             title="Como importar planilha?"
-                                            onClick={() => window.alert('Salvar planilha Excel como .CSV!\nOrdem das Colunas:\n1. Primeiro Nome\n2. Sobrenome\n3. Instituição (Ex: Unisanta)\n4. Curso (Ex: Direito)\n5. Gênero (Masculino ou Feminino)\n6. Modalidades (separadas por "/")')}
+                                            onClick={() => showNotification('Salvar planilha Excel como .CSV!\nOrdem das Colunas:\n1. Primeiro Nome\n2. Sobrenome\n3. Instituição (Ex: Unisanta)\n4. Curso (Ex: Direito)\n5. Gênero (Masculino ou Feminino)\n6. Modalidades (separadas por "/")')}
                                             style={{
                                                 background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
                                                 borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
@@ -1568,7 +1568,7 @@ const AdminDashboard: React.FC = () => {
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <select style={inputStyle} value={newMatchForm.phase} onChange={e => setNewMatchForm({ ...newMatchForm, phase: e.target.value as 'Fase de Classificação' | 'Fase Final' })}>
+                            <select style={inputStyle} value={newMatchForm.stage} onChange={e => setNewMatchForm({ ...newMatchForm, stage: e.target.value as 'Fase de Classificação' | 'Fase Final' })}>
                                 <option value="Fase de Classificação">Fase de Classificação</option>
                                 <option value="Fase Final">Fase Final</option>
                             </select>

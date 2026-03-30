@@ -1,4 +1,5 @@
 import { useState, useEffect, type FC } from "react";
+import { useNotification } from "../NotificationContext";
 import {
   Play,
   Pause,
@@ -23,6 +24,7 @@ interface MatchTimelineProps {
 }
 
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
+  const { showNotification } = useNotification();
   const {
     matches,
     updateMatch,
@@ -1500,7 +1502,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     
     if (selectedMatch.events?.some(e => e.type === "senshu")) {
-       alert("O Senshu (vantagem do primeiro ponto) já foi concedido nesta partida.");
+      showNotification("O Senshu (vantagem do primeiro ponto) já foi concedido nesta partida.");
        return;
     }
 
@@ -2269,13 +2271,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         (t) => t !== "",
       );
       if (selectedSwimmingTeams.length < 2) {
-        alert("Selecione pelo menos 2 cursos para a natação!");
+        showNotification("Selecione pelo menos 2 cursos para a natação!");
         return;
       }
       if (
         new Set(selectedSwimmingTeams).size !== selectedSwimmingTeams.length
       ) {
-        alert("Não é permitido selecionar o mesmo curso mais de uma vez!");
+        showNotification("Não é permitido selecionar o mesmo curso mais de uma vez!");
         return;
       }
       if (
@@ -2284,7 +2286,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         !newMatchForm.location ||
         !newMatchForm.date
       ) {
-        alert("Preencha todos os campos!");
+        showNotification("Preencha todos os campos!");
         return;
       }
     } else {
@@ -2296,11 +2298,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         !newMatchForm.location ||
         !newMatchForm.date
       ) {
-        alert("Preencha todos os campos!");
+        showNotification("Preencha todos os campos!");
         return;
       }
       if (newMatchForm.teamA === newMatchForm.teamB) {
-        alert("Uma equipe não pode enfrentar ela mesma!");
+        showNotification("Uma equipe não pode enfrentar ela mesma!");
         return;
       }
     }
@@ -2343,7 +2345,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       const [nameB, universityB] = newMatchForm.teamB.split(" - ");
 
       if (!emblemA || !emblemB) {
-        alert(
+        showNotification(
           "Atenção: Um ou ambos os cursos não possuem emblema configurado. Verifique o banco de dados.",
         );
         return;
@@ -4923,7 +4925,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 <button
                   onClick={() => {
                     if (storedSwimmingParticipants.length === 0) {
-                      alert(
+                      showNotification(
                         "Nenhuma equipe registrada na prova. Edite a partida e selecione as equipes antes de classificar.",
                       );
                       return;
@@ -4951,14 +4953,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     const hasDuplicateRanks =
                       new Set(ranks).size !== ranks.length;
                     if (hasDuplicateRanks) {
-                      alert(
+                      showNotification(
                         "Existem posições duplicadas. Ajuste para continuar.",
                       );
                       return;
                     }
 
                     if (preparedEntries.length === 0) {
-                      alert(
+                      showNotification(
                         "Informe ao menos uma posição e nome para finalizar.",
                       );
                       return;
@@ -5017,7 +5019,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     updateMatch(updatedMatch);
                     setIsRunning(false);
                     setIsRankingModalOpen(false);
-                    alert("Resultado salvo e prova finalizada!");
+                    showNotification("Resultado salvo e prova finalizada!");
                   }}
                   style={{
                     flex: 2,

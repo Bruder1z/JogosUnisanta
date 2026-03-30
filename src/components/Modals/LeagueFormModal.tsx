@@ -9,12 +9,16 @@ interface LeagueFormModalProps {
     onCreated?: () => void;
 }
 
+
+import { useNotification } from '../NotificationContext';
+
 const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto, onCreated }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [createdLeagueId, setCreatedLeagueId] = useState<string | null>(null);
     const { user } = useAuth();
+    const { showNotification } = useNotification();
 
     if (!aberto) return null;
 
@@ -55,7 +59,7 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto, onCreate
                 const totalCount = privateLeagueCount + automaticCount;
 
                 if (totalCount >= 5) {
-                    alert('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de criar uma nova.');
+                    showNotification('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de criar uma nova.', 'error');
                     setIsLoading(false);
                     return;
                 }
@@ -77,7 +81,7 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto, onCreate
 
             if (error) {
                 console.error("Erro ao criar liga:", error);
-                alert("Erro ao salvar liga no banco de dados. Verifique a tabela 'leagues'.");
+                showNotification("Erro ao salvar liga no banco de dados. Verifique a tabela 'leagues'.", 'error');
                 return;
             }
             
@@ -178,7 +182,7 @@ const LeagueFormModal: FC<LeagueFormModalProps> = ({ aberto, setAberto, onCreate
                                 <button 
                                     onClick={() => {
                                         navigator.clipboard.writeText(`${window.location.origin}/?join=${createdLeagueId}`);
-                                        alert('Link copiado!');
+                                        showNotification('Link copiado!', 'success');
                                     }}
                                     style={{
                                         background: 'var(--accent-color)', color: 'white', border: 'none',

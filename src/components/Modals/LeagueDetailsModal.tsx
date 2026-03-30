@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNotification } from '../NotificationContext';
 import { X, Trophy, Users, Settings, Plus, Trash2, Shield } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +11,7 @@ interface LeagueDetailsModalProps {
 }
 
 const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose }) => {
+    const { showNotification } = useNotification();
     const { user: currentUser } = useAuth();
     const { matches } = useData();
     const [ranking, setRanking] = useState<any[]>([]);
@@ -130,14 +132,14 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                 league.participants = updatedParticipants;
                 // Update local ranking to reflect removal
                 setRanking(prev => prev.filter(p => p.email !== email));
-                alert('Participante removido.');
+                showNotification('Participante removido.');
             }
         }
     };
 
     const handleUpdateLeague = async () => {
         if (!editedName.trim()) {
-            alert("O nome da liga não pode estar vazio.");
+            showNotification("O nome da liga não pode estar vazio.");
             return;
         }
 
@@ -156,10 +158,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             league.name = editedName.trim();
             league.description = editedDescription.trim();
             setIsEditing(false);
-            alert("Informações da liga atualizadas com sucesso!");
+            showNotification("Informações da liga atualizadas com sucesso!");
         } catch (err) {
             console.error("Erro ao atualizar liga:", err);
-            alert("Erro ao atualizar informações da liga.");
+            showNotification("Erro ao atualizar informações da liga.");
         } finally {
             setIsSaving(false);
         }
@@ -167,7 +169,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
     const handleDeleteLeague = async () => {
         if (!league.id) {
-            alert("Erro: ID da liga não encontrado.");
+            showNotification("Erro: ID da liga não encontrado.");
             return;
         }
 
@@ -200,11 +202,11 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
             }
 
             setShowDeleteConfirm(false);
-            alert("Liga excluída com sucesso!");
+            showNotification("Liga excluída com sucesso!");
             onClose();
         } catch (err: any) {
             console.error("Falha total na exclusão:", err);
-            alert(err.message || "Erro desconhecido ao excluir liga. Verifique sua conexão ou permissões.");
+            showNotification(err.message || "Erro desconhecido ao excluir liga. Verifique sua conexão ou permissões.");
         } finally {
             setIsSaving(false);
         }
@@ -233,10 +235,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
             league.participants = updatedParticipants;
             setLeagueRequests(prev => prev.filter(r => r.id !== request.id));
-            alert("Solicitação aprovada!");
+            showNotification("Solicitação aprovada!");
         } catch (err) {
             console.error("Erro ao aprovar:", err);
-            alert("Erro ao aprovar solicitação.");
+            showNotification("Erro ao aprovar solicitação.");
         }
     };
     const handleLeaveLeague = async () => {
@@ -268,10 +270,10 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
         if (error) {
             console.error("Erro ao recusar:", error);
-            alert("Erro ao recusar solicitação.");
+            showNotification("Erro ao recusar solicitação.");
         } else {
             setLeagueRequests(prev => prev.filter(r => r.id !== requestId));
-            alert("Solicitação recusada.");
+            showNotification("Solicitação recusada.");
         }
     };
 
@@ -540,7 +542,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                     <button
                                         onClick={() => {
                                             navigator.clipboard.writeText(`${window.location.origin}/?join=${league.id}`);
-                                            alert('Link copiado!');
+                                            showNotification('Link copiado!');
                                         }}
                                         style={{
                                             background: '#dc2626', color: 'white', border: 'none',
