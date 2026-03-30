@@ -292,6 +292,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           score_b: match.scoreB,
           sport: match.sport,
           category: match.category,
+          stage: match.stage, // <-- Adicionado para salvar a fase
           status: match.status,
           date: match.date,
           time: match.time,
@@ -333,6 +334,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           location: updatedMatch.location,
           events: updatedMatch.events || [],
           participants: updatedMatch.participants || [],
+          stage: updatedMatch.stage, 
         })
         .match({ id: updatedMatch.id });
 

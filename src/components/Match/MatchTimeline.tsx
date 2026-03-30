@@ -73,7 +73,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     swimmingTeams: Array(8).fill(""),
     sport: "",
     category: "Masculino" as "Masculino" | "Feminino",
-    phase: "Fase de Classificação" as "Fase de Classificação" | "Fase Final",
+    stage: "Fase de Classificação" as "Fase de Classificação" | "Fase Final",
     date: new Date().toISOString().split("T")[0],
     time: "",
     location: "",
@@ -2061,7 +2061,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         id: crypto.randomUUID(),
         sport: newMatchForm.sport,
         category: newMatchForm.category,
-        phase: newMatchForm.phase || "Fase de Classificação",
+        stage: newMatchForm.stage || "Fase de Classificação",
         status: "scheduled",
         date: newMatchForm.date,
         time: newMatchForm.time,
@@ -2105,7 +2105,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         scoreB: 0,
         sport: newMatchForm.sport,
         category: newMatchForm.category,
-        phase: newMatchForm.phase || "Fase de Classificação",
+        stage: newMatchForm.stage || "Fase de Classificação",
         status: "scheduled",
         date: newMatchForm.date,
         time: newMatchForm.time,
@@ -2124,7 +2124,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       swimmingTeams: Array(10).fill(""),
       sport: "",
       category: "Masculino",
-      phase: "Fase de Classificação",
+      stage: "Fase de Classificação",
       date: new Date().toISOString().split("T")[0],
       time: "",
       location: "",
@@ -2856,11 +2856,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   }}
                 >
                   <select
-                    value={newMatchForm.phase}
+                    value={newMatchForm.stage}
                     onChange={(e) =>
                       setNewMatchForm({
                         ...newMatchForm,
-                        phase: e.target.value as "Fase de Classificação" | "Fase Final",
+                        stage: e.target.value as "Fase de Classificação" | "Fase Final",
                       })
                     }
                     style={{

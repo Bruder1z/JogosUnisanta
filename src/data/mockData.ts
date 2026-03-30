@@ -75,12 +75,13 @@ export interface Match {
   teamB: Team;
   scoreA: number;
   scoreB: number;
-  participants?: Team[]; // Added for multi-team sports like Swimming
+  participants?: Team[]; 
   status: "live" | "finished" | "scheduled";
   date: string;
   time: string;
   location: string;
   events?: MatchEvent[];
+  stage?: string; 
 }
 
 export const mockUsers: User[] = [
