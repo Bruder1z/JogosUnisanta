@@ -13,6 +13,7 @@ import Calendario from './pages/Calendario';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './components/context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
+import { NotificationProvider } from './components/NotificationContext';
 import Login from './pages/Login';
 
 type ProtectedRouteProps = {
@@ -72,16 +73,19 @@ const AppContent = () => {
   );
 };
 
+
 function App() {
   return (
     <Router>
-      <DataProvider>
-        <SidebarProvider>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </SidebarProvider>
-      </DataProvider>
+      <NotificationProvider>
+        <DataProvider>
+          <SidebarProvider>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </SidebarProvider>
+        </DataProvider>
+      </NotificationProvider>
     </Router>
   );
 }

@@ -1,3 +1,4 @@
+import { useNotification } from '../components/NotificationContext';
 import { type FC, useState, useMemo, useEffect, useRef } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
@@ -28,7 +29,11 @@ interface ToastData {
     scoreB: number;
 }
 
+
 // ── Module-level pure helpers (stable references, no re-creation on parent re-render) ──
+
+// Place this inside your main Simulator component:
+// const { showNotification } = useNotification();
 
 const msUntil = (dateStr: string, timeStr: string): number => {
     const [h, m] = timeStr.split(':').map(Number);
@@ -87,6 +92,7 @@ interface MatchCardProps {
 
 const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction, saveUserPredictions, showToast }: MatchCardProps) => {
     const { user, openLoginModal } = useAuth();
+    const { showNotification } = useNotification();
     const [cardSaved, setCardSaved] = useState(false);
     const hasPrediction = pred && pred.scoreA !== '' && pred.scoreB !== '';
 
@@ -148,7 +154,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
         }
         if (!hasPrediction || !pred) return;
         const success = await saveUserPredictions({ [match.id]: pred });
-        if (!success) { alert('Erro ao salvar o palpite.'); return; }
+        if (!success) { showNotification('Erro ao salvar o palpite.', 'error'); return; }
         setCardSaved(true);
         setTimeout(() => setCardSaved(false), 3000);
         showToast({
@@ -367,6 +373,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
 
 const Simulator: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
+    // Corrige referência do showNotification
+    const { showNotification } = useNotification();
     const [showBolaoRanking, setShowBolaoRanking] = useState(false);
     const [aberto, setAberto] = useState(false);
     const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
@@ -558,7 +566,7 @@ const Simulator: FC = () => {
                 scoreB: 1,
             });
         } else {
-            alert('Erro ao salvar palpites.');
+            showNotification('Erro ao salvar palpites.', 'error');
         }
         setTimeout(() => setPredictionsFinalized(false), 3000);
     };
@@ -837,7 +845,7 @@ const Simulator: FC = () => {
                                         onClick={() => {
                                             if (!user) { openLoginModal(); return; }
                                             if (totalLeaguesCount >= 5) {
-                                                alert("Você atingiu o limite máximo de 5 ligas permitidas.");
+                                                showNotification("Você atingiu o limite máximo de 5 ligas permitidas.", 'error');
                                                 return;
                                             }
                                             setIsLeagueFormOpen(true);

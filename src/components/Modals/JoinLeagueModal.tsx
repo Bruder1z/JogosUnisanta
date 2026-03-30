@@ -1,3 +1,4 @@
+import { useNotification } from '../NotificationContext';
 import React, { useEffect, useState } from 'react';
 import { X, Trophy, Check } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
@@ -9,7 +10,9 @@ interface JoinLeagueModalProps {
     onJoined: () => void;
 }
 
+
 const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, onJoined }) => {
+    const { showNotification } = useNotification();
     const { user, openLoginModal } = useAuth();
     const [league, setLeague] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -68,7 +71,7 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
                 const totalCount = privateLeagueCount + automaticCount;
 
                 if (totalCount >= 5) {
-                    alert('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de entrar em outra.');
+                    showNotification('Você já participa de 5 ligas, que é o máximo permitido. Saia de uma liga antes de entrar em outra.', 'error');
                     setIsJoining(false);
                     return;
                 }
@@ -92,7 +95,7 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
             }
 
             if (currentParticipants.some((p: string) => p.toLowerCase() === userEmail)) {
-                alert('Você já faz parte desta liga!');
+                showNotification('Você já faz parte desta liga!', 'info');
                 onJoined();
                 return;
             }
@@ -110,14 +113,14 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
             console.log("Supabase response status:", status);
             if (error) {
                 console.error("Supabase Update Error:", error);
-                alert(`ERRO SUPABASE (${error.code}): ${error.message}\n\nDica: Verifique se você rodou o SQL das permissões (RLS) e se a coluna 'participants' é do tipo texto[] ou jsonb.`);
+                showNotification(`ERRO SUPABASE (${error.code}): ${error.message}\n\nDica: Verifique se você rodou o SQL das permissões (RLS) e se a coluna 'participants' é do tipo texto[] ou jsonb.`, 'error');
             } else {
                 console.log("Update success data:", data);
                 if (data && data.length > 0) {
-                    alert(`Sucesso! Bem-vindo à liga ${league.name}!`);
+                    showNotification(`Sucesso! Bem-vindo à liga ${league.name}!`, 'success');
                     onJoined();
                 } else {
-                    alert('A atualização foi enviada mas nenhuma linha foi alterada. Isso geralmente acontece se o ID da liga estiver incorreto ou por restrição de segurança (RLS).');
+                    showNotification('A atualização foi enviada mas nenhuma linha foi alterada. Isso geralmente acontece se o ID da liga estiver incorreto ou por restrição de segurança (RLS).', 'warning');
                 }
             }
         } catch (err) {

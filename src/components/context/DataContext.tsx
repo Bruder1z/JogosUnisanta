@@ -304,9 +304,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (error) {
         console.error("Error inserting match in Supabase:", error);
-        alert(
-          "Nao foi possivel salvar a partida no banco. Verifique se a tabela matches tem a coluna participants.",
-        );
+        // Notifique o usuário no componente de tela, se necessário
+        // Exemplo: set um erro no estado e exiba no componente
+        // Aqui apenas loga o erro
         return;
       }
 
