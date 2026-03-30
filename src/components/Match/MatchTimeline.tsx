@@ -1344,15 +1344,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     finishMatch(finishedMatch);
   };
 
-  const handleChessResult = (result: "A" | "B", reason: string) => {
+  const handleChessResult = (result: "A" | "B" | "Draw", reason: string) => {
     if (!selectedMatch) return;
-    
-    let scoreA = result === "A" ? 1 : 0;
-    let scoreB = result === "B" ? 1 : 0;
-    
-    const winningTeamName = result === "A" 
-        ? selectedMatch.teamA.name.split(" - ")[0] 
-        : selectedMatch.teamB.name.split(" - ")[0];
+
+    let scoreA = 0;
+    let scoreB = 0;
+    let description = "";
+    let teamId = undefined;
+    let resultado = "";
+
+    if (result === "A") {
+      scoreA = 1;
+      description = `${reason} (+1.0 pts) - Vitória de ${selectedMatch.teamA.name.split(" - ")[0]}`;
+      teamId = selectedMatch.teamA.id;
+      resultado = selectedMatch.teamA.name.split(" - ")[0];
+    } else if (result === "B") {
+      scoreB = 1;
+      description = `${reason} (+1.0 pts) - Vitória de ${selectedMatch.teamB.name.split(" - ")[0]}`;
+      teamId = selectedMatch.teamB.id;
+      resultado = selectedMatch.teamB.name.split(" - ")[0];
+    } else if (result === "Draw") {
+      scoreA = 0.5;
+      scoreB = 0.5;
+      description = `${reason} (+0.5 pts) - Empate`;
+      resultado = "Empate";
+    }
 
     const events: MatchEvent[] = [...(selectedMatch.events || [])];
 
@@ -1360,23 +1376,23 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       id: `evt_${Date.now()}_chess_win`,
       type: "chess_result",
       minute: getCurrentEventMinute(),
-      teamId: result === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
-      description: `${reason} (+1.0 pts) - Vitória de ${winningTeamName}`,
+      teamId,
+      description,
     } as MatchEvent);
 
     const endEvent: MatchEvent = {
-        id: `evt_${Date.now() + 2}_end_chess`,
-        type: "end",
-        minute: getCurrentEventMinute(),
-        description: `Fim de Jogo (${reason}). Resultado: ${winningTeamName}`,
+      id: `evt_${Date.now() + 2}_end_chess`,
+      type: "end",
+      minute: getCurrentEventMinute(),
+      description: `Fim de Jogo (${reason}). Resultado: ${resultado}`,
     };
 
     const finishedMatch: Match = {
-        ...selectedMatch,
-        scoreA,
-        scoreB,
-        status: "finished",
-        events: [...events, endEvent],
+      ...selectedMatch,
+      scoreA,
+      scoreB,
+      status: "finished",
+      events: [...events, endEvent],
     };
 
     finishMatch(finishedMatch);
@@ -3674,7 +3690,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     <button
                       style={{ ...styles.controlBtn, background: "white", color: "black", flex: 2 }}
                       disabled={!chessReason}
-                      onClick={() => handleChessResult(chessWinner, chessReason)}
+                      onClick={() => {
+                        if (chessWinner === "A" || chessWinner === "B" || chessWinner === "Draw") {
+                          handleChessResult(chessWinner, chessReason);
+                        }
+                      }}
                     >
                       Confirmar {chessWinner === "Draw" ? "Empate" : "Vitória"} e Encerrar
                     </button>
