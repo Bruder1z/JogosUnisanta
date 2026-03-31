@@ -17,7 +17,6 @@ import {
   AVAILABLE_SPORTS,
   COURSE_EMBLEMS,
 } from "../../data/mockData";
-import { useNavigate } from "react-router-dom";
 
 interface MatchTimelineProps {
   matchId?: string;
@@ -32,7 +31,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     addMatch,
     courses: coursesList,
   } = useData();
-  const navigate = useNavigate();
 
   const finishMatch = (updatedMatch: Match) => {
     updateMatch(updatedMatch);
@@ -821,11 +819,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const scoringTeamId =
       scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-
-    const currentA = selectedMatch.scoreA;
-    const currentB = selectedMatch.scoreB;
-    const nextA = scoringTeam === "A" ? currentA + 1 : currentA;
-    const nextB = scoringTeam === "B" ? currentB + 1 : currentB;
 
     const description = `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
 
