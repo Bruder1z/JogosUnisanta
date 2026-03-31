@@ -23,6 +23,7 @@ interface MatchModalProps {
 const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const { matches: allMatches } = useData();
   const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
+  const [showChat, setShowChat] = useState(false);
 
   // Sync state if initialMatch changes in context
   useEffect(() => {
@@ -792,11 +793,12 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       }}
       onClick={onClose}
     >
+      {/* Modal principal */}
       <div
         className="premium-card"
         style={{
           position: "relative",
-          width: "100%",
+          width: showChat ? "600px" : "100%",
           maxWidth: "600px",
           maxHeight: "80vh",
           overflow: "hidden",
@@ -804,6 +806,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           flexDirection: "column",
           animation: "modalSlideUp 0.3s ease-out",
           padding: 0,
+          transition: "width 0.3s",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -813,50 +816,36 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             borderBottom: "1px solid var(--border-color)",
             background:
               "linear-gradient(to bottom, var(--bg-hover), var(--bg-primary))",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "10px",
           }}
         >
-          <button
-            onClick={onClose}
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              background: "var(--bg-hover)",
-              border: "none",
-              color: "var(--text-secondary)",
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <X size={20} />
-          </button>
 
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: "10px",
-              fontSize: "12px",
-              color: "var(--accent-color)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-            }}
-          >
-            {currentMatch.sport}
-          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
+            <div
+              style={{
+                textAlign: "center",
+                marginBottom: "10px",
+                fontSize: "12px",
+                color: "var(--accent-color)",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+              }}
+            >
+              {currentMatch.sport}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
             {isSwimming ? (
               <div style={{ width: "100%", textAlign: "center" }}>
                 <div
@@ -1038,16 +1027,16 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             )}
           </div>
 
-          <div
-            style={{
-              marginTop: "15px",
-              display: "flex",
-              justifyContent: "center",
-              gap: "20px",
-              fontSize: "12px",
-              color: "var(--text-secondary)",
-            }}
-          >
+            <div
+              style={{
+                marginTop: "15px",
+                display: "flex",
+                justifyContent: "center",
+                gap: "20px",
+                fontSize: "12px",
+                color: "var(--text-secondary)",
+              }}
+            >
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <Clock size={14} />
               {currentMatch.date.split("-").reverse().join("-")} às{" "}
@@ -1059,90 +1048,47 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             </div>
           </div>
 
-          {/*
-                    {currentMatch.status === 'scheduled' && (
-                        <div style={{ marginTop: '20px', textAlign: 'center', background: 'var(--bg-card)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                            <h4 style={{ marginBottom: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>Quem vai vencer?</h4>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px' }}>
-                                <button
-                                    onClick={() => user ? setVotedFor(currentMatch.teamA.id) : undefined}
-                                    style={{
-                                        padding: '10px 20px',
-                                        borderRadius: '8px',
-                                        border: votedFor === currentMatch.teamA.id ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                        background: votedFor === currentMatch.teamA.id ? 'rgba(227, 6, 19, 0.1)' : 'var(--bg-main)',
-                                        color: votedFor === currentMatch.teamA.id ? 'var(--accent-color)' : 'var(--text-primary)',
-                                        fontWeight: 700,
-                                        cursor: user ? 'pointer' : 'not-allowed',
-                                        transition: 'all 0.2s',
-                                        opacity: user ? 1 : 0.5
-                                    }}
-                                    disabled={!user}
-                                >
-                                    {currentMatch.teamA.name.split(' - ')[0]}
-                                </button>
-                                <button
-                                    onClick={() => user ? setVotedFor(currentMatch.teamB.id) : undefined}
-                                    style={{
-                                        padding: '10px 20px',
-                                        borderRadius: '8px',
-                                        border: votedFor === currentMatch.teamB.id ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                        background: votedFor === currentMatch.teamB.id ? 'rgba(227, 6, 19, 0.1)' : 'var(--bg-main)',
-                                        color: votedFor === currentMatch.teamB.id ? 'var(--accent-color)' : 'var(--text-primary)',
-                                        fontWeight: 700,
-                                        cursor: user ? 'pointer' : 'not-allowed',
-                                        transition: 'all 0.2s',
-                                        opacity: user ? 1 : 0.5
-                                    }}
-                                    disabled={!user}
-                                >
-                                    {currentMatch.teamB.name.split(' - ')[0]}
-                                </button>
-                            </div>
-
-                            {votedFor && (
-                                <div style={{ marginTop: '15px', padding: '0 10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                                        <span style={{ color: 'var(--accent-color)' }}>{percentA}%</span>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Votos da Galera</span>
-                                        <span>{percentB}%</span>
-                                    </div>
-                                    <div style={{ width: '100%', height: '8px', background: 'var(--bg-hover)', borderRadius: '4px', display: 'flex', overflow: 'hidden' }}>
-                                        <div style={{ width: `${percentA}%`, background: 'var(--accent-color)', height: '100%', transition: 'width 0.5s ease-out' }} />
-                                        <div style={{ width: `${percentB}%`, background: 'var(--text-secondary)', height: '100%', transition: 'width 0.5s ease-out' }} />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div style={{ marginTop: '20px' }}>
-                                <button
-                                    onClick={simulateMatch}
-                                    style={{
-                                        padding: '10px 20px',
-                                        borderRadius: '8px',
-                                        background: 'var(--accent-color)',
-                                        color: 'white',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        border: 'none',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        fontSize: '13px'
-                                    }}
-                                >
-                                    <Play size={16} /> Simular Partida
-                                </button>
-                            </div>
-
-                            {!user && (
-                                <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                    Faça login para registrar seu palpite!
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    */}
+            </div>
+            {/* Botões de ação no topo */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <button
+              onClick={onClose}
+              style={{
+              background: "var(--bg-hover)",
+              border: "none",
+              color: "var(--text-secondary)",
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              }}
+              title="Fechar"
+            >
+              <X size={20} />
+            </button>
+            <button
+              onClick={() => setShowChat((v) => !v)}
+              style={{
+              background: showChat ? "var(--accent-color)" : "var(--bg-hover)",
+              border: "none",
+              color: showChat ? "#fff" : "var(--text-secondary)",
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "background 0.2s, color 0.2s",
+              }}
+              title={showChat ? "Fechar chat" : "Abrir chat da partida"}
+            >
+              <span role="img" aria-label="Chat">💬</span>
+            </button>
+            </div>
         </div>
 
         {/* Scrollable Content Body */}
@@ -1867,27 +1813,80 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             </div>
           )}
         </div>
+
       </div>
 
+      {/* Chat lateral */}
+      {showChat && (
+        <div
+          style={{
+            width: 340,
+            maxWidth: "90vw",
+            height: "80vh",
+            background: "var(--bg-card)",
+            borderRadius: "12px",
+            marginLeft: "16px",
+            boxShadow: "0 2px 16px rgba(0,0,0,0.15)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            animation: "modalSlideUp 0.3s ease-out",
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{
+            padding: "16px",
+            borderBottom: "1px solid var(--border-color)",
+            fontWeight: 700,
+            fontSize: "16px",
+            color: "var(--accent-color)",
+            background: "var(--bg-hover)",
+            textAlign: "center"
+          }}>
+            Chat da Partida
+          </div>
+          <div style={{ flex: 1, padding: "16px", overflowY: "auto", color: "var(--text-secondary)", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ opacity: 0.7 }}>Nenhuma mensagem ainda.</span>
+          </div>
+          <div style={{ padding: "12px", borderTop: "1px solid var(--border-color)", background: "var(--bg-primary)" }}>
+            <input
+              type="text"
+              placeholder="Digite uma mensagem... (em breve)"
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border-color)",
+                background: "var(--bg-main)",
+                color: "var(--text-primary)",
+                fontSize: "14px",
+                outline: "none"
+              }}
+              disabled
+            />
+          </div>
+        </div>
+      )}
+
       <style>{`
-                @keyframes modalSlideUp {
-                    from { transform: translateY(20px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 6px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: var(--border-color);
-                    border-radius: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: var(--text-secondary);
-                }
-            `}</style>
+        @keyframes modalSlideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+      `}</style>
     </div>
   );
 };

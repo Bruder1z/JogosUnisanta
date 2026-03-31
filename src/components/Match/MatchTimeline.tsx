@@ -37,8 +37,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const finishMatch = (updatedMatch: Match) => {
     updateMatch(updatedMatch);
     setIsRunning(false);
-    setActiveMatchId(null);
-    navigate("/");
+    // setActiveMatchId(null);
+    // navigate("/");
   };
 
   // Helper to get team emblem with strict matching
@@ -1840,7 +1840,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "shootout_missed":
         return "❌";
       case "set_win":
-        return isBeachTennis ? "🎾☀️" : "🎾";
+        if (isBeachTennis) return "🎾☀️";
+        if (isVolleyball) return "🏐";
+        return "🎾";
       case "tie_break_start":
         return "🎾";
       case "senshu":
@@ -2020,7 +2022,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           label = event.description || `Game para ${teamName}`;
           break;
         }
-        label = `Ponto para ${teamName}`;
+        // Para esportes de set (vôlei, tênis de mesa, etc), priorizar a descrição do evento
+        label = event.description || `Set ganho por ${teamName}`;
         break;
       case "tie_break_start":
         label = "Início de Tie-break";
