@@ -141,24 +141,43 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 transition: 'all 0.2s'
             }}
         >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <span>{match.sport.toUpperCase()} - {match.category.toUpperCase()}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {match.status === 'live' && (
-                        <span style={{
-                            display: 'inline-block',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: 'var(--live-color)',
-                            boxShadow: '0 0 8px var(--live-color)'
-                        }}></span>
-                    )}
-                    <span style={{ color: match.status === 'live' ? 'var(--live-color)' : 'var(--text-secondary)' }}>
-                        {match.status === 'live' ? 'AO VIVO' : match.status === 'finished' ? 'FINALIZADO' : match.time}
-                    </span>
-                </div>
-            </div>
+            {(() => {
+                const PHASE_SPORTS = ['Vôlei', 'Vôlei de Praia', 'Futevôlei', 'Beach Tennis'];
+                const showPhase = PHASE_SPORTS.includes(match.sport) && match.stage;
+                return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span>{match.sport.toUpperCase()} - {match.category.toUpperCase()}</span>
+                            {showPhase && (
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: match.stage === 'Fase Final' ? '#f59e0b' : 'var(--accent-color)',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                }}>
+                                    {match.stage === 'Fase Final' ? '🏆 Fase Final' : '📋 Fase de Classificação'}
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {match.status === 'live' && (
+                                <span style={{
+                                    display: 'inline-block',
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: 'var(--live-color)',
+                                    boxShadow: '0 0 8px var(--live-color)'
+                                }}></span>
+                            )}
+                            <span style={{ color: match.status === 'live' ? 'var(--live-color)' : 'var(--text-secondary)' }}>
+                                {match.status === 'live' ? 'AO VIVO' : match.status === 'finished' ? 'FINALIZADO' : match.time}
+                            </span>
+                        </div>
+                    </div>
+                );
+            })()}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <TeamDisplay team={match.teamA} />

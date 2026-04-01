@@ -3952,6 +3952,28 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           <>
             <div style={styles.eventSection}>
               <h3 style={styles.sectionTitle}>🎾 Pontuação</h3>
+              {(() => {
+                const isFinal = selectedMatch.stage === "Fase Final";
+                const targetGames = isFinal ? 8 : 6;
+                const currentGamesA = selectedMatch.scoreA;
+                const currentGamesB = selectedMatch.scoreB;
+                return (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "8px 12px", marginBottom: "10px",
+                    background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
+                    borderRadius: "8px",
+                    border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
+                  }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
+                      {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                      Games: {currentGamesA} x {currentGamesB} · Alvo: {targetGames} (vant. 2)
+                    </span>
+                  </div>
+                );
+              })()}
               <div
                 style={styles.eventButtons}
                 className="match-timeline-event-grid"
@@ -4152,6 +4174,38 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   : "🏓 Pontos"
                 : "⚽ Gols"}
             </h3>
+            {isSetSport && isVolleyball && (() => {
+              const stage = selectedMatch.stage || "Fase de Classificação";
+              const isFinal = stage === "Fase Final";
+              const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+              const sport = selectedMatch.sport;
+              let targetPts: number;
+              if (sport === "Vôlei") {
+                targetPts = isFinal ? (currentSet <= 2 ? 25 : 15) : 25;
+              } else if (sport === "Vôlei de Praia") {
+                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 21;
+              } else {
+                // Futevôlei
+                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 18;
+              }
+              return (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 12px", marginBottom: "10px",
+                  background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
+                  borderRadius: "8px",
+                  border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
+                }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
+                    {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
+                    {isFinal && ` · Set ${currentSet}/3`}
+                  </span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                    Alvo: {targetPts} pts{isFinal ? " (vant. 2)" : ""}
+                  </span>
+                </div>
+              );
+            })()}
             <div
               style={styles.eventButtons}
               className="match-timeline-event-grid"

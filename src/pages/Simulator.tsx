@@ -177,7 +177,43 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
     const isTenisMesa = match.sport.includes('Tênis de Mesa') || match.sport.includes('Tenis de Mesa');
     const isFutevolei = match.sport.toLowerCase().includes('futevôlei') || match.sport.toLowerCase().includes('futevolei');
     const isTamboreu = match.sport === 'Tamboréu';
-    const maxScore = (match.sport === 'Basquete 3x3' || isPraia) ? 21 : isFutevolei ? 18 : isVolei ? 25 : isTenisMesa ? 3 : isTamboreu ? 2 : 99;
+    const isBeachTennis = match.sport === 'Beach Tennis';
+
+    // Tabela de regras por modalidade e fase
+    const SCORE_RULES: Record<string, { label: string; classificacao: number; final: number }> = {
+        'Vôlei':          { label: 'sets', classificacao: 25, final: 2 },
+        'Vôlei de Praia': { label: 'pts',  classificacao: 21, final: 2 },
+        'Futevôlei':      { label: 'pts',  classificacao: 18, final: 2 },
+        'Beach Tennis':   { label: 'games',classificacao: 6,  final: 8 },
+    };
+
+    const getMaxScore = (sport: string, stage?: string): number => {
+        const rule = SCORE_RULES[sport];
+        if (!rule) {
+            if (match.sport === 'Basquete 3x3') return 21;
+            if (isTenisMesa) return 3;
+            if (isTamboreu) return 2;
+            return 99;
+        }
+        return stage === 'Fase Final' ? rule.final : rule.classificacao;
+    };
+
+    const getScoreUnit = (sport: string, stage?: string): string => {
+        const rule = SCORE_RULES[sport];
+        if (!rule) {
+            if (isTenisMesa) return 'sets';
+            if (isTamboreu) return 'sets';
+            return 'pts';
+        }
+        if (stage === 'Fase Final' && (sport === 'Vôlei' || sport === 'Vôlei de Praia' || sport === 'Futevôlei')) return 'sets';
+        return rule.label;
+    };
+
+    const maxScore = getMaxScore(match.sport, match.stage);
+    const scoreUnit = getScoreUnit(match.sport, match.stage);
+    const isBestOf = ['Vôlei', 'Vôlei de Praia', 'Futevôlei', 'Tamboréu'].includes(match.sport)
+        ? (match.stage === 'Fase Final' || isTamboreu)
+        : isTenisMesa;
 
     const maxAllowedA = (pred?.scoreB !== '' && Number(pred?.scoreB) === maxScore) ? maxScore - 1 : maxScore;
     const maxAllowedB = (pred?.scoreA !== '' && Number(pred?.scoreA) === maxScore) ? maxScore - 1 : maxScore;
@@ -234,7 +270,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                     onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalA(raw); if (raw === '') { updatePrediction(match.id,'scoreA',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedA)); if (c !== raw) setLocalA(c); updatePrediction(match.id,'scoreA',c); }}
                                     onFocus={(e) => { focusedField.current = 'A'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
-                                    style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
+                                    style={{ width:'48px', height:'48px', border:`2px solid ${localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius:'6px', fontSize:'24px', fontWeight:900, color: localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box', transition:'border-color 0.2s, color 0.2s' }}
                                 />
                             )}
                             {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
@@ -268,6 +304,11 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                         <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', textAlign: 'center' }}>
                             {match.sport} • {match.category}
                         </div>
+                        {['Vôlei', 'Vôlei de Praia', 'Futevôlei', 'Beach Tennis'].includes(match.sport) && match.stage && (
+                            <div style={{ fontSize: '11px', fontWeight: 700, textAlign: 'center', marginTop: '2px', color: match.stage === 'Fase Final' ? '#f59e0b' : 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {match.stage === 'Fase Final' ? '🏆 Fase Final' : '📋 Fase de Classificação'}
+                            </div>
+                        )}
                     </div>
                     {match.status === 'finished' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
@@ -275,7 +316,23 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                             <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80' }}>RESULTADO FINAL</div>
                         </div>
                     ) : (
-                        <div style={{ fontSize: '28px', fontWeight: 300, color: 'rgba(255,255,255,0.4)' }}>×</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '28px', fontWeight: 300, color: 'rgba(255,255,255,0.4)' }}>×</div>
+                            {maxScore < 99 && (
+                                <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: isBestOf ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                                    textAlign: 'center',
+                                    lineHeight: 1.3,
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    {isBestOf
+                                        ? `MX ${maxScore} ${scoreUnit}`
+                                        : `MÁX ${maxScore} ${scoreUnit}`}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -308,7 +365,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                     onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalB(raw); if (raw === '') { updatePrediction(match.id,'scoreB',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedB)); if (c !== raw) setLocalB(c); updatePrediction(match.id,'scoreB',c); }}
                                     onFocus={(e) => { focusedField.current = 'B'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
-                                    style={{ width:'48px', height:'48px', border:'2px solid white', borderRadius:'6px', fontSize:'24px', fontWeight:900, color:'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box' }}
+                                    style={{ width:'48px', height:'48px', border:`2px solid ${localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius:'6px', fontSize:'24px', fontWeight:900, color: localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box', transition:'border-color 0.2s, color 0.2s' }}
                                 />
                             )}
                             {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
