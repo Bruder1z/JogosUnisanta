@@ -1,4 +1,5 @@
 import { useState, useEffect, type FC } from "react";
+import { useNavigate } from "react-router-dom";
 import { useNotification } from "../NotificationContext";
 import {
   Play,
@@ -24,6 +25,7 @@ interface MatchTimelineProps {
 
 const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const { showNotification } = useNotification();
+  const navigate = useNavigate();
   const {
     matches,
     updateMatch,
@@ -126,12 +128,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const isKarate = selectedMatch?.sport === "Caratê";
   const isJudo = selectedMatch?.sport === "Judô";
   const isXadrez = selectedMatch?.sport === "Xadrez";
+  const isTamboreu = selectedMatch?.sport === "Tamboréu";
   const isNoTimerSport = [
     "Vôlei",
     "Vôlei de Praia",
     "Tênis de Mesa",
     "Futevôlei",
     "Beach Tennis",
+    "Tamboréu",
   ].includes(selectedMatch?.sport || "");
 
   type TimelineEvent = MatchEvent & {
@@ -152,6 +156,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [isGoldenScore, setIsGoldenScore] = useState(false);
   const [chessWinner, setChessWinner] = useState<"A" | "B" | "Draw" | null>(null);
   const [chessReason, setChessReason] = useState<string>("");
+  const [tamboreauPointsA, setTamboreauPointsA] = useState<number>(0);
+  const [tamboreauPointsB, setTamboreauPointsB] = useState<number>(0);
+  const [tamboreauMatchWinner, setTamboreauMatchWinner] = useState<{ name: string; setsA: number; setsB: number } | null>(null);
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
     if (!match) return 15 * 60;
@@ -386,12 +393,28 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleSelectMatch = (match: Match) => {
     setActiveMatchId(match.id);
     if (
-      ["Vôlei", "Vôlei de Praia", "Tênis de Mesa", "Futevôlei"].includes(
+      ["Vôlei", "Vôlei de Praia", "Tênis de Mesa", "Futevôlei", "Tamboréu"].includes(
         match.sport,
       )
     ) {
       setCurrentMinute(0);
       setIsRunning(false);
+      // Restaurar pontos do set atual a partir dos eventos persistidos
+      if (match.sport === "Tamboréu") {
+        const events = match.events || [];
+        const lastSetWin = [...events].reverse().find((e) => e.type === "set_win");
+        const relevantGoals = lastSetWin
+          ? events.slice(events.indexOf(lastSetWin) + 1)
+          : events;
+        const ptsA = relevantGoals.filter(
+          (e) => e.type === "goal" && e.teamId === match.teamA.id
+        ).length;
+        const ptsB = relevantGoals.filter(
+          (e) => e.type === "goal" && e.teamId === match.teamB.id
+        ).length;
+        setTamboreauPointsA(ptsA);
+        setTamboreauPointsB(ptsB);
+      }
       return;
     }
 
@@ -1657,6 +1680,133 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     finishMatch(finishedMatch);
   };
 
+  const handleTamboreauPoint = (team: "A" | "B") => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+
+    const existingEvents = selectedMatch.events || [];
+
+    // Auto-start: registra início do set atual
+    const setWinsCount = existingEvents.filter((e) => e.type === "set_win").length;
+    const currentSetNumber = setWinsCount + 1;
+    const hasSetStart = existingEvents.some(
+      (e) => e.type === "start" && e.description === `Início do Set ${currentSetNumber}`
+    );
+    if (!hasSetStart) {
+      existingEvents.push({
+        id: `evt_${Date.now()}_setstart`,
+        type: "start",
+        minute: getCurrentEventMinute(),
+        description: `Início do Set ${currentSetNumber}`,
+      } as MatchEvent);
+    }
+
+    const currentA = team === "A" ? tamboreauPointsA + 1 : tamboreauPointsA;
+    const currentB = team === "B" ? tamboreauPointsB + 1 : tamboreauPointsB;
+
+    const maxPoints = 12;
+    const winPoints = 10;
+
+    const aWins =
+      (currentA >= winPoints && currentA - currentB >= 2) || currentA >= maxPoints;
+    const bWins =
+      (currentB >= winPoints && currentB - currentA >= 2) || currentB >= maxPoints;
+
+    if (aWins || bWins) {
+      const winner = aWins ? "A" : "B";
+      const winnerId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+      const winnerName =
+        winner === "A"
+          ? selectedMatch.teamA.name.split(" - ")[0]
+          : selectedMatch.teamB.name.split(" - ")[0];
+      const loserName =
+        winner === "A"
+          ? selectedMatch.teamB.name.split(" - ")[0]
+          : selectedMatch.teamA.name.split(" - ")[0];
+
+      const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+      const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+
+      // Resultado do set: ex "Set 1: Direito 10 x 08 Enfermagem"
+      const setResultDesc =
+        winner === "A"
+          ? `Set ${currentSetNumber}: ${winnerName} ${currentA} x ${currentB} ${loserName}`
+          : `Set ${currentSetNumber}: ${loserName} ${currentB} x ${currentA} ${winnerName}`;
+
+      const setWinEvent: MatchEvent = {
+        id: `evt_${Date.now()}_setwin`,
+        type: "set_win",
+        minute: getCurrentEventMinute(),
+        teamId: winnerId,
+        description: setResultDesc,
+        score: `${newScoreA}x${newScoreB}`,
+      };
+
+      const newEvents = [...existingEvents, setWinEvent];
+
+      // Regra melhor de 3: quem chegar a 2 sets vence a partida
+      const matchOver = newScoreA >= 2 || newScoreB >= 2;
+
+      if (matchOver) {
+        const matchWinnerName = newScoreA >= 2 ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const endEvent: MatchEvent = {
+          id: `evt_${Date.now() + 1}_end`,
+          type: "end",
+          minute: getCurrentEventMinute(),
+          description: `Fim de Jogo - ${matchWinnerName} vence por ${newScoreA} x ${newScoreB} sets`,
+        };
+
+        const finishedMatch: Match = {
+          ...selectedMatch,
+          scoreA: newScoreA,
+          scoreB: newScoreB,
+          status: "finished",
+          events: [...newEvents, endEvent],
+        };
+
+        finishMatch(finishedMatch);
+        setTamboreauPointsA(0);
+        setTamboreauPointsB(0);
+        setTamboreauMatchWinner({ name: matchWinnerName, setsA: newScoreA, setsB: newScoreB });
+      } else {
+        const updatedMatch: Match = {
+          ...selectedMatch,
+          scoreA: newScoreA,
+          scoreB: newScoreB,
+          status: "live",
+          events: newEvents,
+        };
+        updateMatch(updatedMatch);
+        setTamboreauPointsA(0);
+        setTamboreauPointsB(0);
+        showNotification(`🏆 Set ${currentSetNumber} para ${winnerName}! (${setResultDesc})`, "success");
+      }
+    } else {
+      setTamboreauPointsA(currentA);
+      setTamboreauPointsB(currentB);
+
+      const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+      const teamName =
+        team === "A"
+          ? selectedMatch.teamA.name.split(" - ")[0]
+          : selectedMatch.teamB.name.split(" - ")[0];
+
+      const pointEvent: MatchEvent = {
+        id: `evt_${Date.now()}_goal`,
+        type: "goal",
+        minute: getCurrentEventMinute(),
+        teamId,
+        description: `Ponto para ${teamName} (${currentA} x ${currentB})`,
+      };
+
+      const updatedMatch: Match = {
+        ...selectedMatch,
+        status: "live",
+        events: [...existingEvents, pointEvent],
+      };
+
+      updateMatch(updatedMatch);
+    }
+  };
 
   const handleGoal = (team: "A" | "B") => {
     if (isBeachTennis) {
@@ -1810,6 +1960,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "goal":
         if (isBasketball) return "🏀";
         if (isVolleyball) return "🏐";
+        if (isTamboreu) return "🎾";
         if (isKarate || isJudo) return "🥋";
         return "⚽";
       case "swimming_result":
@@ -1924,6 +2075,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
         if (isVolleyball) {
           label = event.description || `Ponto - ${teamName}`;
+          break;
+        }
+        if (isTamboreu) {
+          label = event.description || `🎾 Ponto - ${teamName}`;
           break;
         }
         if (isFutebolSociety && event.player) {
@@ -2162,6 +2317,28 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           return {
             ...event,
             timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`,
+            timelineQuarter,
+          };
+        }
+
+        if (isTamboreu) {
+          if (event.type === "goal") {
+            if (event.teamId === selectedMatch.teamA.id) setPointsA += 1;
+            if (event.teamId === selectedMatch.teamB.id) setPointsB += 1;
+          }
+
+          if (event.type === "set_win") {
+            if (event.teamId === selectedMatch.teamA.id) setScoreA += 1;
+            if (event.teamId === selectedMatch.teamB.id) setScoreB += 1;
+            setPointsA = 0;
+            setPointsB = 0;
+          }
+
+          return {
+            ...event,
+            timelineScore: event.type === "goal"
+              ? `🎾 ${setPointsA} x ${setPointsB}`
+              : "",
             timelineQuarter,
           };
         }
@@ -3966,7 +4143,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
-        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && (
+        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
           <div style={styles.eventSection}>
             <h3 style={styles.sectionTitle}>
               {isSetSport
@@ -4033,6 +4210,193 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 Set Ganho {selectedMatch.teamB.name.split(" - ")[0]}
               </button>
             </div>
+          </div>
+        )}
+
+        {isTamboreu && (
+          <div style={styles.eventSection}>
+            {/* Modal Fim de Jogo Tamboréu */}
+            {tamboreauMatchWinner && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.85)",
+                  zIndex: 9999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#18181b",
+                    border: "2px solid #22c55e",
+                    borderRadius: "20px",
+                    padding: "40px 48px",
+                    textAlign: "center",
+                    maxWidth: "420px",
+                    width: "90%",
+                    boxShadow: "0 0 60px rgba(34,197,94,0.3)",
+                  }}
+                >
+                  <div style={{ fontSize: "56px", marginBottom: "12px" }}>🏆</div>
+                  <div style={{ fontSize: "13px", color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", marginBottom: "8px" }}>
+                    Fim de Jogo · Tamboréu
+                  </div>
+                  <div style={{ fontSize: "26px", fontWeight: 900, color: "white", marginBottom: "8px" }}>
+                    {tamboreauMatchWinner.name}
+                  </div>
+                  <div style={{ fontSize: "15px", color: "var(--text-secondary)", marginBottom: "28px" }}>
+                    venceu por <span style={{ color: "white", fontWeight: 700 }}>{tamboreauMatchWinner.setsA} x {tamboreauMatchWinner.setsB}</span> sets
+                  </div>
+                  <button
+                    style={{
+                      background: "#22c55e",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "14px 32px",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                    onClick={() => {
+                      setTamboreauMatchWinner(null);
+                      navigate("/");
+                    }}
+                  >
+                    Ver Resultados
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pontos do Set Atual */}
+            <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
+              🎾 Pontos do Set Atual
+            </h3>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "24px",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ fontSize: "52px", fontWeight: 900, color: "#3b82f6", minWidth: "60px", textAlign: "center" }}>
+                {tamboreauPointsA}
+              </div>
+              <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--text-secondary)" }}>x</div>
+              <div style={{ fontSize: "52px", fontWeight: 900, color: "#ef4444", minWidth: "60px", textAlign: "center" }}>
+                {tamboreauPointsB}
+              </div>
+            </div>
+
+            {/* Botões de ponto */}
+            <div
+              style={styles.eventButtons}
+              className="match-timeline-event-grid"
+            >
+              <button
+                style={{
+                  ...styles.eventBtn,
+                  background: "#1d4ed8",
+                  borderColor: "#3b82f6",
+                  color: "white",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  padding: "20px",
+                }}
+                onClick={() => handleTamboreauPoint("A")}
+                disabled={selectedMatch.status === "finished"}
+              >
+                <Plus size={22} />
+                Ponto {selectedMatch.teamA.name.split(" - ")[0]}
+              </button>
+              <button
+                style={{
+                  ...styles.eventBtn,
+                  background: "#b91c1c",
+                  borderColor: "#ef4444",
+                  color: "white",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  padding: "20px",
+                }}
+                onClick={() => handleTamboreauPoint("B")}
+                disabled={selectedMatch.status === "finished"}
+              >
+                <Plus size={22} />
+                Ponto {selectedMatch.teamB.name.split(" - ")[0]}
+              </button>
+            </div>
+
+            {/* Indicador de regra */}
+            <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
+              Set fecha em 10 pts (vantagem de 2) · Máximo 12 pts · Melhor de 3 sets
+            </div>
+
+            {/* Cronologia da Partida */}
+            {(selectedMatch.events || []).filter((e) =>
+              e.type === "start" || e.type === "set_win" || e.type === "end"
+            ).length > 0 && (
+              <div style={{ marginTop: "24px" }}>
+                <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
+                  📋 Cronologia da Partida
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    maxHeight: "260px",
+                    overflowY: "auto",
+                    padding: "4px 2px",
+                  }}
+                >
+                  {[...(selectedMatch.events || [])]
+                    .filter((e) => e.type === "start" || e.type === "set_win" || e.type === "end")
+                    .sort((a, b) => {
+                      const tsA = parseInt(a.id.split("_")[1] || "0", 10);
+                      const tsB = parseInt(b.id.split("_")[1] || "0", 10);
+                      return tsA - tsB;
+                    })
+                    .map((event) => {
+                      const isSetWin = event.type === "set_win";
+                      const isEnd = event.type === "end";
+                      const isStart = event.type === "start";
+                      const color = isEnd ? "#22c55e" : isSetWin ? "#f59e0b" : "var(--text-secondary)";
+                      const icon = isEnd ? "🏁" : isSetWin ? "🏆" : "▶️";
+                      return (
+                        <div
+                          key={event.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            padding: "10px 14px",
+                            background: isEnd
+                              ? "rgba(34,197,94,0.08)"
+                              : isSetWin
+                              ? "rgba(245,158,11,0.08)"
+                              : "rgba(255,255,255,0.04)",
+                            borderRadius: "8px",
+                            borderLeft: `3px solid ${color}`,
+                          }}
+                        >
+                          <span style={{ fontSize: "16px", flexShrink: 0 }}>{icon}</span>
+                          <span style={{ fontSize: "13px", color, fontWeight: isStart ? 400 : 600, lineHeight: 1.4 }}>
+                            {event.description || (isStart ? "Início" : event.type)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -4482,7 +4846,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
-        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && (
+        {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
           <>
             <div style={styles.eventSection}>
               <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>

@@ -176,7 +176,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
     const isVolei = match.sport.includes('Vôlei') || match.sport.includes('Volei');
     const isTenisMesa = match.sport.includes('Tênis de Mesa') || match.sport.includes('Tenis de Mesa');
     const isFutevolei = match.sport.toLowerCase().includes('futevôlei') || match.sport.toLowerCase().includes('futevolei');
-    const maxScore = (match.sport === 'Basquete 3x3' || isPraia) ? 21 : isFutevolei ? 18 : isVolei ? 25 : isTenisMesa ? 3 : 99;
+    const isTamboreu = match.sport === 'Tamboréu';
+    const maxScore = (match.sport === 'Basquete 3x3' || isPraia) ? 21 : isFutevolei ? 18 : isVolei ? 25 : isTenisMesa ? 3 : isTamboreu ? 2 : 99;
 
     const maxAllowedA = (pred?.scoreB !== '' && Number(pred?.scoreB) === maxScore) ? maxScore - 1 : maxScore;
     const maxAllowedB = (pred?.scoreA !== '' && Number(pred?.scoreA) === maxScore) ? maxScore - 1 : maxScore;

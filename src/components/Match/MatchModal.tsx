@@ -135,6 +135,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const isBeachTennis = currentMatch.sport === "Beach Tennis";
   const isFutsal = currentMatch.sport === "Futsal";
   const isFutebolSociety = currentMatch.sport === "Futebol Society";
+  const isTamboreu = currentMatch.sport === "Tamboréu";
   const isSetSport = [
     "Vôlei",
     "Vôlei de Praia",
@@ -397,6 +398,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "goal":
         if (isBasketball) return <div style={{ fontSize: "16px" }}>🏀</div>;
         if (isBeachTennis) return <div style={{ fontSize: "16px" }}>🎾</div>;
+        if (isTamboreu) return <div style={{ fontSize: "16px" }}>🎾</div>;
         if (isKarate || isJudo) return <div style={{ fontSize: "16px" }}>🥋</div>;
         if (isSoccerSport) return <div style={{ fontSize: "16px" }}>⚽</div>;
         if (isVolleyball) return <div style={{ fontSize: "16px" }}>🏐</div>;
@@ -454,6 +456,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     switch (type) {
       case "goal":
         if (isKarate || isJudo) return "PONTO!";
+        if (isTamboreu) return "PONTO!";
         return isVolleyballFamilySport ? "PONTO!" : "GOL!";
       case "set_win":
         return "Fim do Set";
@@ -525,7 +528,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           : "Jogo";
 
     if (event.type === "goal") {
-      if (isBeachTennis || isVolleyballFamilySport || isKarate || isJudo) {
+      if (isBeachTennis || isVolleyballFamilySport || isKarate || isJudo || isTamboreu) {
         return `Ponto para ${teamName}`;
       }
       if (event.player) {
@@ -687,6 +690,26 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return {
           ...event,
           timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`,
+          timelineQuarter,
+        };
+      }
+
+      if (isTamboreu) {
+        if (event.type === "goal") {
+          if (event.teamId === currentMatch.teamA.id) setPointsA += 1;
+          if (event.teamId === currentMatch.teamB.id) setPointsB += 1;
+        }
+
+        if (event.type === "set_win") {
+          if (event.teamId === currentMatch.teamA.id) setScoreA += 1;
+          if (event.teamId === currentMatch.teamB.id) setScoreB += 1;
+          setPointsA = 0;
+          setPointsB = 0;
+        }
+
+        return {
+          ...event,
+          timelineScore: event.type === "goal" ? `🎾 ${setPointsA} x ${setPointsB}` : "",
           timelineQuarter,
         };
       }
