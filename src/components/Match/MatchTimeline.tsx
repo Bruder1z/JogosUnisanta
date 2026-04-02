@@ -1,4 +1,4 @@
-import { useState, useEffect, type FC } from "react";
+import { useState, useEffect, useRef, type FC } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotification } from "../NotificationContext";
 import {
@@ -60,6 +60,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [showPlayerInput, setShowPlayerInput] = useState<{
     type: "goal" | "yellow_card" | "red_card" | "penalty_scored";
     team: "A" | "B";
+    points?: 1 | 2 | 3;
   } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
@@ -159,6 +160,28 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [tamboreauPointsA, setTamboreauPointsA] = useState<number>(0);
   const [tamboreauPointsB, setTamboreauPointsB] = useState<number>(0);
   const [tamboreauMatchWinner, setTamboreauMatchWinner] = useState<{ name: string; setsA: number; setsB: number } | null>(null);
+  const [flashTeam, setFlashTeam] = useState<"A" | "B" | "both" | null>(null);
+  const prevScoreRef = useRef<{ a: number; b: number; id: string } | null>(null);
+
+  // Flash do placar: branco por padrão, vermelho por 4s ao marcar
+  useEffect(() => {
+    if (!selectedMatch) { prevScoreRef.current = null; return; }
+    const prev = prevScoreRef.current;
+    const curr = { a: selectedMatch.scoreA, b: selectedMatch.scoreB, id: selectedMatch.id };
+    if (prev !== null && prev.id === curr.id) {
+      if (curr.a > prev.a && curr.b > prev.b) {
+        setFlashTeam("both");
+        setTimeout(() => setFlashTeam(null), 4000);
+      } else if (curr.a > prev.a) {
+        setFlashTeam("A");
+        setTimeout(() => setFlashTeam(null), 4000);
+      } else if (curr.b > prev.b) {
+        setFlashTeam("B");
+        setTimeout(() => setFlashTeam(null), 4000);
+      }
+    }
+    prevScoreRef.current = curr;
+  }, [selectedMatch?.scoreA, selectedMatch?.scoreB, selectedMatch?.id]);
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
     if (!match) return 15 * 60;
@@ -1232,35 +1255,35 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleBasketballPoint = (team: "A" | "B", points: 1 | 2 | 3) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)) return;
+    // Abre modal de seleção de atleta
+    setShowPlayerInput({ type: "goal", team, points });
+  };
 
-    if (isBasketball3x3) {
-      if (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21) {
-        return; // sudden death already reached
-      }
-    }
+  const confirmBasketballPoint = (playerName: string) => {
+    if (!showPlayerInput || !selectedMatch) return;
+    const points = showPlayerInput.points ?? 2;
+    const team = showPlayerInput.team;
 
     if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({
-        type: "start",
-        minute: getCurrentEventMinute(),
-      });
-      if (started) {
-        selectedMatch.events = started.events;
-      }
+      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
+      if (started) selectedMatch.events = started.events;
       setIsRunning(true);
     }
 
-    const scoringTeamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const currentA = selectedMatch.scoreA;
-    const currentB = selectedMatch.scoreB;
-    const nextA = team === "A" ? currentA + points : currentA;
-    const nextB = team === "B" ? currentB + points : currentB;
+    const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const nextA = team === "A" ? selectedMatch.scoreA + points : selectedMatch.scoreA;
+    const nextB = team === "B" ? selectedMatch.scoreB + points : selectedMatch.scoreB;
     const currentQuarter =
-      (selectedMatch.events || []).filter((e) => e.type === "halftime").length +
-      1;
+      (selectedMatch.events || []).filter((e) => e.type === "halftime").length + 1;
+    const teamShort = team === "A"
+      ? selectedMatch.teamA.name.split(" - ")[0]
+      : selectedMatch.teamB.name.split(" - ")[0];
 
-    const description = `[Q${currentQuarter}] [${nextA} x ${nextB}] +${points} Ponto${points > 1 ? "s" : ""} para ${team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
+    const hasPlayer = playerName && playerName.trim();
+    const description = hasPlayer
+      ? `[Q${currentQuarter}] [${nextA} x ${nextB}] 🏀 ${playerName.trim()} +${points}pts (${teamShort})`
+      : `[Q${currentQuarter}] [${nextA} x ${nextB}] +${points} Ponto${points > 1 ? "s" : ""} para ${teamShort}`;
 
     const updatedMatch: Match = {
       ...selectedMatch,
@@ -1274,12 +1297,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           type: "goal",
           minute: getCurrentEventMinute(),
           teamId: scoringTeamId,
-          description: description,
+          player: hasPlayer ? playerName.trim() : undefined,
+          description,
         } as MatchEvent,
       ],
     };
 
     updateMatch(updatedMatch);
+    setShowPlayerInput(null);
   };
 
   const handleKaratePoint = (team: "A" | "B", points: 1 | 2 | 3, typeLabel: string) => {
@@ -1903,6 +1928,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const confirmPlayerEvent = (playerName: string) => {
     if (!showPlayerInput || !selectedMatch || !playerName.trim()) return;
 
+    if (isBasketball) {
+      confirmBasketballPoint(playerName);
+      return;
+    }
+
     const teamId =
       showPlayerInput.team === "A"
         ? selectedMatch.teamA.id
@@ -2034,6 +2064,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const stripPlayerNameFromLabel = (label: string, event: MatchEvent) => {
     if (!event.player) return label;
+    if (isBasketball && event.type === "goal") return label;
     if (isHandebol && event.type === "goal") return label;
     if (isFutebolX1) return label;
     if (isFutsal) return label;
@@ -2063,7 +2094,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     switch (event.type) {
       case "goal":
         if (isBasketball) {
-          label = event.description || "";
+          if (event.player) {
+            const pts = event.description?.match(/\+(\d+)pts/)?.[1]
+              ?? event.description?.match(/\+(\d+)\s*Ponto/)?.[1];
+            const teamShort = teamName.split(" - ")[0];
+            label = pts
+              ? `🏀 ${event.player} +${pts}pts (${teamShort})`
+              : `🏀 ${event.player} (${teamShort})`;
+          } else {
+            label = event.description || "";
+          }
           break;
         }
         if (isHandebol) {
@@ -3535,7 +3575,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     alignItems: "center",
                   }}
                 >
-                  <div style={styles.score}>{selectedMatch.scoreA}</div>
+                  <div style={{
+                    ...styles.score,
+                    color: (flashTeam === "A" || flashTeam === "both") ? "var(--accent-color)" : "white",
+                    transition: "color 0.4s ease",
+                  }}>{selectedMatch.scoreA}</div>
                   {isSetSport && (
                     <div
                       style={{
@@ -3713,7 +3757,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     alignItems: "center",
                   }}
                 >
-                  <div style={styles.score}>{selectedMatch.scoreB}</div>
+                  <div style={{
+                    ...styles.score,
+                    color: (flashTeam === "B" || flashTeam === "both") ? "var(--accent-color)" : "white",
+                    transition: "color 0.4s ease",
+                  }}>{selectedMatch.scoreB}</div>
                   {isSetSport && (
                     <div
                       style={{
@@ -4456,142 +4504,37 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         {isBasketball && (
           <div style={styles.eventSection}>
-            <h3
-              style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}
-            >
+            <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
               🏀 Pontuação
             </h3>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                gap: "15px",
-              }}
-            >
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    textAlign: "center",
-                    marginBottom: "4px",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {selectedMatch.teamA.name.split(" - ")[0]}
-                </div>
-                <button
-                  style={{
-                    ...styles.eventBtn,
-                    background: "rgba(59, 130, 246, 0.15)",
-                    borderColor: "#3b82f6",
-                    color: "#3b82f6",
-                  }}
-                  onClick={() => handleBasketballPoint("A", 1)}
-                  disabled={
-                    isBasketball3x3 &&
-                    (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
-                  }
-                >
-                  +1 Ponto (
-                  {isBasketball3x3 ? "Dentro da linha" : "Lance Livre"})
-                </button>
-                <button
-                  style={{
-                    ...styles.eventBtn,
-                    background: "rgba(59, 130, 246, 0.15)",
-                    borderColor: "#3b82f6",
-                    color: "#3b82f6",
-                  }}
-                  onClick={() => handleBasketballPoint("A", 2)}
-                  disabled={
-                    isBasketball3x3 &&
-                    (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
-                  }
-                >
-                  +2 Pontos ({isBasketball3x3 ? "Fora da linha" : "Quadra"})
-                </button>
-                {!isBasketball3x3 && (
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "rgba(59, 130, 246, 0.15)",
-                      borderColor: "#3b82f6",
-                      color: "#3b82f6",
-                    }}
-                    onClick={() => handleBasketballPoint("A", 3)}
-                  >
-                    +3 Pontos (Fora)
-                  </button>
-                )}
-              </div>
-
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    textAlign: "center",
-                    marginBottom: "4px",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {selectedMatch.teamB.name.split(" - ")[0]}
-                </div>
-                <button
-                  style={{
-                    ...styles.eventBtn,
-                    background: "rgba(239, 68, 68, 0.15)",
-                    borderColor: "#ef4444",
-                    color: "#ef4444",
-                  }}
-                  onClick={() => handleBasketballPoint("B", 1)}
-                  disabled={
-                    isBasketball3x3 &&
-                    (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
-                  }
-                >
-                  +1 Ponto (
-                  {isBasketball3x3 ? "Dentro da linha" : "Lance Livre"})
-                </button>
-                <button
-                  style={{
-                    ...styles.eventBtn,
-                    background: "rgba(239, 68, 68, 0.15)",
-                    borderColor: "#ef4444",
-                    color: "#ef4444",
-                  }}
-                  onClick={() => handleBasketballPoint("B", 2)}
-                  disabled={
-                    isBasketball3x3 &&
-                    (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)
-                  }
-                >
-                  +2 Pontos ({isBasketball3x3 ? "Fora da linha" : "Quadra"})
-                </button>
-                {!isBasketball3x3 && (
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "rgba(239, 68, 68, 0.15)",
-                      borderColor: "#ef4444",
-                      color: "#ef4444",
-                    }}
-                    onClick={() => handleBasketballPoint("B", 3)}
-                  >
-                    +3 Pontos (Fora)
-                  </button>
-                )}
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "15px" }}>
+              {(["A", "B"] as const).map((team) => {
+                const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
+                const teamBg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
+                const isDisabled = isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21);
+                return (
+                  <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {teamObj.name.split(" - ")[0]}
+                    </div>
+                    <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                      onClick={() => handleBasketballPoint(team, 1)} disabled={isDisabled}>
+                      +1 {isBasketball3x3 ? "(Dentro da linha)" : "(Lance Livre)"}
+                    </button>
+                    <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                      onClick={() => handleBasketballPoint(team, 2)} disabled={isDisabled}>
+                      +2 {isBasketball3x3 ? "(Fora da linha)" : "(Quadra)"}
+                    </button>
+                    {!isBasketball3x3 && (
+                      <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                        onClick={() => handleBasketballPoint(team, 3)}>
+                        +3 (Fora)
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -5073,7 +5016,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           <div style={styles.modal}>
             <div style={styles.modalContentLarge}>
               <h3 style={styles.modalTitle}>
-                {showPlayerInput.type === "goal" && (isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?")}
+                {showPlayerInput.type === "goal" && (
+                  isBasketball
+                    ? `🏀 +${showPlayerInput.points} Ponto${(showPlayerInput.points ?? 1) > 1 ? "s" : ""} — Quem converteu?`
+                    : isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?"
+                )}
                 {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
                 {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
                 {showPlayerInput.type === "penalty_scored" &&
@@ -6061,7 +6008,7 @@ const styles: Record<string, React.CSSProperties> = {
   score: {
     fontSize: "64px",
     fontWeight: 700,
-    color: "var(--accent-color)",
+    color: "white",
     marginTop: "8px",
   },
   timeDisplay: {

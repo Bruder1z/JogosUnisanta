@@ -531,6 +531,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       if (isBeachTennis || isVolleyballFamilySport || isKarate || isJudo || isTamboreu) {
         return `Ponto para ${teamName}`;
       }
+      if (isBasketball) {
+        const pts = event.description?.match(/\+(\d+)\s*Ponto/)?.[1];
+        if (event.player) {
+          return pts ? `🏀 ${event.player} +${pts}pts` : `🏀 ${event.player}`;
+        }
+        return pts ? `🏀 +${pts}pts — ${teamName}` : `🏀 ${teamName}`;
+      }
       if (event.player) {
         return `GOL! ${event.player}`;
       }
