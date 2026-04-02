@@ -592,9 +592,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           ? currentMatch.teamB.name.split(" - ")[0]
           : "Faculdade";
 
+    const pontuacaoLabel = event.player
+      ? `🏀 ${event.player} +${pointValue}pts — ${teamName}`
+      : `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`;
+
     return {
       tempo: `${minutes}:${String(seconds).padStart(2, "0")}`,
-      pontuacaoLabel: `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`,
+      pontuacaoLabel,
       placar: (event.timelineScore || "0x0").replace("x", "-"),
     };
   };

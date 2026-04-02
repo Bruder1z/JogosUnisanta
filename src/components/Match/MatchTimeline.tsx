@@ -1949,7 +1949,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   // Obter estatísticas de um jogador
   const getPlayerStats = (playerName: string) => {
     if (!selectedMatch?.events)
-      return { goals: 0, yellowCards: 0, redCards: 0, canPlay: true };
+      return { goals: 0, points: 0, yellowCards: 0, redCards: 0, canPlay: true };
 
     const playerEvents = selectedMatch.events.filter(
       (e) => e.player === playerName,
@@ -1957,13 +1957,22 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const goals = playerEvents.filter(
       (e) => e.type === "goal" || e.type === "penalty_scored",
     ).length;
+    // Para basquete, somar os pontos reais de cada evento
+    const points = isBasketball
+      ? playerEvents
+          .filter((e) => e.type === "goal")
+          .reduce((sum, e) => {
+            const pts = Number(e.description?.match(/\+(\d+)/)?.[1] || 1);
+            return sum + pts;
+          }, 0)
+      : goals;
     const yellowCards = playerEvents.filter(
       (e) => e.type === "yellow_card",
     ).length;
     const redCards = playerEvents.filter((e) => e.type === "red_card").length;
     const canPlay = redCards === 0;
 
-    return { goals, yellowCards, redCards, canPlay };
+    return { goals, points, yellowCards, redCards, canPlay };
   };
 
   const handleResetMatch = () => {
@@ -2055,9 +2064,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           ? selectedMatch.teamB.name.split(" - ")[0]
           : "Faculdade";
 
+    const playerLabel = event.player
+      ? `🏀 ${event.player} +${pointValue}pts`
+      : `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`;
+
     return {
       tempo: `${minutes}:${String(seconds).padStart(2, "0")}`,
-      pontuacaoLabel: `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`,
+      pontuacaoLabel: playerLabel,
       placar: (event.timelineScore || "0x0").replace("x", "-"),
     };
   };
@@ -5060,9 +5073,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         >
                           <span style={styles.playerName}>{playerName}</span>
                           <div style={styles.playerStats}>
-                            {stats.goals > 0 && (
+                            {stats.points > 0 && (
                               <span style={styles.statBadge}>
-                                ⚽ {stats.goals}
+                                {isBasketball ? `🏀 ${stats.points}pts` : `⚽ ${stats.goals}`}
                               </span>
                             )}
                             {stats.yellowCards > 0 && (
