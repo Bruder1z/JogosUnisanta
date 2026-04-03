@@ -172,12 +172,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
         return `${day} DE ${months[parseInt(month) - 1]}. DE ${year}`;
     };
 
-    const isPraia = match.sport.includes('Praia');
-    const isVolei = match.sport.includes('Vôlei') || match.sport.includes('Volei');
     const isTenisMesa = match.sport.includes('Tênis de Mesa') || match.sport.includes('Tenis de Mesa');
-    const isFutevolei = match.sport.toLowerCase().includes('futevôlei') || match.sport.toLowerCase().includes('futevolei');
     const isTamboreu = match.sport === 'Tamboréu';
-    const isBeachTennis = match.sport === 'Beach Tennis';
 
     // Tabela de regras por modalidade e fase
     const SCORE_RULES: Record<string, { label: string; classificacao: number; final: number }> = {
