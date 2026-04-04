@@ -58,9 +58,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [currentMinute, setCurrentMinute] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [showPlayerInput, setShowPlayerInput] = useState<{
-    type: "goal" | "yellow_card" | "red_card" | "penalty_scored";
+    type: "goal" | "yellow_card" | "red_card" | "penalty_scored" | "penalty_missed";
     team: "A" | "B";
     points?: 1 | 2 | 3;
+    isShootout?: boolean;
   } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
@@ -119,6 +120,46 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const isFutebolX1 = selectedMatch?.sport === "Futebol X1";
   const isFutsal = selectedMatch?.sport === "Futsal";
   const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
+
+  // Disputa de pênaltis: ativa quando jogo terminou empatado no tempo regulamentar
+  const isPenaltyShootoutSport = isFutsal || isFutebolSociety;
+  const isMatchDrawn = selectedMatch?.status !== "finished"
+    && selectedMatch?.scoreA === selectedMatch?.scoreB
+    && (selectedMatch?.events || []).some((e) => e.type === "end" || e.description?.includes("Intervalo"));
+
+  // Detecta se a disputa já foi iniciada (evento halftime com descrição especial)
+  const shootoutStarted = (selectedMatch?.events || []).some(
+    (e) => e.type === "halftime" && e.description?.startsWith("⚽ Início da Disputa de Pênaltis")
+  );
+
+  // Calcula placar da disputa de pênaltis a partir dos eventos
+  const shootoutStats = (() => {
+    if (!selectedMatch) return { scoredA: 0, scoredB: 0, totalA: 0, totalB: 0, usedPlayersA: [] as string[], usedPlayersB: [] as string[], nextTeam: "A" as "A" | "B", isSuddenDeath: false };
+    const startIdx = (selectedMatch.events || []).findIndex(
+      (e) => e.type === "halftime" && e.description?.startsWith("⚽ Início da Disputa de Pênaltis")
+    );
+    if (startIdx === -1) return { scoredA: 0, scoredB: 0, totalA: 0, totalB: 0, usedPlayersA: [] as string[], usedPlayersB: [] as string[], nextTeam: "A" as "A" | "B", isSuddenDeath: false };
+    // Lê o time que iniciou do evento
+    const startDesc = (selectedMatch.events || [])[startIdx]?.description || "";
+    const firstTeamMatch = startDesc.match(/first=([AB])/);
+    const firstTeam: "A" | "B" = (firstTeamMatch?.[1] as "A" | "B") || shootoutFirstTeam;
+    const shootoutEvents = (selectedMatch.events || []).slice(startIdx + 1).filter(
+      (e) => e.type === "penalty_scored" || e.type === "penalty_missed"
+    );
+    const scoredA = shootoutEvents.filter((e) => e.type === "penalty_scored" && e.teamId === selectedMatch.teamA.id).length;
+    const scoredB = shootoutEvents.filter((e) => e.type === "penalty_scored" && e.teamId === selectedMatch.teamB.id).length;
+    const totalA = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamA.id).length;
+    const totalB = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamB.id).length;
+    // Jogadores já utilizados nesta rodada (para controle de repetição)
+    const usedPlayersA = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamA.id && e.player).map((e) => e.player as string);
+    const usedPlayersB = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamB.id && e.player).map((e) => e.player as string);
+    // Próximo time a cobrar: alternância baseada no time que iniciou
+    const totalKicks = totalA + totalB;
+    // Se A iniciou: par=A, ímpar=B. Se B iniciou: par=B, ímpar=A
+    const nextTeam: "A" | "B" = totalKicks % 2 === 0 ? firstTeam : (firstTeam === "A" ? "B" : "A");
+    const isSuddenDeath = totalA >= 3 && totalB >= 3;
+    return { scoredA, scoredB, totalA, totalB, usedPlayersA, usedPlayersB, nextTeam, isSuddenDeath };
+  })();
   const isBasketball =
     selectedMatch?.sport === "Basquetebol" ||
     selectedMatch?.sport === "Basquete 3x3";
@@ -162,6 +203,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [tamboreauMatchWinner, setTamboreauMatchWinner] = useState<{ name: string; setsA: number; setsB: number } | null>(null);
   const [flashTeam, setFlashTeam] = useState<"A" | "B" | "both" | null>(null);
   const prevScoreRef = useRef<{ a: number; b: number; id: string } | null>(null);
+  const [penaltyShootoutActive, setPenaltyShootoutActive] = useState(false);
+  const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
 
   // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
@@ -1231,11 +1274,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleEndMatch = () => {
     if (!selectedMatch) return;
 
+    // Futsal / Futebol Society empatados → disputa de pênaltis
+    if (isPenaltyShootoutSport && selectedMatch.scoreA === selectedMatch.scoreB && !shootoutStarted) {
+      setPenaltyShootoutActive(true);
+      return;
+    }
+
     const finalScoreLabel = isBeachTennis
       ? `${beachSetsState.setsA} x ${beachSetsState.setsB} (sets)`
       : `${selectedMatch.scoreA} x ${selectedMatch.scoreB}`;
 
-    // Criar o evento final com o placar
     const finalEvent: MatchEvent = {
       id: `evt_${Date.now()}`,
       type: "end",
@@ -1243,7 +1291,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       description: `Fim de Jogo - Placar Final: ${finalScoreLabel}`,
     };
 
-    // Atualizar a partida com status 'finished' e adicionar o evento
     const finishedMatch: Match = {
       ...selectedMatch,
       status: "finished",
@@ -1925,11 +1972,129 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     addEvent(type, teamId);
   };
 
+  const handleStartPenaltyShootout = (firstTeam: "A" | "B" = "A") => {
+    if (!selectedMatch) return;
+    setShootoutFirstTeam(firstTeam);
+    const startEvent: MatchEvent = {
+      id: `evt_${Date.now()}_shootout_start`,
+      type: "halftime",
+      minute: getCurrentEventMinute(),
+      description: `⚽ Início da Disputa de Pênaltis|first=${firstTeam}`,
+    };
+    updateMatch({
+      ...selectedMatch,
+      events: [...(selectedMatch.events || []), startEvent],
+    });
+    setPenaltyShootoutActive(true);
+  };
+
+  const handleShootoutPenalty = (type: "penalty_scored" | "penalty_missed", team: "A" | "B") => {
+    if (!selectedMatch) return;
+    // Abre modal de seleção de atleta para ambos os casos
+    setShowPlayerInput({ type, team, isShootout: true });
+  };
+
+  const confirmShootoutPenalty = (type: "penalty_scored" | "penalty_missed", team: "A" | "B", playerName: string) => {
+    if (!selectedMatch) return;
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A"
+      ? selectedMatch.teamA.name.split(" - ")[0]
+      : selectedMatch.teamB.name.split(" - ")[0];
+
+    const { scoredA, scoredB, totalA, totalB } = shootoutStats;
+    const nextScoredA = type === "penalty_scored" && team === "A" ? scoredA + 1 : scoredA;
+    const nextScoredB = type === "penalty_scored" && team === "B" ? scoredB + 1 : scoredB;
+    const nextTotalA = team === "A" ? totalA + 1 : totalA;
+    const nextTotalB = team === "B" ? totalB + 1 : totalB;
+
+    const desc = type === "penalty_scored"
+      ? `🎯 ${playerName} converteu! ${teamName} (${nextScoredA} x ${nextScoredB})`
+      : `❌ ${playerName} perdeu! ${teamName} (${nextScoredA} x ${nextScoredB})`;
+
+    const newEvent: MatchEvent = {
+      id: `evt_${Date.now()}_pen`,
+      type,
+      minute: getCurrentEventMinute(),
+      teamId,
+      player: playerName,
+      description: desc,
+    };
+
+    const updatedEvents = [...(selectedMatch.events || []), newEvent];
+    const SERIES = 3;
+    let matchOver = false;
+    let winner: "A" | "B" | null = null;
+
+    // Cobranças restantes na série inicial (máx 3 cada)
+    const remainingInSeriesA = Math.max(0, SERIES - nextTotalA);
+    const remainingInSeriesB = Math.max(0, SERIES - nextTotalB);
+    const inInitialSeries = nextTotalA < SERIES || nextTotalB < SERIES;
+
+    if (inInitialSeries) {
+      // Vitória antecipada: adversário não pode mais alcançar
+      if (nextScoredB > nextScoredA + remainingInSeriesA) { matchOver = true; winner = "B"; }
+      if (!matchOver && nextScoredA > nextScoredB + remainingInSeriesB) { matchOver = true; winner = "A"; }
+      // Fim da série inicial (ambos cobram 3)
+      if (!matchOver && nextTotalA === SERIES && nextTotalB === SERIES) {
+        if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
+        else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
+        // Empate → morte súbita (não encerra)
+      }
+    } else {
+      // Morte súbita: rodada completa quando ambos cobram 1 nesta rodada extra
+      // Uma rodada extra = ambos totalA e totalB avançaram igualmente além de SERIES
+      if (nextTotalA === nextTotalB) {
+        // Ambos completaram a mesma rodada extra
+        if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
+        else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
+        // Empate → próxima rodada
+      } else {
+        // Um cobrou, o outro ainda não — vitória antecipada se impossível alcançar
+        const extraRound = Math.max(nextTotalA, nextTotalB) - SERIES;
+        const remainingOther = extraRound - Math.min(nextTotalA, nextTotalB) + SERIES;
+        if (team === "A" && nextScoredA > nextScoredB + (nextTotalB < nextTotalA ? 1 : 0)) { matchOver = true; winner = "A"; }
+        if (!matchOver && team === "B" && nextScoredB > nextScoredA + (nextTotalA < nextTotalB ? 1 : 0)) { matchOver = true; winner = "B"; }
+      }
+    }
+
+    if (matchOver && winner) {
+      const winnerName = winner === "A"
+        ? selectedMatch.teamA.name.split(" - ")[0]
+        : selectedMatch.teamB.name.split(" - ")[0];
+      const endEvent: MatchEvent = {
+        id: `evt_${Date.now() + 1}_end`,
+        type: "end",
+        minute: getCurrentEventMinute(),
+        description: `🏆 Fim da Disputa de Pênaltis — ${winnerName} vence (${nextScoredA} x ${nextScoredB})`,
+      };
+      finishMatch({ ...selectedMatch, events: [...updatedEvents, endEvent], status: "finished" });
+      setPenaltyShootoutActive(false);
+      navigate("/");
+    } else {
+      updateMatch({ ...selectedMatch, events: updatedEvents });
+    }
+    setShowPlayerInput(null);
+  };
+
   const confirmPlayerEvent = (playerName: string) => {
     if (!showPlayerInput || !selectedMatch || !playerName.trim()) return;
 
     if (isBasketball) {
       confirmBasketballPoint(playerName);
+      return;
+    }
+
+    if (showPlayerInput.isShootout) {
+      confirmShootoutPenalty(
+        showPlayerInput.type as "penalty_scored" | "penalty_missed",
+        showPlayerInput.team,
+        playerName.trim(),
+      );
+      return;
+    }
+
+    if (showPlayerInput.type === "penalty_missed") {
+      setShowPlayerInput(null);
       return;
     }
 
@@ -3809,8 +3974,161 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           )}
         </div>
 
+        {/* Banner de Disputa de Pênaltis — aparece ao clicar Fim de Jogo com empate */}
+        {isPenaltyShootoutSport && penaltyShootoutActive && !shootoutStarted && selectedMatch && (
+          <div style={{
+            margin: '16px 0',
+            padding: '24px',
+            background: 'rgba(234,179,8,0.08)',
+            border: '1px solid rgba(234,179,8,0.4)',
+            borderRadius: '14px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: 800, color: '#f59e0b', marginBottom: '6px' }}>
+              ⚽ Empate no tempo regulamentar — {selectedMatch.scoreA} x {selectedMatch.scoreB}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Disputa por 3 pênaltis alternados. Persistindo o empate, cobranças alternadas até o desempate.
+            </div>
+
+            {/* Seleção do time que inicia */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                Quem cobra primeiro?
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {(["A", "B"] as const).map((team) => {
+                  const name = team === "A"
+                    ? selectedMatch.teamA.name.split(" - ")[0]
+                    : selectedMatch.teamB.name.split(" - ")[0];
+                  const color = team === "A" ? "#3b82f6" : "#ef4444";
+                  const isSelected = shootoutFirstTeam === team;
+                  return (
+                    <button
+                      key={team}
+                      onClick={() => setShootoutFirstTeam(team)}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '8px', border: `2px solid ${isSelected ? color : 'rgba(255,255,255,0.15)'}`,
+                        background: isSelected ? `${color}22` : 'transparent',
+                        color: isSelected ? color : 'var(--text-secondary)',
+                        fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              style={{
+                background: '#f59e0b', color: 'black', border: 'none',
+                borderRadius: '10px', padding: '14px 32px',
+                fontSize: '15px', fontWeight: 800, cursor: 'pointer', width: '100%',
+              }}
+              onClick={() => handleStartPenaltyShootout(shootoutFirstTeam)}
+            >
+              🥅 Iniciar Disputa de Pênaltis
+            </button>
+          </div>
+        )}
+
+        {/* Painel de cobranças — visível durante toda a disputa após início */}
+        {isPenaltyShootoutSport && shootoutStarted && selectedMatch && selectedMatch.status !== "finished" && (
+          <div style={{
+            margin: '16px 0',
+            padding: '20px',
+            background: 'rgba(234,179,8,0.06)',
+            border: '1px solid rgba(234,179,8,0.3)',
+            borderRadius: '14px',
+          }}>
+            <h3 style={{ ...styles.sectionTitle, color: '#f59e0b', marginBottom: '8px', textAlign: 'center' }}>
+              🥅 Disputa de Pênaltis {shootoutStats.isSuddenDeath && <span style={{ fontSize: '12px', color: '#ef4444' }}>— MORTE SÚBITA</span>}
+            </h3>
+
+            {/* Indicador de vez */}
+            <div style={{ textAlign: 'center', marginBottom: '14px', fontSize: '13px', fontWeight: 700, color: shootoutStats.nextTeam === "A" ? "#3b82f6" : "#ef4444" }}>
+              ▶ Vez de cobrar: {shootoutStats.nextTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}
+            </div>
+
+            {/* Placar da disputa */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '24px', marginBottom: '16px', padding: '12px',
+              background: 'rgba(0,0,0,0.3)', borderRadius: '10px',
+            }}>
+              {(["A", "B"] as const).map((team) => {
+                const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                const scored = team === "A" ? shootoutStats.scoredA : shootoutStats.scoredB;
+                const total = team === "A" ? shootoutStats.totalA : shootoutStats.totalB;
+                const color = team === "A" ? "#3b82f6" : "#ef4444";
+                const SERIES = 3;
+                return (
+                  <div key={team} style={{ textAlign: 'center', flex: 1 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      {teamObj.name.split(" - ")[0]}
+                    </div>
+                    <div style={{ fontSize: '44px', fontWeight: 900, color, lineHeight: 1 }}>{scored}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      {total}/{Math.max(SERIES, total)} cobranças
+                    </div>
+                    {/* Indicadores de cobrança */}
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginTop: '6px' }}>
+                      {Array.from({ length: Math.max(SERIES, total) }).map((_, i) => {
+                        const startIdx = (selectedMatch.events || []).findIndex(
+                          (e) => e.type === "halftime" && e.description === "⚽ Início da Disputa de Pênaltis"
+                        );
+                        const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+                        const kicks = (selectedMatch.events || []).slice(startIdx + 1).filter(
+                          (e) => (e.type === "penalty_scored" || e.type === "penalty_missed") && e.teamId === teamId
+                        );
+                        const kick = kicks[i];
+                        const bg = !kick ? 'rgba(255,255,255,0.15)' : kick.type === "penalty_scored" ? '#22c55e' : '#ef4444';
+                        return <div key={i} style={{ width: '14px', height: '14px', borderRadius: '50%', background: bg }} />;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Botões de cobrança — só o time da vez está ativo */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {(["A", "B"] as const).map((team) => {
+                const isMyTurn = shootoutStats.nextTeam === team;
+                const color = team === "A" ? "#3b82f6" : "#ef4444";
+                const bg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
+                const name = team === "A"
+                  ? selectedMatch.teamA.name.split(" - ")[0]
+                  : selectedMatch.teamB.name.split(" - ")[0];
+                return (
+                  <div key={team} style={{ display: 'flex', flexDirection: 'column', gap: '8px', opacity: isMyTurn ? 1 : 0.35 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', color }}>{name}</div>
+                    <button
+                      style={{ ...styles.eventBtn, background: bg, borderColor: color, color, fontWeight: 700 }}
+                      onClick={() => handleShootoutPenalty("penalty_scored", team)}
+                      disabled={!isMyTurn}
+                    >
+                      🎯 Pênalti Marcado
+                    </button>
+                    <button
+                      style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn, opacity: isMyTurn ? 1 : 0.35 }}
+                      onClick={() => handleShootoutPenalty("penalty_missed", team)}
+                      disabled={!isMyTurn}
+                    >
+                      ❌ Pênalti Perdido
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Controles do Jogo */}
-        <div style={styles.gameControls}>
+        <div style={{ ...styles.gameControls, display: penaltyShootoutActive ? 'none' : undefined }}>
           <h3
             style={styles.sectionTitle}
             className="match-timeline-section-title"
@@ -4121,6 +4439,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             </div>
           </>
         )}
+
+        {/* Blocos de eventos — ocultos durante toda a disputa de pênaltis */}
+        <div style={{ display: (penaltyShootoutActive) ? 'none' : undefined }}>
 
         {isXadrez && (
           <div style={{ ...styles.eventSection, background: "rgba(30, 30, 30, 0.4)", padding: "24px", borderRadius: "16px", border: "1px solid #333" }}>
@@ -4944,6 +5265,50 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </div>
             </div>
 
+            {/* Painel de cobranças da disputa de pênaltis */}
+            {isPenaltyShootoutSport && shootoutStarted && selectedMatch.status !== "finished" && (
+              <div style={{ ...styles.eventSection, background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: "12px" }}>
+                <h3 style={{ ...styles.sectionTitle, color: "#f59e0b", marginBottom: "12px" }}>
+                  🥅 Disputa de Pênaltis
+                </h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", marginBottom: "16px", padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "10px" }}>
+                  {(["A", "B"] as const).map((team, i) => {
+                    const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                    const scored = team === "A" ? shootoutStats.scoredA : shootoutStats.scoredB;
+                    const total = team === "A" ? shootoutStats.totalA : shootoutStats.totalB;
+                    const color = team === "A" ? "#3b82f6" : "#ef4444";
+                    return (
+                      <div key={team} style={{ textAlign: "center", flex: 1 }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "2px" }}>{teamObj.name.split(" - ")[0]}</div>
+                        <div style={{ fontSize: "40px", fontWeight: 900, color }}>{scored}</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{total} cobranças</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  {(["A", "B"] as const).map((team) => {
+                    const color = team === "A" ? "#3b82f6" : "#ef4444";
+                    const bg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
+                    const name = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+                    return (
+                      <div key={team} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 700, textAlign: "center", color }}>{name}</div>
+                        <button style={{ ...styles.eventBtn, background: bg, borderColor: color, color, fontWeight: 700 }}
+                          onClick={() => handleShootoutPenalty("penalty_scored", team)}>
+                          🎯 Pênalti Marcado
+                        </button>
+                        <button style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                          onClick={() => handleShootoutPenalty("penalty_missed", team)}>
+                          ❌ Pênalti Perdido
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {isFutebolX1 && (
               <div style={styles.eventSection}>
                 <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
@@ -5020,103 +5385,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   Cancelar
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Seleção de Jogador */}
-        {showPlayerInput && selectedMatch && (
-          <div style={styles.modal}>
-            <div style={styles.modalContentLarge}>
-              <h3 style={styles.modalTitle}>
-                {showPlayerInput.type === "goal" && (
-                  isBasketball
-                    ? `🏀 +${showPlayerInput.points} Ponto${(showPlayerInput.points ?? 1) > 1 ? "s" : ""} — Quem converteu?`
-                    : isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?"
-                )}
-                {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
-                {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
-                {showPlayerInput.type === "penalty_scored" &&
-                  "🎯 Pênalti Marcado"}
-              </h3>
-              <div style={styles.modalSubtitle}>
-                {showPlayerInput.team === "A"
-                  ? selectedMatch.teamA.name
-                  : selectedMatch.teamB.name}
-              </div>
-              {(() => {
-                const team =
-                  showPlayerInput.team === "A"
-                    ? selectedMatch.teamA
-                    : selectedMatch.teamB;
-                const availableAthletes = athletes.filter((a) =>
-                  athleteMatchesTeamAndMatch(a, team),
-                );
-
-                return (
-                  <div style={styles.playerList} className="player-list">
-                    {availableAthletes.map((athlete) => {
-                      const playerName = `${athlete.firstName} ${athlete.lastName}`;
-                      const stats = getPlayerStats(playerName);
-                      return (
-                        <button
-                          key={athlete.id}
-                          className={stats.canPlay ? "player-item-hover" : ""}
-                          style={{
-                            ...styles.playerItem,
-                            ...(stats.canPlay ? {} : styles.playerItemDisabled),
-                          }}
-                          onClick={() =>
-                            stats.canPlay && confirmPlayerEvent(playerName)
-                          }
-                          disabled={!stats.canPlay}
-                        >
-                          <span style={styles.playerName}>{playerName}</span>
-                          <div style={styles.playerStats}>
-                            {stats.points > 0 && (
-                              <span style={styles.statBadge}>
-                                {isBasketball ? `🏀 ${stats.points}pts` : `⚽ ${stats.goals}`}
-                              </span>
-                            )}
-                            {stats.yellowCards > 0 && (
-                              <span style={styles.statBadge}>
-                                🟨 {stats.yellowCards}
-                              </span>
-                            )}
-                            {stats.redCards > 0 && (
-                              <span style={styles.statBadgeRed}>
-                                🟥 EXPULSO
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {availableAthletes.length === 0 && (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          padding: "20px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        Nenhum atleta encontrado para esta modalidade e sexo
-                        nesta equipe.
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              <button
-                style={{
-                  ...styles.modalBtn,
-                  ...styles.cancelBtn,
-                  marginTop: "16px",
-                }}
-                onClick={cancelPlayerInput}
-              >
-                Cancelar
-              </button>
             </div>
           </div>
         )}
@@ -5887,6 +6155,108 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         }
                     }
                 `}</style>
+      </div>{/* fecha wrapper hideForShootout */}
+
+      {/* Modal de Seleção de Jogador — fora do wrapper para funcionar durante a disputa */}
+      {showPlayerInput && selectedMatch && (
+        <div style={styles.modal}>
+          <div style={styles.modalContentLarge}>
+            <h3 style={styles.modalTitle}>
+              {showPlayerInput.type === "goal" && (
+                isBasketball
+                  ? `🏀 +${showPlayerInput.points} Ponto${(showPlayerInput.points ?? 1) > 1 ? "s" : ""} — Quem converteu?`
+                  : isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?"
+              )}
+              {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
+              {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
+              {showPlayerInput.type === "penalty_scored" && (
+                showPlayerInput.isShootout ? "🎯 Quem cobrou o pênalti?" : "🎯 Pênalti Marcado"
+              )}
+              {showPlayerInput.type === "penalty_missed" && showPlayerInput.isShootout && "❌ Quem cobrou (e perdeu)?"}
+            </h3>
+            <div style={styles.modalSubtitle}>
+              {showPlayerInput.team === "A"
+                ? selectedMatch.teamA.name
+                : selectedMatch.teamB.name}
+            </div>
+            {(() => {
+              const team =
+                showPlayerInput.team === "A"
+                  ? selectedMatch.teamA
+                  : selectedMatch.teamB;
+              const availableAthletes = athletes.filter((a) =>
+                athleteMatchesTeamAndMatch(a, team),
+              );
+              const isShootoutModal = showPlayerInput.isShootout;
+              // Jogadores já utilizados nesta disputa para este time
+              const usedPlayers = showPlayerInput.team === "A"
+                ? shootoutStats.usedPlayersA
+                : shootoutStats.usedPlayersB;
+              // Ordena: disponíveis primeiro, já utilizados por último
+              const sortedAthletes = isShootoutModal
+                ? [...availableAthletes].sort((a, b) => {
+                    const nameA = `${a.firstName} ${a.lastName}`;
+                    const nameB = `${b.firstName} ${b.lastName}`;
+                    const usedA = usedPlayers.includes(nameA);
+                    const usedB = usedPlayers.includes(nameB);
+                    if (usedA === usedB) return 0;
+                    return usedA ? 1 : -1;
+                  })
+                : availableAthletes;
+              return (
+                <div style={styles.playerList} className="player-list">
+                  {sortedAthletes.map((athlete) => {
+                    const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                    const stats = getPlayerStats(playerName);
+                    const alreadyUsed = isShootoutModal && usedPlayers.includes(playerName);
+                    // Pode cobrar se: não expulso. Se já usou, pode repetir só se todos já cobram
+                    const allUsed = isShootoutModal && availableAthletes.every(a => usedPlayers.includes(`${a.firstName} ${a.lastName}`));
+                    const canAct = isShootoutModal
+                      ? !stats.redCards && (!alreadyUsed || allUsed)
+                      : stats.canPlay;
+                    return (
+                      <button
+                        key={athlete.id}
+                        className={canAct ? "player-item-hover" : ""}
+                        style={{
+                          ...styles.playerItem,
+                          ...(canAct ? {} : styles.playerItemDisabled),
+                        }}
+                        onClick={() => canAct && confirmPlayerEvent(playerName)}
+                        disabled={!canAct}
+                      >
+                        <span style={styles.playerName}>{playerName}</span>
+                        <div style={styles.playerStats}>
+                          {isShootoutModal && alreadyUsed && !allUsed && (
+                            <span style={{ ...styles.statBadge, color: '#f59e0b' }}>já cobrou</span>
+                          )}
+                          {stats.redCards > 0 && (
+                            <span style={styles.statBadgeRed}>🟥 EXPULSO</span>
+                          )}
+                          {!isShootoutModal && stats.yellowCards > 0 && (
+                            <span style={styles.statBadge}>🟨 {stats.yellowCards}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {sortedAthletes.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "20px", color: "var(--text-secondary)" }}>
+                      Nenhum atleta encontrado para esta modalidade e sexo nesta equipe.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            <button
+              style={{ ...styles.modalBtn, ...styles.cancelBtn, marginTop: "16px" }}
+              onClick={cancelPlayerInput}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

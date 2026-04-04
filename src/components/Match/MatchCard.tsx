@@ -9,6 +9,26 @@ interface MatchCardProps {
 
 const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
     const isBeachTennis = match.sport === 'Beach Tennis';
+    const isPenaltyShootoutSport = match.sport === 'Futsal' || match.sport === 'Futebol Society';
+
+    // Extrai resultado da disputa de pênaltis dos eventos
+    const penaltyResult = (() => {
+        if (!isPenaltyShootoutSport || match.status !== 'finished') return null;
+        const startIdx = (match.events || []).findIndex(
+            (e) => e.type === 'halftime' && e.description?.startsWith('⚽ Início da Disputa de Pênaltis')
+        );
+        if (startIdx === -1) return null;
+        const shootoutEvents = (match.events || []).slice(startIdx + 1).filter(
+            (e) => e.type === 'penalty_scored' || e.type === 'penalty_missed'
+        );
+        if (shootoutEvents.length === 0) return null;
+        const scoredA = shootoutEvents.filter((e) => e.type === 'penalty_scored' && e.teamId === match.teamA.id).length;
+        const scoredB = shootoutEvents.filter((e) => e.type === 'penalty_scored' && e.teamId === match.teamB.id).length;
+        const winnerName = scoredA > scoredB
+            ? match.teamA.name.split(' - ')[0]
+            : match.teamB.name.split(' - ')[0];
+        return { scoredA, scoredB, winnerName };
+    })();
 
     const getEventTimestamp = (eventId: string) => {
         const raw = eventId.split('_')[1] || eventId;
@@ -222,6 +242,19 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                                 const ptsB = events.filter(e => e.type === 'goal' && e.teamId === match.teamB.id).length;
                                 return `${ptsA} - ${ptsB} (Pt)`;
                             })()}
+                        </div>
+                    )}
+                    {penaltyResult && (
+                        <div style={{ marginTop: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.5px' }}>
+                                🥅 PÊNALTIS
+                            </div>
+                            <div style={{ fontSize: '16px', fontWeight: 900, color: 'white' }}>
+                                {penaltyResult.scoredA} x {penaltyResult.scoredB}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 700 }}>
+                                {penaltyResult.winnerName} venceu
+                            </div>
                         </div>
                     )}
                 </div>
