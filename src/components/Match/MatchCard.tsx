@@ -9,7 +9,7 @@ interface MatchCardProps {
 
 const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
     const isBeachTennis = match.sport === 'Beach Tennis';
-    const isPenaltyShootoutSport = match.sport === 'Futsal' || match.sport === 'Futebol Society';
+    const isPenaltyShootoutSport = match.sport === 'Futsal' || match.sport === 'Futebol Society' || match.sport === 'Futebol X1';
 
     // Extrai resultado da disputa de pênaltis dos eventos
     const penaltyResult = (() => {

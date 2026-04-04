@@ -122,7 +122,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
 
   // Disputa de pênaltis: ativa quando jogo terminou empatado no tempo regulamentar
-  const isPenaltyShootoutSport = isFutsal || isFutebolSociety;
+  const isPenaltyShootoutSport = isFutsal || isFutebolSociety || isFutebolX1;
   const isMatchDrawn = selectedMatch?.status !== "finished"
     && selectedMatch?.scoreA === selectedMatch?.scoreB
     && (selectedMatch?.events || []).some((e) => e.type === "end" || e.description?.includes("Intervalo"));
@@ -2021,39 +2021,42 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
 
     const updatedEvents = [...(selectedMatch.events || []), newEvent];
-    const SERIES = 3;
+    const SERIES = isFutebolX1 ? 0 : 3; // X1: morte súbita desde o início
     let matchOver = false;
     let winner: "A" | "B" | null = null;
 
-    // Cobranças restantes na série inicial (máx 3 cada)
-    const remainingInSeriesA = Math.max(0, SERIES - nextTotalA);
-    const remainingInSeriesB = Math.max(0, SERIES - nextTotalB);
-    const inInitialSeries = nextTotalA < SERIES || nextTotalB < SERIES;
-
-    if (inInitialSeries) {
-      // Vitória antecipada: adversário não pode mais alcançar
-      if (nextScoredB > nextScoredA + remainingInSeriesA) { matchOver = true; winner = "B"; }
-      if (!matchOver && nextScoredA > nextScoredB + remainingInSeriesB) { matchOver = true; winner = "A"; }
-      // Fim da série inicial (ambos cobram 3)
-      if (!matchOver && nextTotalA === SERIES && nextTotalB === SERIES) {
-        if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
-        else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
-        // Empate → morte súbita (não encerra)
-      }
-    } else {
-      // Morte súbita: rodada completa quando ambos cobram 1 nesta rodada extra
-      // Uma rodada extra = ambos totalA e totalB avançaram igualmente além de SERIES
+    if (isFutebolX1) {
+      // Morte súbita pura: rodada completa quando ambos cobram 1
       if (nextTotalA === nextTotalB) {
-        // Ambos completaram a mesma rodada extra
         if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
         else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
-        // Empate → próxima rodada
+        // Empate na rodada → próxima rodada
       } else {
         // Um cobrou, o outro ainda não — vitória antecipada se impossível alcançar
-        const extraRound = Math.max(nextTotalA, nextTotalB) - SERIES;
-        const remainingOther = extraRound - Math.min(nextTotalA, nextTotalB) + SERIES;
-        if (team === "A" && nextScoredA > nextScoredB + (nextTotalB < nextTotalA ? 1 : 0)) { matchOver = true; winner = "A"; }
-        if (!matchOver && team === "B" && nextScoredB > nextScoredA + (nextTotalA < nextTotalB ? 1 : 0)) { matchOver = true; winner = "B"; }
+        if (team === "A" && nextScoredA > nextScoredB + 1) { matchOver = true; winner = "A"; }
+        if (!matchOver && team === "B" && nextScoredB > nextScoredA + 1) { matchOver = true; winner = "B"; }
+      }
+    } else {
+      // Futsal / Futebol Society: série de 3 + morte súbita
+      const remainingInSeriesA = Math.max(0, SERIES - nextTotalA);
+      const remainingInSeriesB = Math.max(0, SERIES - nextTotalB);
+      const inInitialSeries = nextTotalA < SERIES || nextTotalB < SERIES;
+
+      if (inInitialSeries) {
+        if (nextScoredB > nextScoredA + remainingInSeriesA) { matchOver = true; winner = "B"; }
+        if (!matchOver && nextScoredA > nextScoredB + remainingInSeriesB) { matchOver = true; winner = "A"; }
+        if (!matchOver && nextTotalA === SERIES && nextTotalB === SERIES) {
+          if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
+          else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
+        }
+      } else {
+        if (nextTotalA === nextTotalB) {
+          if (nextScoredA > nextScoredB) { matchOver = true; winner = "A"; }
+          else if (nextScoredB > nextScoredA) { matchOver = true; winner = "B"; }
+        } else {
+          if (team === "A" && nextScoredA > nextScoredB + (nextTotalB < nextTotalA ? 1 : 0)) { matchOver = true; winner = "A"; }
+          if (!matchOver && team === "B" && nextScoredB > nextScoredA + (nextTotalA < nextTotalB ? 1 : 0)) { matchOver = true; winner = "B"; }
+        }
       }
     }
 
@@ -3988,7 +3991,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               ⚽ Empate no tempo regulamentar — {selectedMatch.scoreA} x {selectedMatch.scoreB}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Disputa por 3 pênaltis alternados. Persistindo o empate, cobranças alternadas até o desempate.
+              {isFutebolX1
+                ? 'Cobranças alternadas em morte súbita até sair o vencedor.'
+                : 'Disputa por 3 pênaltis alternados. Persistindo o empate, cobranças alternadas até o desempate.'}
             </div>
 
             {/* Seleção do time que inicia */}
@@ -4045,7 +4050,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             borderRadius: '14px',
           }}>
             <h3 style={{ ...styles.sectionTitle, color: '#f59e0b', marginBottom: '8px', textAlign: 'center' }}>
-              🥅 Disputa de Pênaltis {shootoutStats.isSuddenDeath && <span style={{ fontSize: '12px', color: '#ef4444' }}>— MORTE SÚBITA</span>}
+              🥅 Disputa de Pênaltis {isFutebolX1 ? <span style={{ fontSize: '12px', color: '#ef4444' }}>— MORTE SÚBITA</span> : shootoutStats.isSuddenDeath && <span style={{ fontSize: '12px', color: '#ef4444' }}>— MORTE SÚBITA</span>}
             </h3>
 
             {/* Indicador de vez */}

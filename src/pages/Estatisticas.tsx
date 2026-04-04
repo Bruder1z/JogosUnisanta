@@ -9,6 +9,9 @@ import { AVAILABLE_SPORTS } from '../data/mockData';
 // Modalidades que usam gols/pontos por atleta (LAYOUT_INVASAO)
 const MODALIDADES_GOLS = ['Futsal', 'Futebol Society', 'Futebol X1', 'Handebol', 'Basquetebol', 'Basquete 3x3'];
 
+// Modalidades de rede (LAYOUT_REDE)
+const MODALIDADES_REDE = ['Vôlei', 'Vôlei de Praia', 'Futevôlei'];
+
 const Estatisticas: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     const { matches, courses: allCourses, athletes } = useData();
@@ -18,6 +21,8 @@ const Estatisticas: FC = () => {
     const [genderFilter, setGenderFilter] = useState<string>('Masculino');
 
     const isInvasaoLayout = MODALIDADES_GOLS.includes(sportFilter);
+    const isRedeLayout = MODALIDADES_REDE.includes(sportFilter);
+    const isAnyLayout = isInvasaoLayout || isRedeLayout;
     const isBasquete = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
 
     const uniqueCourses = useMemo(() => {
@@ -25,32 +30,42 @@ const Estatisticas: FC = () => {
     }, [allCourses]);
 
     const stats = useMemo(() => {
-        if (!isInvasaoLayout) return { bestAttack: [], bestDefense: [], topScorers: [] };
+        if (!isAnyLayout) return { bestAttack: [], bestDefense: [], topScorers: [], gamesPlayed: {} as Record<string, number> };
 
         const isBasqueteMemo = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
+        const isRedeMemo = MODALIDADES_REDE.includes(sportFilter);
 
         const filteredMatches = matches.filter(
             m => m.status === 'finished' && m.sport === sportFilter && m.category === genderFilter
         );
 
-        // Gols por equipe
-        const teamStats: Record<string, { scored: number; conceded: number; course: string; name: string; faculty: string }> = {};
+        // Pontos/sets por equipe
+        const teamStats: Record<string, { scored: number; conceded: number; course: string; name: string; faculty: string; games: number }> = {};
         filteredMatches.forEach(m => {
-            if (!teamStats[m.teamA.name]) teamStats[m.teamA.name] = { scored: 0, conceded: 0, course: m.teamA.course, name: m.teamA.name, faculty: m.teamA.faculty || m.teamA.name.split(' - ')[1] || '' };
-            if (!teamStats[m.teamB.name]) teamStats[m.teamB.name] = { scored: 0, conceded: 0, course: m.teamB.course, name: m.teamB.name, faculty: m.teamB.faculty || m.teamB.name.split(' - ')[1] || '' };
+            if (!teamStats[m.teamA.name]) teamStats[m.teamA.name] = { scored: 0, conceded: 0, course: m.teamA.course, name: m.teamA.name, faculty: m.teamA.faculty || m.teamA.name.split(' - ')[1] || '', games: 0 };
+            if (!teamStats[m.teamB.name]) teamStats[m.teamB.name] = { scored: 0, conceded: 0, course: m.teamB.course, name: m.teamB.name, faculty: m.teamB.faculty || m.teamB.name.split(' - ')[1] || '', games: 0 };
             teamStats[m.teamA.name].scored += m.scoreA;
             teamStats[m.teamA.name].conceded += m.scoreB;
+            teamStats[m.teamA.name].games += 1;
             teamStats[m.teamB.name].scored += m.scoreB;
             teamStats[m.teamB.name].conceded += m.scoreA;
+            teamStats[m.teamB.name].games += 1;
         });
 
         let teams = Object.values(teamStats);
         if (courseFilter) teams = teams.filter(t => t.course === courseFilter);
 
         const bestAttack = [...teams].sort((a, b) => b.scored - a.scored);
-        const bestDefense = [...teams].sort((a, b) => a.conceded - b.conceded); // menor → maior
+        // Para rede: ordena por média de pontos sofridos por set (menor = melhor)
+        const bestDefense = isRedeMemo
+            ? [...teams].sort((a, b) => {
+                const avgA = a.games > 0 ? a.conceded / a.games : 0;
+                const avgB = b.games > 0 ? b.conceded / b.games : 0;
+                return avgA - avgB;
+              })
+            : [...teams].sort((a, b) => a.conceded - b.conceded);
 
-        // Artilheiros reais a partir dos eventos de gol
+        // Pontuadores individuais a partir dos eventos de gol
         const goalMap: Record<string, { name: string; course: string; goals: number }> = {};
         filteredMatches.forEach(m => {
             (m.events || []).forEach(evt => {
@@ -59,7 +74,6 @@ const Estatisticas: FC = () => {
                 const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                 const key = evt.player;
                 if (!goalMap[key]) goalMap[key] = { name: evt.player, course: teamObj.course || teamObj.name, goals: 0 };
-                // Para basquete, extrai os pontos da description (+1, +2, +3)
                 const pts = isBasqueteMemo
                     ? (Number(evt.description?.match(/\+(\d+)\s*Ponto/)?.[1]) || 1)
                     : 1;
@@ -69,7 +83,7 @@ const Estatisticas: FC = () => {
 
         let topScorers = Object.values(goalMap).sort((a, b) => b.goals - a.goals).slice(0, 10);
 
-        // Fallback sintético se não houver eventos com player
+        // Fallback sintético
         if (topScorers.length === 0) {
             const seededRandom = (str: string) => {
                 let hash = 0;
@@ -88,13 +102,22 @@ const Estatisticas: FC = () => {
             }).sort((a, b) => b.goals - a.goals).slice(0, 10);
         }
 
-        return { bestAttack, bestDefense, topScorers };
-    }, [matches, sportFilter, courseFilter, genderFilter, athletes, isInvasaoLayout]);
+        const gamesPlayed = Object.fromEntries(Object.entries(teamStats).map(([k, v]) => [k, v.games]));
+        return { bestAttack, bestDefense, topScorers, gamesPlayed };
+    }, [matches, sportFilter, courseFilter, genderFilter, athletes, isAnyLayout]);
 
     const maxAttack = stats.bestAttack[0]?.scored || 1;
-    const maxDefense = stats.bestDefense.length > 0
-        ? Math.max(...stats.bestDefense.map(t => t.conceded), 1)
-        : 1;
+    const maxDefense = (() => {
+        if (stats.bestDefense.length === 0) return 1;
+        if (isRedeLayout) {
+            // Para rede: máximo da média de pontos sofridos por jogo
+            return Math.max(...stats.bestDefense.map(t => {
+                const g = stats.gamesPlayed[t.name] || 1;
+                return t.conceded / g;
+            }), 1);
+        }
+        return Math.max(...stats.bestDefense.map(t => t.conceded), 1);
+    })();
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -122,7 +145,7 @@ const Estatisticas: FC = () => {
                                 {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        {isInvasaoLayout && (
+                        {(isInvasaoLayout || isRedeLayout) && (
                             <div style={{ flex: '1 1 220px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Curso (Opcional)</label>
                                 <select style={selectStyle} value={courseFilter} onChange={e => setCourseFilter(e.target.value)}>
@@ -133,26 +156,28 @@ const Estatisticas: FC = () => {
                         )}
                     </div>
 
-                    {/* Guard: só renderiza o dashboard para modalidades de gol */}
-                    {!isInvasaoLayout ? (
+                    {/* Guard: só renderiza o dashboard para modalidades suportadas */}
+                    {!isAnyLayout ? (
                         <div className="premium-card" style={{ padding: '60px 40px', textAlign: 'center' }}>
                             <FileSearch size={48} style={{ margin: '0 auto 16px', opacity: 0.4 }} />
                             <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                                 Selecione uma modalidade para ver as estatísticas
                             </p>
                             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', opacity: 0.6 }}>
-                                Estatísticas disponíveis para: {MODALIDADES_GOLS.join(', ')}
+                                Estatísticas disponíveis para: {[...MODALIDADES_GOLS, ...MODALIDADES_REDE].join(', ')}
                             </p>
                         </div>
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
 
-                            {/* Coluna 1 — Artilheiros / Cestinhas */}
+                            {/* Coluna 1 — Artilheiros / Cestinhas / Maiores Pontuadores */}
                             <div style={cardStyle}>
                                 <div style={cardHeaderStyle}>
                                     <BarChart2 size={22} color="#fbbf24" />
                                     <div>
-                                        <h2 style={cardTitleStyle}>{isBasquete ? '🏀 Cestinhas' : '🥇 Artilheiros'}</h2>
+                                        <h2 style={cardTitleStyle}>
+                                            {isBasquete ? '🏀 Cestinhas' : isRedeLayout ? '🏐 Maiores Pontuadores' : '🥇 Artilheiros'}
+                                        </h2>
                                         <p style={cardSubStyle}>Top 10 · {sportFilter} {genderFilter}</p>
                                     </div>
                                 </div>
@@ -192,6 +217,8 @@ const Estatisticas: FC = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 {isBasquete
                                                     ? <span style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24' }}>Pts</span>
+                                                    : isRedeLayout
+                                                    ? <span style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24' }}>Pts</span>
                                                     : <Target size={14} color="#fbbf24" />
                                                 }
                                                 <span style={{ fontWeight: 800, color: idx === 0 ? '#fbbf24' : 'white', fontSize: '18px' }}>
@@ -208,8 +235,12 @@ const Estatisticas: FC = () => {
                                 <div style={cardHeaderStyle}>
                                     <Sword size={22} color="#22c55e" />
                                     <div>
-                                        <h2 style={cardTitleStyle}>⚔️ {isBasquete ? 'Melhor Ataque (Pontos)' : 'Melhor Ataque (Gols)'}</h2>
-                                        <p style={cardSubStyle}>{isBasquete ? 'Total de pontos marcados' : 'Mais gols marcados'}</p>
+                                        <h2 style={cardTitleStyle}>
+                                            ⚔️ {isBasquete ? 'Melhor Ataque (Pontos)' : isRedeLayout ? 'Melhor Ataque (Sets)' : 'Melhor Ataque (Gols)'}
+                                        </h2>
+                                        <p style={cardSubStyle}>
+                                            {isBasquete ? 'Total de pontos marcados' : isRedeLayout ? 'Mais sets vencidos' : 'Mais gols marcados'}
+                                        </p>
                                     </div>
                                 </div>
                                 <div>
@@ -226,7 +257,7 @@ const Estatisticas: FC = () => {
                                                     </div>
                                                 </div>
                                                 <span style={{ fontSize: '14px', fontWeight: 800, color: '#22c55e' }}>
-                                                    {team.scored}{isBasquete ? ' pts' : ''}
+                                                    {team.scored}{isBasquete ? ' pts' : isRedeLayout ? ' sets' : ''}
                                                 </span>
                                             </div>
                                             <div style={{ height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
@@ -246,14 +277,28 @@ const Estatisticas: FC = () => {
                                 <div style={cardHeaderStyle}>
                                     <Shield size={22} color="#3b82f6" />
                                     <div>
-                                        <h2 style={cardTitleStyle}>🛡️ {isBasquete ? 'Eficiência Defensiva' : 'Defesa Menos Vazada'}</h2>
-                                        <p style={cardSubStyle}>{isBasquete ? 'Menos pontos sofridos' : 'Menos gols sofridos'}</p>
+                                        <h2 style={cardTitleStyle}>
+                                            🛡️ {isBasquete ? 'Eficiência Defensiva' : isRedeLayout ? 'Média de Ptos Sofridos/Set' : 'Defesa Menos Vazada'}
+                                        </h2>
+                                        <p style={cardSubStyle}>
+                                            {isBasquete ? 'Menos pontos sofridos' : isRedeLayout ? 'Menor média de pontos sofridos por jogo' : 'Menos gols sofridos'}
+                                        </p>
                                     </div>
                                 </div>
                                 <div>
                                     {stats.bestDefense.length === 0 ? (
                                         <EmptyState />
-                                    ) : stats.bestDefense.slice(0, 10).map((team, idx) => (
+                                    ) : stats.bestDefense.slice(0, 10).map((team, idx) => {
+                                        const games = stats.gamesPlayed[team.name] || 1;
+                                        const displayValue = isRedeLayout
+                                            ? (team.conceded / games).toFixed(1)
+                                            : isBasquete
+                                            ? `${team.conceded} pts`
+                                            : String(team.conceded);
+                                        const barValue = isRedeLayout
+                                            ? team.conceded / games
+                                            : team.conceded;
+                                        return (
                                         <div key={idx} style={{ marginBottom: '12px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -264,18 +309,19 @@ const Estatisticas: FC = () => {
                                                     </div>
                                                 </div>
                                                 <span style={{ fontSize: '14px', fontWeight: 800, color: '#3b82f6' }}>
-                                                    {team.conceded}{isBasquete ? ' pts' : ''}
+                                                    {displayValue}{isRedeLayout ? ' sets/j' : ''}
                                                 </span>
                                             </div>
                                             <div style={{ height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                                                 <div style={{
                                                     height: '100%', borderRadius: '999px', background: '#2563eb',
-                                                    width: `${Math.round((team.conceded / maxDefense) * 100)}%`,
+                                                    width: `${Math.round((barValue / maxDefense) * 100)}%`,
                                                     transition: 'width 0.6s ease',
                                                 }} />
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
