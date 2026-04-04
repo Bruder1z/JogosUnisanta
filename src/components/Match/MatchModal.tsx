@@ -7,6 +7,7 @@ import {
   Play,
   CheckCircle,
   Pause,
+  Users,
 } from "lucide-react";
 import {
   type Match,
@@ -14,6 +15,7 @@ import {
   COURSE_EMBLEMS,
 } from "../../data/mockData";
 import { useData } from "../context/DataContext";
+import PlayerStats from "./PlayerStats";
 
 interface MatchModalProps {
   match: Match;
@@ -24,6 +26,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const { matches: allMatches } = useData();
   const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
   const [showChat, setShowChat] = useState(false);
+  const [showPlayerStats, setShowPlayerStats] = useState(false);
 
   // Sync state if initialMatch changes in context
   useEffect(() => {
@@ -610,6 +613,46 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
 
+  // Calculate MVP (player with most points)
+  const calculateMVP = (): { player: string; points: number; teamId: string; teamName: string } | null => {
+    if (!currentMatch.events || currentMatch.events.length === 0) return null;
+    
+    // Only calculate MVP for basketball and volleyball
+    if (!isBasketball && !isVolleyballFamilySport) return null;
+    
+    const playerPoints: { [key: string]: { points: number; teamId: string; teamName: string } } = {};
+    
+    currentMatch.events.forEach((event) => {
+      if (event.type === "goal" && event.player && event.teamId) {
+        if (!playerPoints[event.player]) {
+          const teamName = event.teamId === currentMatch.teamA.id 
+            ? currentMatch.teamA.name.split(" - ")[0]
+            : currentMatch.teamB.name.split(" - ")[0];
+          playerPoints[event.player] = { points: 0, teamId: event.teamId, teamName };
+        }
+        
+        // For basketball, extract point value from description
+        if (isBasketball) {
+          const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 2);
+          playerPoints[event.player].points += pointValue;
+        } else {
+          // For volleyball, each goal is 1 point
+          playerPoints[event.player].points += 1;
+        }
+      }
+    });
+    
+    // Find player with most points
+    let mvpResult: { player: string; points: number; teamId: string; teamName: string } | null = null;
+    Object.entries(playerPoints).forEach(([player, data]) => {
+      if (!mvpResult || data.points > mvpResult.points) {
+        mvpResult = { player, ...data };
+      }
+    });
+    
+    return mvpResult;
+  };
+
   const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
     const timestampA = getEventTimestamp(a.id);
     const timestampB = getEventTimestamp(b.id);
@@ -1103,6 +1146,38 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             >
               <X size={20} />
             </button>
+            
+            {/* Player Stats Button - Only for Basketball */}
+            {isBasketball && (
+              <button
+                onClick={() => setShowPlayerStats(true)}
+                style={{
+                  background: "var(--bg-hover)",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "background 0.2s, color 0.2s",
+                }}
+                title="Ver estatísticas dos jogadores"
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "var(--accent-color)";
+                  e.currentTarget.style.color = "#fff";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                }}
+              >
+                <Users size={18} />
+              </button>
+            )}
+            
             <button
               onClick={() => setShowChat((v) => !v)}
               style={{
@@ -1201,6 +1276,72 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
               </div>
             </div>
           )}
+
+          {/* MVP Card - Show only when match is finished */}
+          {currentMatch.status === "finished" && (() => {
+            const mvp = calculateMVP();
+            if (!mvp) return null;
+            
+            return (
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderTop: "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "12px",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    background: "rgba(255, 215, 0, 0.1)",
+                    border: "1px solid rgba(255, 215, 0, 0.3)",
+                  }}
+                >
+                  <Trophy size={18} color="#ffd700" />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    Destaque:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 900,
+                      color: "var(--accent-color)",
+                    }}
+                  >
+                    {mvp.player}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    ({mvp.teamName})
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      color: "#ffd700",
+                    }}
+                  >
+                    • {mvp.points} {isBasketball ? "pts" : mvp.points === 1 ? "pt" : "pts"}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Timeline Body */}
           <div
@@ -1900,6 +2041,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             />
           </div>
         </div>
+      )}
+
+      {/* Player Stats Modal */}
+      {showPlayerStats && (
+        <PlayerStats
+          match={currentMatch}
+          onClose={() => setShowPlayerStats(false)}
+        />
       )}
 
       <style>{`
