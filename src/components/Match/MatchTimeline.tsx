@@ -123,9 +123,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   // Disputa de pênaltis: ativa quando jogo terminou empatado no tempo regulamentar
   const isPenaltyShootoutSport = isFutsal || isFutebolSociety || isFutebolX1;
-  const isMatchDrawn = selectedMatch?.status !== "finished"
-    && selectedMatch?.scoreA === selectedMatch?.scoreB
-    && (selectedMatch?.events || []).some((e) => e.type === "end" || e.description?.includes("Intervalo"));
 
   // Detecta se a disputa já foi iniciada (evento halftime com descrição especial)
   const shootoutStarted = (selectedMatch?.events || []).some(
@@ -142,7 +139,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     // Lê o time que iniciou do evento
     const startDesc = (selectedMatch.events || [])[startIdx]?.description || "";
     const firstTeamMatch = startDesc.match(/first=([AB])/);
-    const firstTeam: "A" | "B" = (firstTeamMatch?.[1] as "A" | "B") || shootoutFirstTeam;
+    const firstTeam: "A" | "B" = (firstTeamMatch?.[1] as "A" | "B") || "A";
     const shootoutEvents = (selectedMatch.events || []).slice(startIdx + 1).filter(
       (e) => e.type === "penalty_scored" || e.type === "penalty_missed"
     );
@@ -5277,7 +5274,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   🥅 Disputa de Pênaltis
                 </h3>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", marginBottom: "16px", padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "10px" }}>
-                  {(["A", "B"] as const).map((team, i) => {
+                  {(["A", "B"] as const).map((team) => {
                     const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
                     const scored = team === "A" ? shootoutStats.scoredA : shootoutStats.scoredB;
                     const total = team === "A" ? shootoutStats.totalA : shootoutStats.totalB;
