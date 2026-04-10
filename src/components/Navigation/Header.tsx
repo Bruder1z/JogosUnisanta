@@ -58,7 +58,6 @@ const Header: FC = () => {
                 borderBottom: '1px solid var(--border-color)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {/* Hamburger - visível só no mobile */}
                     <button
                         className="mobile-menu-btn"
                         onClick={toggle}
@@ -154,7 +153,6 @@ const Header: FC = () => {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {/* Botão completo - desktop */}
                             <button
                                 onClick={openLoginModal}
                                 className="header-login-text"
@@ -172,7 +170,6 @@ const Header: FC = () => {
                             >
                                 Login / Cadastro
                             </button>
-                            {/* Apenas ícone - mobile */}
                             <button
                                 onClick={openLoginModal}
                                 className="header-login-icon-only"

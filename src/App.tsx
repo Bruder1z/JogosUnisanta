@@ -46,7 +46,6 @@ const AppContent = () => {
     const params = new URLSearchParams(location.search);
     const joinId = params.get('join');
     if (joinId && location.pathname !== '/bolao') {
-      // Se tiver join e não estiver no bolao, redireciona
       navigate(`/bolao?join=${joinId}`, { replace: true });
     }
   }, [location, navigate]);
