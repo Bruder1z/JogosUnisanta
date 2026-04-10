@@ -1,0 +1,449 @@
+:root {
+  /* Colors - Unisanta & 365scores inspired */
+  --primary-color: #000000;
+  --secondary-color: #1a1a1a;
+  --accent-color: #e30613; /* Unisanta Redish */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --bg-main: #0a0a0a;
+  --bg-card: #141414;
+  --bg-hover: #212121;
+  --border-color: #2a2a2a;
+  --live-color: #ef4444;
+  
+  /* Layout */
+  --header-height: 60px;
+  --sidebar-width: 240px;
+  --border-radius: 8px;
+  
+  /* Fonts */
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(20, 20, 20, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.premium-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  transition: all 0.3s ease;
+}
+
+.premium-card:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* =========================================
+   VARIÁVEIS RESPONSIVAS
+   ========================================= */
+
+:root {
+  --main-padding: 30px;
+  --home-grid-cols: 1fr 340px;
+  --news-grid-cols: repeat(auto-fill, minmax(380px, 1fr));
+  --header-padding: 0 24px;
+}
+
+@media (max-width: 968px) {
+  :root {
+    --home-grid-cols: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+    --header-height: 56px;
+    --main-padding: 16px;
+    --home-grid-cols: 1fr;
+    --news-grid-cols: repeat(auto-fill, minmax(280px, 1fr));
+    --header-padding: 0 14px;
+  }
+}
+
+/* =========================================
+   SIDEBAR - DRAWER MOBILE
+   ========================================= */
+
+.app-sidebar {
+  transition: transform 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    transform: translateX(-100%);
+    width: 260px !important;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  .app-sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 769px) {
+  .app-sidebar {
+    transform: translateX(0) !important;
+  }
+}
+
+/* Backdrop overlay */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 39;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .sidebar-backdrop.active {
+    display: block;
+  }
+}
+
+/* =========================================
+   HEADER - MOBILE
+   ========================================= */
+
+.mobile-menu-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-desktop-nav {
+    display: none !important;
+  }
+
+  .header-user-pts {
+    display: none !important;
+  }
+}
+
+/* =========================================
+   SIDEBAR - SEÇÃO MOBILE NAV
+   ========================================= */
+
+.sidebar-mobile-nav {
+  display: none;
+  padding: 0 20px 15px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+  .sidebar-mobile-nav {
+    display: block;
+  }
+
+  .sidebar-mobile-nav-link {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    white-space: nowrap;
+  }
+
+  .sidebar-mobile-nav-label {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* =========================================
+   MATCH CARD - MOBILE
+   ========================================= */
+
+@media (max-width: 480px) {
+  .match-card-wrapper {
+    padding: 14px !important;
+  }
+
+  .match-team-name {
+    font-size: 12px !important;
+  }
+
+  .match-score {
+    font-size: 26px !important;
+    gap: 10px !important;
+  }
+
+  .match-team-emblem {
+    height: 48px !important;
+  }
+}
+
+/* =========================================
+   HOME - BARRA DE FILTROS MOBILE
+   ========================================= */
+
+.home-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 12px;
+}
+
+.home-filter-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-filter-top h1 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-cat-filter {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .home-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .home-filter-top {
+    justify-content: space-between;
+  }
+
+  .home-filter-top h1 {
+    font-size: 18px !important;
+    white-space: nowrap;
+  }
+
+  .home-cat-filter {
+    width: 100%;
+    display: flex;
+  }
+
+  .home-cat-filter button {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px !important;
+    font-size: 11px !important;
+  }
+
+  /* Ocultar login fixo duplicado no mobile */
+  .home-fixed-login {
+    display: none !important;
+  }
+
+  /* Botão login no header - texto curto */
+  .header-login-text {
+    display: none;
+  }
+
+  .header-login-icon-only {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .header-login-icon-only {
+    display: none !important;
+  }
+
+  .header-login-text {
+    display: inline !important;
+  }
+}
+
+/* =========================================
+   ADMIN DASHBOARD
+   ========================================= */
+
+.admin-page-title {
+  line-height: 1.2;
+}
+
+@media (max-width: 1100px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+
+  .admin-tabs-nav {
+    flex-direction: row !important;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 10px !important;
+    scrollbar-width: thin;
+  }
+
+  .admin-tab-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard-root {
+    padding: 8px 0 0 !important;
+  }
+
+  .admin-page-title {
+    font-size: 18px !important;
+  }
+
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .admin-stat-card {
+    padding: 16px !important;
+    gap: 12px !important;
+    align-items: flex-start !important;
+  }
+
+  .admin-section-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+
+  .admin-section-title-row {
+    gap: 10px !important;
+  }
+
+  .admin-primary-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-filter-row {
+    overflow-x: auto;
+    padding: 16px !important;
+  }
+
+  .admin-filter-row button {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .admin-content-column {
+    min-width: 0;
+  }
+
+  .admin-table {
+    min-width: 720px;
+  }
+
+  .admin-match-title,
+  .admin-actions-cell,
+  .admin-status-badge {
+    white-space: nowrap;
+  }
+
+  .admin-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .admin-form-two-cols {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-modal-actions {
+    flex-direction: column;
+  }
+
+  .admin-score-grid {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-tab-button {
+    padding: 12px 14px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* =========================================
+   MODAIS - MOBILE
+   ========================================= */
+
+@media (max-width: 768px) {
+  .modal-content-wide {
+    max-width: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin-top: auto !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+}
