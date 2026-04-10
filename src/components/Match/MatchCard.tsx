@@ -40,6 +40,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
         const initial = {
             setsA: 0,
             setsB: 0,
+            gamesA: 0,
+            gamesB: 0,
             pointsA: 0,
             pointsB: 0,
             setResults: [] as string[]
@@ -53,6 +55,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
         let currentSetStartIndex = 0;
         let currentGamePointsA = 0;
         let currentGamePointsB = 0;
+        let currentGamesA = 0;
+        let currentGamesB = 0;
         let setsA = 0;
         let setsB = 0;
         const setResults: string[] = [];
@@ -65,6 +69,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
             }
 
             if (event.type === 'set_win' && event.description?.startsWith('Game para ')) {
+                if (event.teamId === match.teamA.id) currentGamesA += 1;
+                if (event.teamId === match.teamB.id) currentGamesB += 1;
                 currentGamePointsA = 0;
                 currentGamePointsB = 0;
                 return;
@@ -78,6 +84,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 if (event.teamId === match.teamA.id) setsA += 1;
                 if (event.teamId === match.teamB.id) setsB += 1;
                 currentSetStartIndex = index + 1;
+                currentGamesA = 0;
+                currentGamesB = 0;
                 currentGamePointsA = 0;
                 currentGamePointsB = 0;
             }
@@ -86,6 +94,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
         return {
             setsA,
             setsB,
+            gamesA: currentGamesA,
+            gamesB: currentGamesB,
             pointsA: currentGamePointsA,
             pointsB: currentGamePointsB,
             setResults
@@ -211,7 +221,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                     {isBeachTennis && (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginTop: '-5px' }}>
                             <div style={{ fontSize: '12px', color: 'var(--accent-color)', fontWeight: 700 }}>
-                                Games: {match.scoreA} - {match.scoreB}
+                                Games: {beachSummary.gamesA} - {beachSummary.gamesB}
                             </div>
                             {match.status === 'live' && (
                                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700 }}>

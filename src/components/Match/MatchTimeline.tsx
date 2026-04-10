@@ -704,22 +704,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
     const gameWinnerName =
       team === "A" ? selectedMatch.teamA.name : selectedMatch.teamB.name;
-    const nextGamesA =
-      team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
-    const nextGamesB =
-      team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
-    
-    // Condição de Fim de Partida no Beach Tennis
-    const isClassificacao = selectedMatch.stage === "Fase de Classificação";
-    const targetGames = isClassificacao ? 6 : 8;
-
-    let isMatchOver = false;
-    if ((nextGamesA >= targetGames && nextGamesA - nextGamesB >= 2) ||
-        (nextGamesB >= targetGames && nextGamesB - nextGamesA >= 2) ||
-        (nextGamesA === targetGames + 1) || 
-        (nextGamesB === targetGames + 1)) {
-        isMatchOver = true;
-    }
 
     const gameWinEvent: MatchEvent = {
       id: `evt_${Date.now()}_setwin`,
@@ -735,32 +719,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       gameWinEvent,
     ];
 
-    if (isMatchOver) {
-      const finalScoreLabel = `${nextGamesA} x ${nextGamesB} (Games)`;
-      const finalEvent: MatchEvent = {
-        id: `evt_${Date.now() + 1}`,
-        type: "end",
-        minute: getCurrentEventMinute(),
-        description: `Fim de Jogo - Placar Final: ${finalScoreLabel}`,
-      };
-      const finishedMatch: Match = {
-        ...selectedMatch,
-        scoreA: nextGamesA,
-        scoreB: nextGamesB,
-        status: "finished",
-        events: [...baseEvents, finalEvent],
-      };
-      finishMatch(finishedMatch);
-    } else {
-      const updatedMatch: Match = {
-        ...selectedMatch,
-        scoreA: nextGamesA,
-        scoreB: nextGamesB,
-        status: "live",
-        events: baseEvents,
-      };
-      updateMatch(updatedMatch);
-    }
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: baseEvents,
+    };
+    updateMatch(updatedMatch);
   };
 
   const handleBeachSetWin = (team: "A" | "B") => {
@@ -791,8 +755,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const updatedMatch: Match = {
       ...selectedMatch,
-      scoreA: 0,
-      scoreB: 0,
+      scoreA: team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA,
+      scoreB: team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB,
       status: "live",
       events: [...(selectedMatch.events || []), setWinEvent],
     };
