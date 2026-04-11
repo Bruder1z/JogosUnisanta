@@ -11,7 +11,6 @@ const MODALIDADES_GOLS = ['Futsal', 'Futebol Society', 'Futebol X1', 'Handebol',
 
 // Modalidades de rede (LAYOUT_REDE)
 const MODALIDADES_REDE = ['Vôlei', 'Vôlei de Praia', 'Futevôlei'];
-const MODALIDADES_SO_VITORIAS = ['Beach Tennis', 'Tênis de Mesa', 'Tenis de Mesa'];
 const MODALIDADES_FUTEBOL = ['Futebol Society', 'Futsal', 'Futebol X1'];
 
 const Estatisticas: FC = () => {
@@ -24,8 +23,10 @@ const Estatisticas: FC = () => {
 
     const isInvasaoLayout = MODALIDADES_GOLS.includes(sportFilter);
     const isRedeLayout = MODALIDADES_REDE.includes(sportFilter);
-    const isOnlyWinsLayout = MODALIDADES_SO_VITORIAS.includes(sportFilter);
-    const isAnyLayout = isInvasaoLayout || isRedeLayout || isOnlyWinsLayout;
+    const isBeachTennis = sportFilter === 'Beach Tennis';
+    const isTamboreu = sportFilter === 'Tamboréu';
+    const isTenisDeMesa = sportFilter === 'Tênis de Mesa' || sportFilter === 'Tenis de Mesa';
+    const isAnyLayout = isInvasaoLayout || isRedeLayout || isBeachTennis || isTamboreu || isTenisDeMesa;
     const isBasquete = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
     const isBasquete3x3 = sportFilter === 'Basquete 3x3';
     const isFutebol = MODALIDADES_FUTEBOL.includes(sportFilter);
@@ -56,6 +57,10 @@ const Estatisticas: FC = () => {
             teamYellowCards: [],
             teamRedCards: [],
             gamesPlayed: {} as Record<string, number>,
+            topAces: [] as any[],
+            topServeErrors: [] as any[],
+            teamStatsList: [] as any[],
+            topSetsConsistencyList: [] as any[],
         };
 
         const isBasqueteMemo = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
@@ -137,14 +142,35 @@ const Estatisticas: FC = () => {
         const penaltyGoalMap: Record<string, { name: string; course: string; faculty: string; penalties: number }> = {};
         const yellowPlayerMap: Record<string, { name: string; course: string; faculty: string; yellowCards: number }> = {};
         const redPlayerMap: Record<string, { name: string; course: string; faculty: string; redCards: number }> = {};
+        // Mapas de Aces e Erros de Saque (vôlei)
+        const aceMap: Record<string, { name: string; course: string; faculty: string; aces: number }> = {};
+        const serveErrorMap: Record<string, { name: string; course: string; faculty: string; errors: number }> = {};
         const teamCleanSheetsMap: Record<string, number> = {};
         const teamYellowMap: Record<string, number> = {};
         const teamRedMap: Record<string, number> = {};
         const teamPenaltyMap: Record<string, number> = {};
+        const setsEfficacyMap: Record<string, { pointsConceded: number; setsPlayed: number; course: string; name: string; faculty: string }> = {};
 
         filteredMatches.forEach(m => {
             if (m.scoreB === 0) teamCleanSheetsMap[m.teamA.name] = (teamCleanSheetsMap[m.teamA.name] || 0) + 1;
             if (m.scoreA === 0) teamCleanSheetsMap[m.teamB.name] = (teamCleanSheetsMap[m.teamB.name] || 0) + 1;
+
+            if (m.sport === 'Tamboréu' || m.sport === 'Tênis de Mesa' || m.sport === 'Tenis de Mesa') {
+                const teamAInfo = getTeamCourseFaculty(m.teamA);
+                const teamBInfo = getTeamCourseFaculty(m.teamB);
+                if (!setsEfficacyMap[m.teamA.name]) setsEfficacyMap[m.teamA.name] = { pointsConceded: 0, setsPlayed: 0, course: teamAInfo.course, name: m.teamA.name, faculty: teamAInfo.faculty };
+                if (!setsEfficacyMap[m.teamB.name]) setsEfficacyMap[m.teamB.name] = { pointsConceded: 0, setsPlayed: 0, course: teamBInfo.course, name: m.teamB.name, faculty: teamBInfo.faculty };
+                
+                setsEfficacyMap[m.teamA.name].setsPlayed += (m.scoreA + m.scoreB);
+                setsEfficacyMap[m.teamB.name].setsPlayed += (m.scoreA + m.scoreB);
+
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type === 'goal') {
+                        if (evt.teamId === m.teamB.id) setsEfficacyMap[m.teamA.name].pointsConceded += 1;
+                        if (evt.teamId === m.teamA.id) setsEfficacyMap[m.teamB.name].pointsConceded += 1;
+                    }
+                });
+            }
         });
 
         filteredMatches.forEach(m => {
@@ -252,6 +278,21 @@ const Estatisticas: FC = () => {
                     redPlayerMap[key].redCards += 1;
                     teamRedMap[teamObj.name] = (teamRedMap[teamObj.name] || 0) + 1;
                 }
+
+                // Aces: eventos goal com descrição iniciando em '🏐 ACE!'
+                if (evt.type === 'goal' && evt.player && String(evt.description || '').includes('ACE!')) {
+                    const key = evt.player;
+                    if (!aceMap[key]) aceMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, aces: 0 };
+                    aceMap[key].aces += 1;
+                }
+
+                // Erros de Saque: eventos goal com descrição contendo 'Erro de Saque'
+                if (evt.type === 'goal' && evt.player && String(evt.description || '').includes('Erro de Saque')) {
+                    // O player no evento de erro é quem cometeu o erro
+                    const key = evt.player;
+                    if (!serveErrorMap[key]) serveErrorMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, errors: 0 };
+                    serveErrorMap[key].errors += 1;
+                }
             });
         });
 
@@ -337,6 +378,23 @@ const Estatisticas: FC = () => {
             .slice(0, 20);
 
         const gamesPlayed = Object.fromEntries(Object.entries(teamStats).map(([k, v]) => [k, v.games]));
+
+        // Aces e Erros de Saque (vôlei)
+        let topAces = Object.values(aceMap);
+        if (courseFilter) topAces = topAces.filter(p => p.course === courseFilter);
+        topAces = topAces.sort((a, b) => b.aces - a.aces).slice(0, 20);
+
+        let topServeErrors = Object.values(serveErrorMap);
+        if (courseFilter) topServeErrors = topServeErrors.filter(p => p.course === courseFilter);
+        topServeErrors = topServeErrors.sort((a, b) => b.errors - a.errors).slice(0, 20);
+
+        let topSetsConsistency = Object.values(setsEfficacyMap);
+        if (courseFilter) topSetsConsistency = topSetsConsistency.filter(p => p.course === courseFilter);
+        const topSetsConsistencyList = topSetsConsistency.map(p => {
+            const avg = p.setsPlayed > 0 ? (p.pointsConceded / p.setsPlayed) : 0;
+            return { ...p, avgConceded: avg };
+        }).sort((a, b) => a.avgConceded - b.avgConceded).slice(0, 20);
+
         return {
             bestAttack,
             bestDefense,
@@ -356,6 +414,10 @@ const Estatisticas: FC = () => {
             teamYellowCards,
             teamRedCards,
             gamesPlayed,
+            topAces,
+            topServeErrors,
+            topSetsConsistencyList,
+            teamStatsList: Object.values(teamStats).filter(t => !courseFilter || t.course === courseFilter),
         };
     }, [matches, sportFilter, courseFilter, genderFilter, isAnyLayout]);
 
@@ -400,7 +462,7 @@ const Estatisticas: FC = () => {
                                 {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        {(isInvasaoLayout || isRedeLayout || isOnlyWinsLayout) && (
+                        {(isInvasaoLayout || isRedeLayout || isBeachTennis || isTenisDeMesa || isTamboreu) && (
                             <div style={{ flex: '1 1 220px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Curso (Opcional)</label>
                                 <select style={selectStyle} value={courseFilter} onChange={e => setCourseFilter(e.target.value)}>
@@ -419,12 +481,12 @@ const Estatisticas: FC = () => {
                                 Selecione uma modalidade para ver as estatísticas
                             </p>
                             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', opacity: 0.6 }}>
-                                Estatísticas disponíveis para: {[...MODALIDADES_GOLS, ...MODALIDADES_REDE, ...MODALIDADES_SO_VITORIAS].join(', ')}
+                                Estatísticas disponíveis para: {[...MODALIDADES_GOLS, ...MODALIDADES_REDE, 'Beach Tennis', 'Tamboréu', 'Tênis de Mesa'].join(', ')}
                             </p>
                         </div>
                     ) : (
                         <>
-                            {!isOnlyWinsLayout && !isFutevolei && (
+                            {!isBeachTennis && !isFutevolei && !isTamboreu && !isTenisDeMesa && (
                             <section style={{ marginBottom: '30px' }}>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Jogadores</h2>
                                 <div style={twoCardsGridStyle}>
@@ -668,39 +730,113 @@ const Estatisticas: FC = () => {
                                         </div>
                                     )}
 
-                                    {(isFutebol || isHandebol) && (
-                                        <div style={cardStyle}>
-                                            <div style={cardHeaderStyle}>
-                                                <Target size={22} color="#ef4444" />
-                                                <div>
-                                                    <h2 style={cardTitleStyle}>Cartões Vermelhos</h2>
+                                    {/* Aces e Erros de Saque — Vôlei / Vôlei de Praia */}
+                                    {isRedeLayout && !isFutevolei && (
+                                        <>
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}>
+                                                    <span style={{ fontSize: '22px' }}>🏐</span>
+                                                    <div>
+                                                        <h2 style={cardTitleStyle}>Ranking de Aces</h2>
+                                                        <p style={cardSubStyle}>Saques diretos por atleta</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div style={cardListScrollStyle}>
-                                                {stats.topRedPlayers.length === 0 ? (
-                                                    <EmptyState />
-                                                ) : stats.topRedPlayers.map((player, idx) => (
-                                                    <div key={idx} style={{
-                                                        padding: '12px 16px',
-                                                        borderRadius: '10px',
-                                                        marginBottom: '6px',
-                                                        background: idx === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
-                                                        border: idx === 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid transparent',
-                                                    }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topAces.length === 0 ? (
+                                                        <EmptyState />
+                                                    ) : stats.topAces.map((player, idx) => (
+                                                        <div key={idx} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            padding: '12px 16px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(34,197,94,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                <div style={{
+                                                                    width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                                                                    background: idx === 0 ? '#22c55e' : idx === 1 ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.08)',
+                                                                    color: idx < 2 ? '#000' : 'var(--text-secondary)',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                    fontSize: '11px', fontWeight: 800,
+                                                                }}>
+                                                                    {idx + 1}
+                                                                </div>
                                                                 <div>
-                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
-                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'white' }}>{player.name}</div>
+                                                                    <span style={{
+                                                                        fontSize: '11px', fontWeight: 600, padding: '2px 8px',
+                                                                        borderRadius: '999px', background: 'rgba(255,255,255,0.08)',
+                                                                        color: 'var(--text-secondary)',
+                                                                    }}>{`${player.course} | ${player.faculty || '-'}`}</span>
                                                                 </div>
                                                             </div>
-                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#ef4444' }}>{player.redCards} CV</span>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#22c55e' }}>ACE</span>
+                                                                <span style={{ fontWeight: 800, color: idx === 0 ? '#22c55e' : 'white', fontSize: '18px' }}>
+                                                                    {player.aces}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
+
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}>
+                                                    <span style={{ fontSize: '22px' }}>❌</span>
+                                                    <div>
+                                                        <h2 style={cardTitleStyle}>Erros de Saque</h2>
+                                                        <p style={cardSubStyle}>Erros de saque por atleta</p>
+                                                    </div>
+                                                </div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topServeErrors.length === 0 ? (
+                                                        <EmptyState />
+                                                    ) : stats.topServeErrors.map((player, idx) => (
+                                                        <div key={idx} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            padding: '12px 16px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                <div style={{
+                                                                    width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                                                                    background: idx === 0 ? '#ef4444' : idx === 1 ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)',
+                                                                    color: idx < 2 ? '#fff' : 'var(--text-secondary)',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                    fontSize: '11px', fontWeight: 800,
+                                                                }}>
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'white' }}>{player.name}</div>
+                                                                    <span style={{
+                                                                        fontSize: '11px', fontWeight: 600, padding: '2px 8px',
+                                                                        borderRadius: '999px', background: 'rgba(255,255,255,0.08)',
+                                                                        color: 'var(--text-secondary)',
+                                                                    }}>{`${player.course} | ${player.faculty || '-'}`}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444' }}>ERRO</span>
+                                                                <span style={{ fontWeight: 800, color: idx === 0 ? '#ef4444' : 'white', fontSize: '18px' }}>
+                                                                    {player.errors}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </section>
@@ -709,37 +845,325 @@ const Estatisticas: FC = () => {
                             <section>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Equipes</h2>
                                 <div style={twoCardsGridStyle}>
-                                    {isOnlyWinsLayout ? (
-                                        <div style={cardStyle}>
-                                            <div style={cardHeaderStyle}>
-                                                <Trophy size={22} color="#a78bfa" />
-                                                <div>
-                                                    <h2 style={cardTitleStyle}>Mais vitórias</h2>
-                                                    <p style={cardSubStyle}>Ranking de vitórias por equipe</p>
+                                    {isTamboreu ? (
+                                        <>
+                                            {/* Informação sobre Tamboréu */}
+                                            <div style={{
+                                                gridColumn: '1 / -1',
+                                                background: 'rgba(167,139,250,0.1)',
+                                                border: '1px solid rgba(167,139,250,0.3)',
+                                                padding: '12px 16px',
+                                                borderRadius: '10px',
+                                                marginBottom: '10px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px'
+                                            }}>
+                                                <span style={{ fontSize: '18px' }}>ℹ️</span>
+                                                <span style={{ fontSize: '13px', color: '#a78bfa', fontWeight: 600 }}>
+                                                    <strong>Regra Oficial do Tamboréu:</strong> Sets fechados em 10 pontos (limite 12 pts). Máximo de 3 sets por partida.
+                                                </span>
+                                            </div>
+
+                                            {/* Card 1: Ranking de Vitórias */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Trophy size={22} color="#a78bfa" /><div><h2 style={cardTitleStyle}>Ranking de Vitórias</h2><p style={cardSubStyle}>Ranking de vitórias por equipe/dupla</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                        <div key={`tmb-w-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(167,139,250,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#a78bfa' }}>{team.wins} V</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
-                                            <div style={cardListScrollStyle}>
-                                                {stats.topWins.length === 0 ? (
-                                                    <EmptyState />
-                                                ) : stats.topWins.slice(0, 10).map((team, idx) => (
-                                                    <div key={`wins-only-${idx}`} style={{
-                                                        padding: '10px 12px',
-                                                        borderRadius: '10px',
-                                                        marginBottom: '6px',
-                                                        background: idx === 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
-                                                        border: idx === 0 ? '1px solid rgba(167,139,250,0.35)' : '1px solid transparent',
-                                                    }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-                                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
-                                                                {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+
+                                            {/* Card 2: Domínio de Sets */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Sword size={22} color="#a78bfa" /><div><h2 style={cardTitleStyle}>Domínio de Sets</h2><p style={cardSubStyle}>Saldo de Sets (Vencidos vs Perdidos)</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.teamStatsList.length === 0 ? <EmptyState /> : stats.teamStatsList.sort((a,b) => (b.scored - b.conceded) - (a.scored - a.conceded)).slice(0, 10).map((team, idx) => {
+                                                        const totalSets = team.scored + team.conceded;
+                                                        const winPct = totalSets > 0 ? (team.scored / totalSets) * 100 : 0;
+                                                        return (
+                                                            <div key={`tmb-d-${idx}`} style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '10px',
+                                                                marginBottom: '6px',
+                                                                background: idx === 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+                                                                border: idx === 0 ? '1px solid rgba(167,139,250,0.35)' : '1px solid transparent',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                        {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#a78bfa' }}>Saldo: {team.scored - team.conceded > 0 ? `+${team.scored - team.conceded}` : team.scored - team.conceded}</div>
+                                                                </div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.scored} Vencidos · {team.conceded} Perdidos</div>
+                                                                <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${winPct}%`, background: '#a78bfa', height: '100%', borderRadius: '3px' }}></div>
+                                                                </div>
                                                             </div>
-                                                            <div style={{ fontSize: '13px', fontWeight: 800, color: '#a78bfa' }}>{team.wins} V</div>
-                                                        </div>
-                                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
-                                                    </div>
-                                                ))}
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
+
+                                            {/* Card 3: Consistência de Placar */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Shield size={22} color="#a78bfa" /><div><h2 style={cardTitleStyle}>Consistência de Placar</h2><p style={cardSubStyle}>Média de Pontos Sofridos por Set</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topSetsConsistencyList.length === 0 ? <EmptyState /> : stats.topSetsConsistencyList.slice(0, 10).map((team, idx) => (
+                                                        <div key={`tmb-c-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(167,139,250,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#a78bfa' }}>{team.avgConceded.toFixed(1)} <span style={{fontSize: '10px'}}>PTS/SET</span></div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.pointsConceded} sofridos em {team.setsPlayed} sets</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : isTenisDeMesa ? (
+                                        <>
+                                            {/* Informação sobre Tênis de Mesa */}
+                                            <div style={{
+                                                gridColumn: '1 / -1',
+                                                background: 'rgba(251,191,36,0.1)',
+                                                border: '1px solid rgba(251,191,36,0.3)',
+                                                padding: '12px 16px',
+                                                borderRadius: '10px',
+                                                marginBottom: '10px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px'
+                                            }}>
+                                                <span style={{ fontSize: '18px' }}>ℹ️</span>
+                                                <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 600 }}>
+                                                    <strong>Regra Oficial do Tênis de Mesa:</strong> Partidas de 11 pontos em melhor de 5 sets.
+                                                </span>
+                                            </div>
+
+                                            {/* Card 1: Vitórias e Aproveitamento */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}>
+                                                    <span style={{ fontSize: '22px' }}>🏓</span>
+                                                    <div><h2 style={cardTitleStyle}>Vitórias e Aproveitamento</h2><p style={cardSubStyle}>Ranking de vitórias por equipe/dupla</p></div>
+                                                </div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                        <div key={`tm-w-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 2: Domínio de Sets */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Sword size={22} color="#22c55e" /><div><h2 style={cardTitleStyle}>Domínio de Sets</h2><p style={cardSubStyle}>Saldo de Sets (Vencidos vs Perdidos)</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.teamStatsList.length === 0 ? <EmptyState /> : stats.teamStatsList.sort((a,b) => (b.scored - b.conceded) - (a.scored - a.conceded)).slice(0, 10).map((team, idx) => {
+                                                        const totalSets = team.scored + team.conceded;
+                                                        const winPct = totalSets > 0 ? (team.scored / totalSets) * 100 : 0;
+                                                        return (
+                                                            <div key={`tm-d-${idx}`} style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '10px',
+                                                                marginBottom: '6px',
+                                                                background: idx === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                                                                border: idx === 0 ? '1px solid rgba(34,197,94,0.35)' : '1px solid transparent',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                        {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#22c55e' }}>Saldo: {team.scored - team.conceded > 0 ? `+${team.scored - team.conceded}` : team.scored - team.conceded}</div>
+                                                                </div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.scored} Vencidos · {team.conceded} Perdidos</div>
+                                                                <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${winPct}%`, background: '#22c55e', height: '100%', borderRadius: '3px' }}></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 3: Consistência de Placar */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Shield size={22} color="#3b82f6" /><div><h2 style={cardTitleStyle}>Consistência de Placar</h2><p style={cardSubStyle}>Média de Pontos Sofridos por Set</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topSetsConsistencyList.length === 0 ? <EmptyState /> : stats.topSetsConsistencyList.slice(0, 10).map((team, idx) => {
+                                                        const concededPct = Math.min((team.avgConceded / 11) * 100, 100);
+                                                        return (
+                                                        <div key={`tm-c-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(59,130,246,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#3b82f6' }}>{team.avgConceded.toFixed(1)} <span style={{fontSize: '10px'}}>PTS/SET</span></div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.pointsConceded} sofridos em {team.setsPlayed} sets</div>
+                                                            <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                                                                <div style={{ width: `${concededPct}%`, background: '#3b82f6', height: '100%', borderRadius: '3px' }}></div>
+                                                            </div>
+                                                        </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : isBeachTennis ? (
+                                        <>
+                                            {/* Informação sobre Beach Tennis */}
+                                            <div style={{
+                                                gridColumn: '1 / -1',
+                                                background: 'rgba(251,191,36,0.1)',
+                                                border: '1px solid rgba(251,191,36,0.3)',
+                                                padding: '12px 16px',
+                                                borderRadius: '10px',
+                                                marginBottom: '10px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px'
+                                            }}>
+                                                <span style={{ fontSize: '18px' }}>ℹ️</span>
+                                                <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 600 }}>
+                                                    <strong>Fase Inicial:</strong> Set de 6 games | <strong>Finais:</strong> Set de 8 games
+                                                </span>
+                                            </div>
+
+                                            {/* Card 1: Vitórias e Aproveitamento */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}>
+                                                    <span style={{ fontSize: '22px' }}>🎾</span>
+                                                    <div><h2 style={cardTitleStyle}>Vitórias e Aproveitamento</h2><p style={cardSubStyle}>Ranking de vitórias por dupla/atleta</p></div>
+                                                </div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                        <div key={`bt-w-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 2: Saldo de Games */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Sword size={22} color="#22c55e" /><div><h2 style={cardTitleStyle}>Domínio de Games</h2><p style={cardSubStyle}>Saldo de Games (Vencidos vs Perdidos)</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.teamStatsList.length === 0 ? <EmptyState /> : stats.teamStatsList.sort((a,b) => (b.scored - b.conceded) - (a.scored - a.conceded)).slice(0, 10).map((team, idx) => {
+                                                        const avgScored = team.games > 0 ? team.scored / team.games : 0;
+                                                        // Max possible games to score can be around 9, so a 9-game match dominates the bar
+                                                        const winPct = Math.min((avgScored / 9) * 100, 100);
+                                                        return (
+                                                            <div key={`bt-d-${idx}`} style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '10px',
+                                                                marginBottom: '6px',
+                                                                background: idx === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                                                                border: idx === 0 ? '1px solid rgba(34,197,94,0.35)' : '1px solid transparent',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                        {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#22c55e' }}>Saldo: {team.scored - team.conceded > 0 ? `+${team.scored - team.conceded}` : team.scored - team.conceded}</div>
+                                                                </div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.scored} Vencidos · {team.conceded} Perdidos</div>
+                                                                <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${winPct}%`, background: '#22c55e', height: '100%', borderRadius: '3px' }}></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 3: Média de Games Sofridos */}
+                                            <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Shield size={22} color="#3b82f6" /><div><h2 style={cardTitleStyle}>Consistência de Placar</h2><p style={cardSubStyle}>Média de Games Sofridos</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.teamStatsList.length === 0 ? <EmptyState /> : stats.teamStatsList.slice()
+                                                        .map(team => ({ ...team, avg: team.games > 0 ? team.conceded / team.games : 0 }))
+                                                        .sort((a,b) => a.avg - b.avg)
+                                                        .slice(0, 10).map((team, idx) => {
+                                                        const concededPct = Math.min((team.avg / 9) * 100, 100);
+                                                        return (
+                                                        <div key={`bt-c-${idx}`} style={{
+                                                            padding: '10px 12px',
+                                                            borderRadius: '10px',
+                                                            marginBottom: '6px',
+                                                            background: idx === 0 ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+                                                            border: idx === 0 ? '1px solid rgba(59,130,246,0.35)' : '1px solid transparent',
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                    {idx + 1}. {`${team.name.split(' - ')[0]} | ${team.faculty || team.name.split(' - ')[1] || '-'}`}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#3b82f6' }}>{team.avg.toFixed(1)} <span style={{fontSize: '10px'}}>GAMES</span></div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.conceded} sofridos em {team.games} partidas</div>
+                                                            <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                                                                <div style={{ width: `${concededPct}%`, background: '#3b82f6', height: '100%', borderRadius: '3px' }}></div>
+                                                            </div>
+                                                        </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </>
                                     ) : isHandebol ? (
                                         <>
                                             <div style={cardStyle}>

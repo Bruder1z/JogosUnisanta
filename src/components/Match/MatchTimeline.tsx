@@ -117,6 +117,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     selectedMatch?.sport === "Vôlei" ||
     selectedMatch?.sport === "Vôlei de Praia" ||
     selectedMatch?.sport === "Futevôlei";
+  // Apenas Vôlei e Vôlei de Praia exibem botões ACE/ERRO nos cards de atletas
+  const isVolleyballAceSport =
+    selectedMatch?.sport === "Vôlei" ||
+    selectedMatch?.sport === "Vôlei de Praia";
   const isFutebolX1 = selectedMatch?.sport === "Futebol X1";
   const isFutsal = selectedMatch?.sport === "Futsal";
   const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
@@ -202,6 +206,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const prevScoreRef = useRef<{ a: number; b: number; id: string } | null>(null);
   const [penaltyShootoutActive, setPenaltyShootoutActive] = useState(false);
   const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
+  // Feedback visual ao registrar ACE / ERRO
+  const [volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
 
   // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
@@ -848,6 +854,176 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       status: "live",
     };
 
+    updateMatch(updatedMatch);
+  };
+
+  // ACE: ponto para o time que serviu, registrado com nome do atleta
+  const handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
+      if (started) selectedMatch.events = started.events;
+    }
+    const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    // Recalcular pontuação do set atual antes de adicionar o ponto (igual a handleVolleyPoint)
+    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
+    const relevantEvents = lastSetWinEvent
+      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
+      : selectedMatch.events || [];
+    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
+    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const nextPtsA = team === "A" ? ptsA + 1 : ptsA;
+    const nextPtsB = team === "B" ? ptsB + 1 : ptsB;
+    const aceEvent: MatchEvent = {
+      id: `evt_${Date.now()}_ace`,
+      type: "goal",
+      minute: getCurrentEventMinute(),
+      teamId: scoringTeamId,
+      player: playerName,
+      description: `🏐 ACE! ${playerName} (${teamName}) — ${nextPtsA}x${nextPtsB}`,
+      score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`,
+    } as MatchEvent;
+    // Reusar lógica de pontuação do set via handleVolleyPoint internamente
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: [...(selectedMatch.events || []), aceEvent],
+    };
+    // Disparar feedback visual
+    setVolleyActionFeedback({ playerId, type: "ace" });
+    setTimeout(() => setVolleyActionFeedback(null), 600);
+    // Delegar lógica de set/fim de jogo à handleVolleyPoint interna
+    handleVolleyPointInternal(team, updatedMatch, nextPtsA, nextPtsB);
+  };
+
+  // ERRO: ponto para o time adversário (erro de saque dá ponto para quem recebe)
+  const handleVolleyErro = (team: "A" | "B", playerName: string, playerId: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    const adversaryTeam: "A" | "B" = team === "A" ? "B" : "A";
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
+      if (started) selectedMatch.events = started.events;
+    }
+    const adversaryTeamId = adversaryTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const adversaryName = adversaryTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
+    const relevantEvents = lastSetWinEvent
+      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
+      : selectedMatch.events || [];
+    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
+    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const nextPtsA = adversaryTeam === "A" ? ptsA + 1 : ptsA;
+    const nextPtsB = adversaryTeam === "B" ? ptsB + 1 : ptsB;
+    const erroEvent: MatchEvent = {
+      id: `evt_${Date.now()}_erro`,
+      type: "goal",
+      minute: getCurrentEventMinute(),
+      teamId: adversaryTeamId,
+      player: playerName,
+      description: `❌ Erro de Saque — ${playerName} | Ponto para ${adversaryName} (${nextPtsA}x${nextPtsB})`,
+      score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`,
+    } as MatchEvent;
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: [...(selectedMatch.events || []), erroEvent],
+    };
+    setVolleyActionFeedback({ playerId, type: "erro" });
+    setTimeout(() => setVolleyActionFeedback(null), 600);
+    handleVolleyPointInternal(adversaryTeam, updatedMatch, nextPtsA, nextPtsB);
+  };
+
+  // Função interna que aplica a lógica de set/fim de jogo a partir de um match já mutado
+  const handleVolleyPointInternal = (scoringTeam: "A" | "B", updatedMatch: Match, nextPtsA: number, nextPtsB: number) => {
+    if (!selectedMatch) return;
+    const scoringTeamId = scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const currentPhase = selectedMatch.stage || "Fase de Classificação";
+
+    if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase de Classificação") {
+      if (nextPtsA >= 25 || nextPtsB >= 25) {
+        const winner = nextPtsA >= 25 ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        updatedMatch.status = "finished";
+        updatedMatch.scoreA = winner === "A" ? 1 : 0;
+        updatedMatch.scoreB = winner === "B" ? 1 : 0;
+        updatedMatch.events = [
+          ...(updatedMatch.events || []),
+          { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: scoringTeamId, description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`, score: winner === "A" ? "1x0" : "0x1" } as MatchEvent,
+          { id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}` } as MatchEvent,
+        ];
+        finishMatch(updatedMatch);
+        return;
+      }
+    } else if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase Final") {
+      const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+      const targetScore = currentSet <= 2 ? 25 : 15;
+      if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
+        const winner = nextPtsA > nextPtsB ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+        const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+        updatedMatch.scoreA = newScoreA;
+        updatedMatch.scoreB = newScoreB;
+        updatedMatch.events = [
+          ...(updatedMatch.events || []),
+          { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id, description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`, score: `${newScoreA}x${newScoreB}` } as MatchEvent,
+        ];
+        if (newScoreA === 2 || newScoreB === 2) {
+          updatedMatch.status = "finished";
+          updatedMatch.events.push({ id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets` } as MatchEvent);
+          finishMatch(updatedMatch);
+          return;
+        }
+        updatedMatch.status = "live";
+        updateMatch(updatedMatch);
+        setIsRunning(false);
+        return;
+      }
+    } else if (selectedMatch.sport === "Vôlei de Praia") {
+      const currentPhaseBeach = selectedMatch.stage || "Fase de Classificação";
+      if (currentPhaseBeach === "Fase de Classificação") {
+        if (nextPtsA >= 21 || nextPtsB >= 21) {
+          const winner = nextPtsA >= 21 ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          updatedMatch.status = "finished";
+          updatedMatch.scoreA = winner === "A" ? 1 : 0;
+          updatedMatch.scoreB = winner === "B" ? 1 : 0;
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: scoringTeamId, description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`, score: winner === "A" ? "1x0" : "0x1" } as MatchEvent,
+            { id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}` } as MatchEvent,
+          ];
+          finishMatch(updatedMatch);
+          return;
+        }
+      } else if (currentPhaseBeach === "Fase Final") {
+        const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+        const targetScore = currentSet <= 2 ? 18 : 15;
+        if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
+          const winner = nextPtsA > nextPtsB ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+          const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+          updatedMatch.scoreA = newScoreA;
+          updatedMatch.scoreB = newScoreB;
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id, description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`, score: `${newScoreA}x${newScoreB}` } as MatchEvent,
+          ];
+          if (newScoreA === 2 || newScoreB === 2) {
+            updatedMatch.status = "finished";
+            updatedMatch.events.push({ id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets` } as MatchEvent);
+            finishMatch(updatedMatch);
+            return;
+          }
+          updatedMatch.status = "live";
+          updateMatch(updatedMatch);
+          setIsRunning(false);
+          return;
+        }
+      }
+    }
     updateMatch(updatedMatch);
   };
 
@@ -4582,6 +4758,188 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
+        {/* Roster de Atletas com botões ACE / ERRO — apenas Vôlei e Vôlei de Praia */}
+        {isVolleyballAceSport && selectedMatch && selectedMatch.status !== "finished" && (
+          <>
+            {(["A", "B"] as const).map((team) => {
+              const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+              const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
+              const teamBg = team === "A" ? "rgba(59,130,246,0.08)" : "rgba(239,68,68,0.08)";
+              const teamAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+              if (teamAthletes.length === 0) return null;
+              return (
+                <div key={team} style={{
+                  ...styles.eventSection,
+                  background: teamBg,
+                  border: `1px solid ${teamColor}33`,
+                  borderRadius: "14px",
+                  padding: "16px",
+                  marginTop: "4px",
+                }}>
+                  <h3 style={{ ...styles.sectionTitle, color: teamColor, marginBottom: "12px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "18px" }}>🏐</span>
+                    {teamObj.name.split(" - ")[0]}
+                    <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-secondary)", marginLeft: "4px" }}>
+                      — Clique em ACE ou ERRO para registrar
+                    </span>
+                  </h3>
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    maxHeight: "220px",
+                    overflowY: "auto",
+                    paddingRight: "4px",
+                  }} className="player-list">
+                    {teamAthletes.map((athlete) => {
+                      const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                      const isFeedbackAce = volleyActionFeedback?.playerId === athlete.id && volleyActionFeedback.type === "ace";
+                      const isFeedbackErro = volleyActionFeedback?.playerId === athlete.id && volleyActionFeedback.type === "erro";
+                      
+                      // Computing in-match stats for the live scoreboard
+                      let aces = 0;
+                      let erros = 0;
+                      if (selectedMatch.events) {
+                        selectedMatch.events.forEach((evt) => {
+                          if (evt.type === "goal" && evt.player === playerName) {
+                            if (String(evt.description || "").includes("ACE!")) aces++;
+                            if (String(evt.description || "").includes("Erro de Saque")) erros++;
+                          }
+                        });
+                      }
+
+                      return (
+                        <div
+                          key={athlete.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "9px 12px",
+                            background: isFeedbackAce
+                              ? "rgba(34,197,94,0.22)"
+                              : isFeedbackErro
+                              ? "rgba(239,68,68,0.22)"
+                              : "rgba(255,255,255,0.04)",
+                            borderRadius: "10px",
+                            border: isFeedbackAce
+                              ? "1px solid #22c55e"
+                              : isFeedbackErro
+                              ? "1px solid #ef4444"
+                              : "1px solid rgba(255,255,255,0.07)",
+                            transition: "background 0.25s, border 0.25s",
+                            animation: (isFeedbackAce || isFeedbackErro) ? "volley-btn-glow 0.6s ease-out" : "none",
+                          }}
+                        >
+                          {/* Nome do atleta e Badges de Status */}
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            flex: 1,
+                            minWidth: 0,
+                            paddingRight: "10px",
+                          }}>
+                            <span style={{
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}>
+                              {playerName}
+                            </span>
+                            
+                            {(aces > 0 || erros > 0) && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                                {aces > 0 && (
+                                  <span style={{ fontSize: "10px", background: "rgba(34,197,94,0.15)", color: "#22c55e", fontWeight: 800, padding: "2px 6px", borderRadius: "4px" }}>
+                                    {aces} ACE
+                                  </span>
+                                )}
+                                {erros > 0 && (
+                                  <span style={{ fontSize: "10px", background: "rgba(239,68,68,0.15)", color: "#ef4444", fontWeight: 800, padding: "2px 6px", borderRadius: "4px" }}>
+                                    {erros} ERRO
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Botões ACE / ERRO */}
+                          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                            {/* Botão ACE */}
+                            <button
+                              id={`btn-ace-${athlete.id}`}
+                              onClick={() => handleVolleyAce(team, playerName, athlete.id)}
+                              disabled={selectedMatch.status === "finished"}
+                              title={`ACE de ${playerName}`}
+                              className="volley-ace-btn"
+                              style={{
+                                width: "44px",
+                                height: "30px",
+                                borderRadius: "8px",
+                                border: "1px solid #22c55e",
+                                background: isFeedbackAce ? "#22c55e" : "rgba(34,197,94,0.15)",
+                                color: isFeedbackAce ? "white" : "#22c55e",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                letterSpacing: "0.5px",
+                                transition: "background 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s",
+                                boxShadow: isFeedbackAce ? "0 0 12px rgba(34,197,94,0.6)" : "none",
+                              }}
+                            >
+                              ACE
+                            </button>
+
+                            {/* Botão ERRO */}
+                            <button
+                              id={`btn-erro-${athlete.id}`}
+                              onClick={() => handleVolleyErro(team, playerName, athlete.id)}
+                              disabled={selectedMatch.status === "finished"}
+                              title={`Erro de saque de ${playerName}`}
+                              className="volley-erro-btn"
+                              style={{
+                                width: "44px",
+                                height: "30px",
+                                borderRadius: "8px",
+                                border: "1px solid #ef4444",
+                                background: isFeedbackErro ? "#ef4444" : "rgba(239,68,68,0.12)",
+                                color: isFeedbackErro ? "white" : "#ef4444",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                letterSpacing: "0.5px",
+                                transition: "background 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s",
+                                boxShadow: isFeedbackErro ? "0 0 12px rgba(239,68,68,0.6)" : "none",
+                              }}
+                            >
+                              ERRO
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {teamAthletes.length === 0 && (
+                      <div style={{ textAlign: "center", padding: "12px", color: "var(--text-secondary)", fontSize: "12px" }}>
+                        Nenhum atleta encontrado para esta equipe.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
         {isSetSport && (
           <div style={styles.eventSection}>
             <h3 style={styles.sectionTitle}>🏆 Sets</h3>
@@ -5872,6 +6230,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         background-color: var(--bg-hover) !important;
                         border-color: var(--accent-color) !important;
                         transform: translateY(-2px);
+                    }
+
+                    /* Botões ACE e ERRO — hover e feedback */
+                    .volley-ace-btn:hover:not(:disabled) {
+                        background: rgba(34, 197, 94, 0.35) !important;
+                        transform: scale(1.08);
+                        box-shadow: 0 0 10px rgba(34, 197, 94, 0.45) !important;
+                    }
+                    .volley-ace-btn:active:not(:disabled) {
+                        transform: scale(0.95);
+                    }
+                    .volley-erro-btn:hover:not(:disabled) {
+                        background: rgba(239, 68, 68, 0.3) !important;
+                        transform: scale(1.08);
+                        box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
+                    }
+                    .volley-erro-btn:active:not(:disabled) {
+                        transform: scale(0.95);
+                    }
+
+                    @keyframes volley-btn-glow {
+                        0%   { transform: scale(1); }
+                        25%  { transform: scale(1.03); }
+                        60%  { transform: scale(1.01); }
+                        100% { transform: scale(1); }
                     }
                     
                     /* Custom scrollbar */
