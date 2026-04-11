@@ -120,6 +120,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     selectedMatch?.sport === "Vôlei" ||
     selectedMatch?.sport === "Vôlei de Praia" ||
     selectedMatch?.sport === "Futevôlei";
+  // Apenas Vôlei e Vôlei de Praia exibem botões ACE/ERRO nos cards de atletas
+  const isVolleyballAceSport =
+    selectedMatch?.sport === "Vôlei" ||
+    selectedMatch?.sport === "Vôlei de Praia";
   const isFutebolX1 = selectedMatch?.sport === "Futebol X1";
   const isFutsal = selectedMatch?.sport === "Futsal";
   const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
@@ -205,6 +209,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const prevScoreRef = useRef<{ a: number; b: number; id: string } | null>(null);
   const [penaltyShootoutActive, setPenaltyShootoutActive] = useState(false);
   const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
+  // Feedback visual ao registrar ACE / ERRO
+  const [volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
 
   // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
@@ -851,6 +857,176 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       status: "live",
     };
 
+    updateMatch(updatedMatch);
+  };
+
+  // ACE: ponto para o time que serviu, registrado com nome do atleta
+  const handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
+      if (started) selectedMatch.events = started.events;
+    }
+    const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    // Recalcular pontuação do set atual antes de adicionar o ponto (igual a handleVolleyPoint)
+    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
+    const relevantEvents = lastSetWinEvent
+      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
+      : selectedMatch.events || [];
+    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
+    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const nextPtsA = team === "A" ? ptsA + 1 : ptsA;
+    const nextPtsB = team === "B" ? ptsB + 1 : ptsB;
+    const aceEvent: MatchEvent = {
+      id: `evt_${Date.now()}_ace`,
+      type: "goal",
+      minute: getCurrentEventMinute(),
+      teamId: scoringTeamId,
+      player: playerName,
+      description: `🏐 ACE! ${playerName} (${teamName}) — ${nextPtsA}x${nextPtsB}`,
+      score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`,
+    } as MatchEvent;
+    // Reusar lógica de pontuação do set via handleVolleyPoint internamente
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: [...(selectedMatch.events || []), aceEvent],
+    };
+    // Disparar feedback visual
+    setVolleyActionFeedback({ playerId, type: "ace" });
+    setTimeout(() => setVolleyActionFeedback(null), 600);
+    // Delegar lógica de set/fim de jogo à handleVolleyPoint interna
+    handleVolleyPointInternal(team, updatedMatch, nextPtsA, nextPtsB);
+  };
+
+  // ERRO: ponto para o time adversário (erro de saque dá ponto para quem recebe)
+  const handleVolleyErro = (team: "A" | "B", playerName: string, playerId: string) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
+    const adversaryTeam: "A" | "B" = team === "A" ? "B" : "A";
+    if (!selectedMatch.events?.some((e) => e.type === "start")) {
+      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
+      if (started) selectedMatch.events = started.events;
+    }
+    const adversaryTeamId = adversaryTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const adversaryName = adversaryTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
+    const relevantEvents = lastSetWinEvent
+      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
+      : selectedMatch.events || [];
+    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
+    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const nextPtsA = adversaryTeam === "A" ? ptsA + 1 : ptsA;
+    const nextPtsB = adversaryTeam === "B" ? ptsB + 1 : ptsB;
+    const erroEvent: MatchEvent = {
+      id: `evt_${Date.now()}_erro`,
+      type: "goal",
+      minute: getCurrentEventMinute(),
+      teamId: adversaryTeamId,
+      player: playerName,
+      description: `❌ Erro de Saque — ${playerName} | Ponto para ${adversaryName} (${nextPtsA}x${nextPtsB})`,
+      score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`,
+    } as MatchEvent;
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      status: "live",
+      events: [...(selectedMatch.events || []), erroEvent],
+    };
+    setVolleyActionFeedback({ playerId, type: "erro" });
+    setTimeout(() => setVolleyActionFeedback(null), 600);
+    handleVolleyPointInternal(adversaryTeam, updatedMatch, nextPtsA, nextPtsB);
+  };
+
+  // Função interna que aplica a lógica de set/fim de jogo a partir de um match já mutado
+  const handleVolleyPointInternal = (scoringTeam: "A" | "B", updatedMatch: Match, nextPtsA: number, nextPtsB: number) => {
+    if (!selectedMatch) return;
+    const scoringTeamId = scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const currentPhase = selectedMatch.stage || "Fase de Classificação";
+
+    if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase de Classificação") {
+      if (nextPtsA >= 25 || nextPtsB >= 25) {
+        const winner = nextPtsA >= 25 ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        updatedMatch.status = "finished";
+        updatedMatch.scoreA = winner === "A" ? 1 : 0;
+        updatedMatch.scoreB = winner === "B" ? 1 : 0;
+        updatedMatch.events = [
+          ...(updatedMatch.events || []),
+          { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: scoringTeamId, description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`, score: winner === "A" ? "1x0" : "0x1" } as MatchEvent,
+          { id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}` } as MatchEvent,
+        ];
+        finishMatch(updatedMatch);
+        return;
+      }
+    } else if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase Final") {
+      const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+      const targetScore = currentSet <= 2 ? 25 : 15;
+      if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
+        const winner = nextPtsA > nextPtsB ? "A" : "B";
+        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+        const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+        updatedMatch.scoreA = newScoreA;
+        updatedMatch.scoreB = newScoreB;
+        updatedMatch.events = [
+          ...(updatedMatch.events || []),
+          { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id, description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`, score: `${newScoreA}x${newScoreB}` } as MatchEvent,
+        ];
+        if (newScoreA === 2 || newScoreB === 2) {
+          updatedMatch.status = "finished";
+          updatedMatch.events.push({ id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets` } as MatchEvent);
+          finishMatch(updatedMatch);
+          return;
+        }
+        updatedMatch.status = "live";
+        updateMatch(updatedMatch);
+        setIsRunning(false);
+        return;
+      }
+    } else if (selectedMatch.sport === "Vôlei de Praia") {
+      const currentPhaseBeach = selectedMatch.stage || "Fase de Classificação";
+      if (currentPhaseBeach === "Fase de Classificação") {
+        if (nextPtsA >= 21 || nextPtsB >= 21) {
+          const winner = nextPtsA >= 21 ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          updatedMatch.status = "finished";
+          updatedMatch.scoreA = winner === "A" ? 1 : 0;
+          updatedMatch.scoreB = winner === "B" ? 1 : 0;
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: scoringTeamId, description: `Fim de Jogo (Fase de Classificação) para ${winnerName}`, score: winner === "A" ? "1x0" : "0x1" } as MatchEvent,
+            { id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${nextPtsA} x ${nextPtsB}` } as MatchEvent,
+          ];
+          finishMatch(updatedMatch);
+          return;
+        }
+      } else if (currentPhaseBeach === "Fase Final") {
+        const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+        const targetScore = currentSet <= 2 ? 18 : 15;
+        if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
+          const winner = nextPtsA > nextPtsB ? "A" : "B";
+          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+          const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+          updatedMatch.scoreA = newScoreA;
+          updatedMatch.scoreB = newScoreB;
+          updatedMatch.events = [
+            ...(updatedMatch.events || []),
+            { id: `evt_${Date.now() + 1}`, type: "set_win", minute: getCurrentEventMinute(), teamId: winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id, description: `Set ganho por ${winnerName} (${nextPtsA}x${nextPtsB})`, score: `${newScoreA}x${newScoreB}` } as MatchEvent,
+          ];
+          if (newScoreA === 2 || newScoreB === 2) {
+            updatedMatch.status = "finished";
+            updatedMatch.events.push({ id: `evt_${Date.now() + 2}`, type: "end", minute: getCurrentEventMinute(), description: `Fim de Jogo - Placar Final: ${newScoreA} x ${newScoreB} em sets` } as MatchEvent);
+            finishMatch(updatedMatch);
+            return;
+          }
+          updatedMatch.status = "live";
+          updateMatch(updatedMatch);
+          setIsRunning(false);
+          return;
+        }
+      }
+    }
     updateMatch(updatedMatch);
   };
 
@@ -4539,74 +4715,74 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </div>
             )}
 
-            {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>
-                  {isSetSport
-                    ? isVolleyball
-                      ? "🏐 Pontos"
-                      : "🏓 Pontos"
-                    : "⚽ Gols"}
-                </h3>
-                {isSetSport && isVolleyball && (() => {
-                  const stage = selectedMatch.stage || "Fase de Classificação";
-                  const isFinal = stage === "Fase Final";
-                  const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
-                  const sport = selectedMatch.sport;
-                  let targetPts: number;
-                  if (sport === "Vôlei") {
-                    targetPts = isFinal ? (currentSet <= 2 ? 25 : 15) : 25;
-                  } else if (sport === "Vôlei de Praia") {
-                    targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 21;
-                  } else {
-                    // Futevôlei
-                    targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 18;
-                  }
-                  return (
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "8px 12px", marginBottom: "10px",
-                      background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
-                      borderRadius: "8px",
-                      border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
-                    }}>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
-                        {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
-                        {isFinal && ` · Set ${currentSet}/3`}
-                      </span>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
-                        Alvo: {targetPts} pts{isFinal ? " (vant. 2)" : ""}
-                      </span>
-                    </div>
-                  );
-                })()}
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                    onClick={() =>
-                      isSetSport ? handleVolleyPoint("A") : handleGoal("A")
-                    }
-                  >
-                    <Plus size={20} />
-                    {isSetSport ? "Ponto" : "Gol"}{" "}
-                    {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                    onClick={() =>
-                      isSetSport ? handleVolleyPoint("B") : handleGoal("B")
-                    }
-                  >
-                    <Plus size={20} />
-                    {isSetSport ? "Ponto" : "Gol"}{" "}
-                    {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
+        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
+          <div style={styles.eventSection}>
+            <h3 style={styles.sectionTitle}>
+              {isSetSport
+                ? isVolleyball
+                  ? "🏐 Pontos"
+                  : "🏓 Pontos"
+                : "⚽ Gols"}
+            </h3>
+            {isSetSport && isVolleyball && (() => {
+              const stage = selectedMatch.stage || "Fase de Classificação";
+              const isFinal = stage === "Fase Final";
+              const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+              const sport = selectedMatch.sport;
+              let targetPts: number;
+              if (sport === "Vôlei") {
+                targetPts = isFinal ? (currentSet <= 2 ? 25 : 15) : 25;
+              } else if (sport === "Vôlei de Praia") {
+                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 21;
+              } else {
+                // Futevôlei
+                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 18;
+              }
+              return (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 12px", marginBottom: "10px",
+                  background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
+                  borderRadius: "8px",
+                  border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
+                }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
+                    {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
+                    {isFinal && ` · Set ${currentSet}/3`}
+                  </span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                    Alvo: {targetPts} pts{isFinal ? " (vant. 2)" : ""}
+                  </span>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+            <div
+              style={styles.eventButtons}
+              className="match-timeline-event-grid"
+            >
+              <button
+                style={{ ...styles.eventBtn, ...styles.teamABtn }}
+                onClick={() =>
+                  isSetSport ? handleVolleyPoint("A") : handleGoal("A")
+                }
+              >
+                <Plus size={20} />
+                {isSetSport ? "Ponto" : "Gol"}{" "}
+                {selectedMatch.teamA.name.split(" - ")[0]}
+              </button>
+              <button
+                style={{ ...styles.eventBtn, ...styles.teamBBtn }}
+                onClick={() =>
+                  isSetSport ? handleVolleyPoint("B") : handleGoal("B")
+                }
+              >
+                <Plus size={20} />
+                {isSetSport ? "Ponto" : "Gol"}{" "}
+                {selectedMatch.teamB.name.split(" - ")[0]}
+              </button>
+            </div>
+          </div>
+        )}
 
             {isSetSport && (
               <div style={styles.eventSection}>
@@ -5898,6 +6074,31 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         background-color: var(--bg-hover) !important;
                         border-color: var(--accent-color) !important;
                         transform: translateY(-2px);
+                    }
+
+                    /* Botões ACE e ERRO — hover e feedback */
+                    .volley-ace-btn:hover:not(:disabled) {
+                        background: rgba(34, 197, 94, 0.35) !important;
+                        transform: scale(1.08);
+                        box-shadow: 0 0 10px rgba(34, 197, 94, 0.45) !important;
+                    }
+                    .volley-ace-btn:active:not(:disabled) {
+                        transform: scale(0.95);
+                    }
+                    .volley-erro-btn:hover:not(:disabled) {
+                        background: rgba(239, 68, 68, 0.3) !important;
+                        transform: scale(1.08);
+                        box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
+                    }
+                    .volley-erro-btn:active:not(:disabled) {
+                        transform: scale(0.95);
+                    }
+
+                    @keyframes volley-btn-glow {
+                        0%   { transform: scale(1); }
+                        25%  { transform: scale(1.03); }
+                        60%  { transform: scale(1.01); }
+                        100% { transform: scale(1); }
                     }
                     
                     /* Custom scrollbar */
