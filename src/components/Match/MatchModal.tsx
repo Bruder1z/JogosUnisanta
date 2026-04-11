@@ -16,6 +16,7 @@ import {
 } from "../../data/mockData";
 import { useData } from "../context/DataContext";
 import PlayerStats from "./PlayerStats";
+import LiveChat from "../Chat/LiveChat";
 
 interface MatchModalProps {
   match: Match;
@@ -229,24 +230,24 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       const segmentEvents = events.slice(currentSetStartIndex, index + 1);
       let scoreA = isBeachTennis
         ? segmentEvents.filter(
-            (e) =>
-              e.type === "set_win" &&
-              e.description?.startsWith("Game para ") &&
-              e.teamId === currentMatch.teamA.id,
-          ).length
+          (e) =>
+            e.type === "set_win" &&
+            e.description?.startsWith("Game para ") &&
+            e.teamId === currentMatch.teamA.id,
+        ).length
         : segmentEvents.filter(
-            (e) => e.type === "goal" && e.teamId === currentMatch.teamA.id,
-          ).length;
+          (e) => e.type === "goal" && e.teamId === currentMatch.teamA.id,
+        ).length;
       let scoreB = isBeachTennis
         ? segmentEvents.filter(
-            (e) =>
-              e.type === "set_win" &&
-              e.description?.startsWith("Game para ") &&
-              e.teamId === currentMatch.teamB.id,
-          ).length
+          (e) =>
+            e.type === "set_win" &&
+            e.description?.startsWith("Game para ") &&
+            e.teamId === currentMatch.teamB.id,
+        ).length
         : segmentEvents.filter(
-            (e) => e.type === "goal" && e.teamId === currentMatch.teamB.id,
-          ).length;
+          (e) => e.type === "goal" && e.teamId === currentMatch.teamB.id,
+        ).length;
 
       // Fallback when a set is finalized without goal events in the segment.
       if (scoreA === 0 && scoreB === 0 && event.description) {
@@ -616,21 +617,21 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   // Calculate MVP (player with most points)
   const calculateMVP = (): { player: string; points: number; teamId: string; teamName: string } | null => {
     if (!currentMatch.events || currentMatch.events.length === 0) return null;
-    
+
     // Only calculate MVP for basketball and volleyball
     if (!isBasketball && !isVolleyballFamilySport) return null;
-    
+
     const playerPoints: { [key: string]: { points: number; teamId: string; teamName: string } } = {};
-    
+
     currentMatch.events.forEach((event) => {
       if (event.type === "goal" && event.player && event.teamId) {
         if (!playerPoints[event.player]) {
-          const teamName = event.teamId === currentMatch.teamA.id 
+          const teamName = event.teamId === currentMatch.teamA.id
             ? currentMatch.teamA.name.split(" - ")[0]
             : currentMatch.teamB.name.split(" - ")[0];
           playerPoints[event.player] = { points: 0, teamId: event.teamId, teamName };
         }
-        
+
         // For basketball, extract point value from description
         if (isBasketball) {
           const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 2);
@@ -641,7 +642,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         }
       }
     });
-    
+
     // Find player with most points
     let mvpResult: { player: string; points: number; teamId: string; teamName: string } | null = null;
     Object.entries(playerPoints).forEach(([player, data]) => {
@@ -649,7 +650,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         mvpResult = { player, ...data };
       }
     });
-    
+
     return mvpResult;
   };
 
@@ -785,7 +786,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
       const mappedEvent: TimelineEvent = {
         ...event,
-        timelineScore: isXadrez 
+        timelineScore: isXadrez
           ? `${regularScoreA.toFixed(1)}x${regularScoreB.toFixed(1)}`
           : `${regularScoreA}x${regularScoreB}`,
         timelineQuarter,
@@ -870,287 +871,280 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       }}
       onClick={onClose}
     >
-      {/* Modal principal */}
+      {/* Wrapper para parear as alturas */}
       <div
-        className="premium-card"
         style={{
-          position: "relative",
-          width: showChat ? "600px" : "100%",
-          maxWidth: "600px",
-          maxHeight: "80vh",
-          overflow: "hidden",
           display: "flex",
-          flexDirection: "column",
-          animation: "modalSlideUp 0.3s ease-out",
-          padding: 0,
-          transition: "width 0.3s",
+          alignItems: "stretch",
+          justifyContent: "center",
+          width: "100%",
+          maxWidth: showChat ? "960px" : "600px",
+          height: "fit-content",
+          maxHeight: "80vh",
+          gap: "16px",
+          transition: "max-width 0.3s ease-out"
         }}
-        onClick={(e) => e.stopPropagation()}
       >
+        {/* Modal principal */}
         <div
+          className="premium-card"
           style={{
-            padding: "20px",
-            borderBottom: "1px solid var(--border-color)",
-            background:
-              "linear-gradient(to bottom, var(--bg-hover), var(--bg-primary))",
+            position: "relative",
+            width: "100%",
+            maxWidth: "600px",
+            maxHeight: "80vh",
+            overflow: "hidden",
             display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: "10px",
+            flexDirection: "column",
+            animation: "modalSlideUp 0.3s ease-out",
+            padding: 0,
+            margin: 0,
           }}
+          onClick={(e) => e.stopPropagation()}
         >
+          <div
+            style={{
+              padding: "20px",
+              borderBottom: "1px solid var(--border-color)",
+              background:
+                "linear-gradient(to bottom, var(--bg-hover), var(--bg-primary))",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "10px",
+            }}
+          >
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
 
-            <div
-              style={{
-                textAlign: "center",
-                marginBottom: "10px",
-                fontSize: "12px",
-                color: "var(--accent-color)",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-              }}
-            >
-              {currentMatch.sport}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-            {isSwimming ? (
-              <div style={{ width: "100%", textAlign: "center" }}>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--text-secondary)",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "1px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Equipes participantes
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "8px",
-                    justifyContent: "center",
-                  }}
-                >
-                  {(swimmingParticipants.length
-                    ? swimmingParticipants
-                    : [currentMatch.teamA, currentMatch.teamB]
-                  ).map((team) => (
-                    <span
-                      key={team.id}
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "999px",
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid var(--border-color)",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {team.name.split(" - ")[0]}
-                    </span>
-                  ))}
-                </div>
+              <div
+                style={{
+                  textAlign: "center",
+                  marginBottom: "10px",
+                  fontSize: "12px",
+                  color: "var(--accent-color)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}
+              >
+                {currentMatch.sport}
               </div>
-            ) : (
-              <>
-                <TeamHeaderDisplay team={currentMatch.teamA} />
 
-                <div style={{ padding: "0 20px", textAlign: "center" }}>
-                  <div
-                    style={{
-                      fontSize: "36px",
-                      fontWeight: 900,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "15px",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <span>
-                      {isBeachTennis
-                        ? beachLiveState.setsA
-                        : currentMatch.scoreA}
-                    </span>
-                    <span
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                {isSwimming ? (
+                  <div style={{ width: "100%", textAlign: "center" }}>
+                    <div
                       style={{
-                        fontSize: "20px",
+                        fontSize: "12px",
                         color: "var(--text-secondary)",
                         fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "1px",
+                        marginBottom: "10px",
                       }}
                     >
-                      X
-                    </span>
-                    <span>
-                      {isBeachTennis
-                        ? beachLiveState.setsB
-                        : currentMatch.scoreB}
-                    </span>
-                  </div>
-                  {isBeachTennis && (
+                      Equipes participantes
+                    </div>
                     <div
                       style={{
                         display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "2px",
-                        marginTop: "2px",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        justifyContent: "center",
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        Games: {currentMatch.scoreA} - {currentMatch.scoreB}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        Pontos:{" "}
-                        {BEACH_POINT_LABELS[Math.min(beachLiveState.pointA, 3)]}{" "}
-                        -{" "}
-                        {BEACH_POINT_LABELS[Math.min(beachLiveState.pointB, 3)]}
-                      </div>
+                      {(swimmingParticipants.length
+                        ? swimmingParticipants
+                        : [currentMatch.teamA, currentMatch.teamB]
+                      ).map((team) => (
+                        <span
+                          key={team.id}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "999px",
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid var(--border-color)",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {team.name.split(" - ")[0]}
+                        </span>
+                      ))}
                     </div>
-                  )}
-                  {[
-                    "Vôlei",
-                    "Vôlei de Praia",
-                    "Tênis de Mesa",
-                    "Futevôlei",
-                  ].includes(currentMatch.sport) &&
-                    currentMatch.status === "live" && (
+                  </div>
+                ) : (
+                  <>
+                    <TeamHeaderDisplay team={currentMatch.teamA} />
+
+                    <div style={{ padding: "0 20px", textAlign: "center" }}>
                       <div
                         style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                          marginTop: "2px",
+                          fontSize: "36px",
+                          fontWeight: 900,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "15px",
+                          color: "var(--text-primary)",
                         }}
                       >
-                        {(() => {
-                          const lastSetWinEvent = [
-                            ...(currentMatch.events || []),
-                          ]
-                            .reverse()
-                            .find((e) => e.type === "set_win");
-                          const events = lastSetWinEvent
-                            ? currentMatch.events?.slice(
-                                currentMatch.events.indexOf(lastSetWinEvent) +
+                        <span>
+                          {isBeachTennis
+                            ? beachLiveState.setsA
+                            : currentMatch.scoreA}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "20px",
+                            color: "var(--text-secondary)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          X
+                        </span>
+                        <span>
+                          {isBeachTennis
+                            ? beachLiveState.setsB
+                            : currentMatch.scoreB}
+                        </span>
+                      </div>
+                      {isBeachTennis && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "2px",
+                            marginTop: "2px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: "var(--accent-color)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Games: {currentMatch.scoreA} - {currentMatch.scoreB}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--text-secondary)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Pontos:{" "}
+                            {BEACH_POINT_LABELS[Math.min(beachLiveState.pointA, 3)]}{" "}
+                            -{" "}
+                            {BEACH_POINT_LABELS[Math.min(beachLiveState.pointB, 3)]}
+                          </div>
+                        </div>
+                      )}
+                      {[
+                        "Vôlei",
+                        "Vôlei de Praia",
+                        "Tênis de Mesa",
+                        "Futevôlei",
+                      ].includes(currentMatch.sport) &&
+                        currentMatch.status === "live" && (
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: "var(--accent-color)",
+                              fontWeight: 700,
+                              marginTop: "2px",
+                            }}
+                          >
+                            {(() => {
+                              const lastSetWinEvent = [
+                                ...(currentMatch.events || []),
+                              ]
+                                .reverse()
+                                .find((e) => e.type === "set_win");
+                              const events = lastSetWinEvent
+                                ? currentMatch.events?.slice(
+                                  currentMatch.events.indexOf(lastSetWinEvent) +
                                   1,
-                              ) || []
-                            : currentMatch.events || [];
-                          const ptsA = events.filter(
-                            (e) =>
-                              e.type === "goal" &&
-                              e.teamId === currentMatch.teamA.id,
-                          ).length;
-                          const ptsB = events.filter(
-                            (e) =>
-                              e.type === "goal" &&
-                              e.teamId === currentMatch.teamB.id,
-                          ).length;
-                          return `${ptsA} - ${ptsB} (Pt)`;
-                        })()}
-                      </div>
-                    )}
-                  {currentMatch.status === "live" &&
-                    ![
-                      "Vôlei",
-                      "Vôlei de Praia",
-                      "Tênis de Mesa",
-                      "Futevôlei",
-                    ].includes(currentMatch.sport) && (
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--live-color)",
-                          fontWeight: 700,
-                          background: "rgba(255, 68, 68, 0.1)",
-                          padding: "2px 8px",
-                          borderRadius: "10px",
-                          marginTop: "5px",
-                          display: "inline-block",
-                        }}
-                      >
-                        AO VIVO
-                      </div>
-                    )}
+                                ) || []
+                                : currentMatch.events || [];
+                              const ptsA = events.filter(
+                                (e) =>
+                                  e.type === "goal" &&
+                                  e.teamId === currentMatch.teamA.id,
+                              ).length;
+                              const ptsB = events.filter(
+                                (e) =>
+                                  e.type === "goal" &&
+                                  e.teamId === currentMatch.teamB.id,
+                              ).length;
+                              return `${ptsA} - ${ptsB} (Pt)`;
+                            })()}
+                          </div>
+                        )}
+                      {currentMatch.status === "live" &&
+                        ![
+                          "Vôlei",
+                          "Vôlei de Praia",
+                          "Tênis de Mesa",
+                          "Futevôlei",
+                        ].includes(currentMatch.sport) && (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "var(--live-color)",
+                              fontWeight: 700,
+                              background: "rgba(255, 68, 68, 0.1)",
+                              padding: "2px 8px",
+                              borderRadius: "10px",
+                              marginTop: "5px",
+                              display: "inline-block",
+                            }}
+                          >
+                            AO VIVO
+                          </div>
+                        )}
+                    </div>
+
+                    <TeamHeaderDisplay team={currentMatch.teamB} />
+                  </>
+                )}
+              </div>
+
+              <div
+                style={{
+                  marginTop: "15px",
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "20px",
+                  fontSize: "12px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Clock size={14} />
+                  {currentMatch.date.split("-").reverse().join("-")} às{" "}
+                  {currentMatch.time}
                 </div>
-
-                <TeamHeaderDisplay team={currentMatch.teamB} />
-              </>
-            )}
-          </div>
-
-            <div
-              style={{
-                marginTop: "15px",
-                display: "flex",
-                justifyContent: "center",
-                gap: "20px",
-                fontSize: "12px",
-                color: "var(--text-secondary)",
-              }}
-            >
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Clock size={14} />
-              {currentMatch.date.split("-").reverse().join("-")} às{" "}
-              {currentMatch.time}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <MapPin size={14} />
-              {currentMatch.location}
-            </div>
-          </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <MapPin size={14} />
+                  {currentMatch.location}
+                </div>
+              </div>
 
             </div>
             {/* Botões de ação no topo */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <button
-              onClick={onClose}
-              style={{
-              background: "var(--bg-hover)",
-              border: "none",
-              color: "var(--text-secondary)",
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              }}
-              title="Fechar"
-            >
-              <X size={20} />
-            </button>
-            
-            {/* Player Stats Button - Only for Basketball */}
-            {isBasketball && (
               <button
-                onClick={() => setShowPlayerStats(true)}
+                onClick={onClose}
                 style={{
                   background: "var(--bg-hover)",
                   border: "none",
@@ -1162,532 +1156,212 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
+                }}
+                title="Fechar"
+              >
+                <X size={20} />
+              </button>
+
+              {/* Player Stats Button - Only for Basketball */}
+              {isBasketball && (
+                <button
+                  onClick={() => setShowPlayerStats(true)}
+                  style={{
+                    background: "var(--bg-hover)",
+                    border: "none",
+                    color: "var(--text-secondary)",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "background 0.2s, color 0.2s",
+                  }}
+                  title="Ver estatísticas dos jogadores"
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = "var(--accent-color)";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                >
+                  <Users size={18} />
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowChat((v) => !v)}
+                style={{
+                  background: showChat ? "var(--accent-color)" : "var(--bg-hover)",
+                  border: "none",
+                  color: showChat ? "#fff" : "var(--text-secondary)",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
                   transition: "background 0.2s, color 0.2s",
                 }}
-                title="Ver estatísticas dos jogadores"
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "var(--accent-color)";
-                  e.currentTarget.style.color = "#fff";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-secondary)";
-                }}
+                title={showChat ? "Fechar chat" : "Abrir chat da partida"}
               >
-                <Users size={18} />
+                <span role="img" aria-label="Chat">💬</span>
               </button>
-            )}
-            
-            <button
-              onClick={() => setShowChat((v) => !v)}
-              style={{
-              background: showChat ? "var(--accent-color)" : "var(--bg-hover)",
-              border: "none",
-              color: showChat ? "#fff" : "var(--text-secondary)",
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "background 0.2s, color 0.2s",
-              }}
-              title={showChat ? "Fechar chat" : "Abrir chat da partida"}
-            >
-              <span role="img" aria-label="Chat">💬</span>
-            </button>
             </div>
-        </div>
+          </div>
 
-        {/* Scrollable Content Body */}
-        <div
-          className="custom-scrollbar"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            background: "var(--bg-primary)",
-          }}
-        >
-          {isResultBreakdownSport && setBreakdown.length > 0 && (
-            <div
-              style={{
-                padding: "20px",
-                borderBottom: "1px solid var(--border-color)",
-                background: "var(--bg-card)",
-              }}
-            >
-              <h3
+          {/* Scrollable Content Body */}
+          <div
+            className="custom-scrollbar"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              background: "var(--bg-primary)",
+            }}
+          >
+            {isResultBreakdownSport && setBreakdown.length > 0 && (
+              <div
                 style={{
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  marginBottom: "14px",
-                  color: "var(--text-primary)",
+                  padding: "20px",
+                  borderBottom: "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
                 }}
               >
-                Resultado por Sets
-              </h3>
+                <h3
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    marginBottom: "14px",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Resultado por Sets
+                </h3>
 
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                {setBreakdown.map((setItem) => (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                >
+                  {setBreakdown.map((setItem) => (
+                    <div
+                      key={`set-${setItem.setNumber}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "var(--bg-primary)",
+                        border: "1px solid var(--border-color)",
+                        borderRadius: "10px",
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        Set {setItem.setNumber}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 800,
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        {setItem.scoreA} x {setItem.scoreB}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: "var(--accent-color)",
+                        }}
+                      >
+                        {setItem.winnerTeamName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* MVP Card - Show only when match is finished */}
+            {currentMatch.status === "finished" && (() => {
+              const mvp = calculateMVP();
+              if (!mvp) return null;
+
+              return (
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderTop: "1px solid var(--border-color)",
+                    background: "var(--bg-card)",
+                  }}
+                >
                   <div
-                    key={`set-${setItem.setNumber}`}
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      background: "var(--bg-primary)",
-                      border: "1px solid var(--border-color)",
-                      borderRadius: "10px",
-                      padding: "10px 12px",
+                      justifyContent: "center",
+                      gap: "12px",
+                      padding: "12px 16px",
+                      borderRadius: "8px",
+                      background: "rgba(255, 215, 0, 0.1)",
+                      border: "1px solid rgba(255, 215, 0, 0.3)",
                     }}
                   >
+                    <Trophy size={18} color="#ffd700" />
                     <span
                       style={{
-                        fontSize: "12px",
+                        fontSize: "14px",
                         fontWeight: 700,
-                        color: "var(--text-secondary)",
+                        color: "var(--text-primary)",
                       }}
                     >
-                      Set {setItem.setNumber}
+                      Destaque:
                     </span>
                     <span
                       style={{
                         fontSize: "14px",
-                        fontWeight: 800,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {setItem.scoreA} x {setItem.scoreB}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 700,
+                        fontWeight: 900,
                         color: "var(--accent-color)",
                       }}
                     >
-                      {setItem.winnerTeamName}
+                      {mvp.player}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      ({mvp.teamName})
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        color: "#ffd700",
+                      }}
+                    >
+                      • {mvp.points} {isBasketball ? "pts" : mvp.points === 1 ? "pt" : "pts"}
                     </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* MVP Card - Show only when match is finished */}
-          {currentMatch.status === "finished" && (() => {
-            const mvp = calculateMVP();
-            if (!mvp) return null;
-            
-            return (
-              <div
-                style={{
-                  padding: "16px 20px",
-                  borderTop: "1px solid var(--border-color)",
-                  background: "var(--bg-card)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "12px",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    background: "rgba(255, 215, 0, 0.1)",
-                    border: "1px solid rgba(255, 215, 0, 0.3)",
-                  }}
-                >
-                  <Trophy size={18} color="#ffd700" />
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    Destaque:
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 900,
-                      color: "var(--accent-color)",
-                    }}
-                  >
-                    {mvp.player}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    ({mvp.teamName})
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      color: "#ffd700",
-                    }}
-                  >
-                    • {mvp.points} {isBasketball ? "pts" : mvp.points === 1 ? "pt" : "pts"}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Timeline Body */}
-          <div
-            style={{
-              padding: "20px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: 700,
-                marginBottom: "20px",
-                color: "var(--text-primary)",
-              }}
-            >
-              Cronologia
-            </h3>
-
-            {(() => {
-              const matchEvents: MatchEvent[] = currentMatch.events
-                ? [...currentMatch.events]
-                : [];
-              if (
-                currentMatch.status === "finished" &&
-                !matchEvents.some((e) => e.type === "end")
-              ) {
-                const maxMin = matchEvents.reduce(
-                  (max, e) => Math.max(max, e.minute),
-                  0,
-                );
-                matchEvents.push({
-                  id: "end-event",
-                  type: "end",
-                  minute: maxMin + 1,
-                });
-              }
-
-              const timelineEvents = getTimelineEventsWithScore(matchEvents);
-
-              return timelineEvents.length > 0 ? (
-                <div style={{ position: "relative" }}>
-                  {/* Vertical Line */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: "50%",
-                      top: "10px",
-                      bottom: "10px",
-                      width: "2px",
-                      background: "var(--border-color)",
-                      transform: "translateX(-50%)",
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                    }}
-                  >
-                    {timelineEvents.map((event) => {
-                      const isTeamA = event.teamId === currentMatch.teamA.id;
-                      const isTeamB = event.teamId === currentMatch.teamB.id;
-                      const isGeneral = !event.teamId;
-                      const rowJustify = isGeneral
-                        ? "center"
-                        : isTeamA
-                          ? "flex-start"
-                          : "flex-end";
-                      const cardWidth = isGeneral ? "56%" : "48%";
-                      const teamLabel = isTeamA
-                        ? currentMatch.teamA.name.split(" - ")[0]
-                        : isTeamB
-                          ? currentMatch.teamB.name.split(" - ")[0]
-                          : "Jogo";
-                      return (
-                        <div
-                          key={event.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: rowJustify,
-                            position: "relative",
-                            zIndex: 1,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              position: "relative",
-                              marginBottom: "6px",
-                              width: cardWidth,
-                              padding: "8px 10px",
-                              borderRadius: "10px",
-                              background: "var(--bg-main)",
-                              border: "1px solid var(--border-color)",
-                              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                flex: 1,
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                flexDirection: isTeamB ? "row-reverse" : "row",
-                              }}
-                            >
-                              {isBasketball && event.type === "goal" ? (
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns:
-                                      "repeat(3, minmax(0, 1fr))",
-                                    width: "100%",
-                                    gap: "6px",
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  {(() => {
-                                    const data = getBasketballEventData(event);
-                                    return (
-                                      <>
-                                        {isTeamA ? (
-                                          <>
-                                            <span
-                                              style={{
-                                                fontSize: "13px",
-                                                fontWeight: 700,
-                                                color: "var(--text-primary)",
-                                              }}
-                                            >
-                                              {data.tempo}
-                                            </span>
-                                            <span
-                                              style={{
-                                                fontSize: "12px",
-                                                fontWeight: 800,
-                                                color: "var(--accent-color)",
-                                                textAlign: "center",
-                                              }}
-                                            >
-                                              {data.pontuacaoLabel}
-                                            </span>
-                                            <span
-                                              style={{
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                justifyContent: "flex-end",
-                                                gap: "6px",
-                                                fontSize: "13px",
-                                                fontWeight: 800,
-                                                color: "var(--text-primary)",
-                                                textAlign: "right",
-                                              }}
-                                            >
-                                              <span>{data.placar}</span>
-                                              <span
-                                                style={{
-                                                  width: "3px",
-                                                  height: "14px",
-                                                  borderRadius: "999px",
-                                                  background: "#3b82f6",
-                                                }}
-                                              />
-                                            </span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <span
-                                              style={{
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                                fontSize: "13px",
-                                                fontWeight: 800,
-                                                color: "var(--text-primary)",
-                                              }}
-                                            >
-                                              <span
-                                                style={{
-                                                  width: "3px",
-                                                  height: "14px",
-                                                  borderRadius: "999px",
-                                                  background: "#ef4444",
-                                                }}
-                                              />
-                                              <span>{data.placar}</span>
-                                            </span>
-                                            <span
-                                              style={{
-                                                fontSize: "12px",
-                                                fontWeight: 800,
-                                                color: "var(--accent-color)",
-                                                textAlign: "center",
-                                              }}
-                                            >
-                                              {data.pontuacaoLabel}
-                                            </span>
-                                            <span
-                                              style={{
-                                                fontSize: "13px",
-                                                fontWeight: 700,
-                                                color: "var(--text-primary)",
-                                                textAlign: "right",
-                                              }}
-                                            >
-                                              {data.tempo}
-                                            </span>
-                                          </>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              ) : (
-                                <>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "12px",
-                                      textAlign: isTeamB
-                                        ? "right"
-                                        : isGeneral
-                                          ? "center"
-                                          : "left",
-                                      flexDirection: isTeamB
-                                        ? "row-reverse"
-                                        : "row",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        minWidth: "20px",
-                                      }}
-                                    >
-                                      {getEventIcon(event.type)}
-                                    </div>
-                                    <div>
-                                      <div
-                                        style={{
-                                          fontSize: "14px",
-                                          fontWeight: 700,
-                                          color: "var(--text-primary)",
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: "8px",
-                                          justifyContent: isTeamB
-                                            ? "flex-end"
-                                            : isGeneral
-                                              ? "center"
-                                              : "flex-start",
-                                        }}
-                                      >
-                                        {getTimelinePrimaryText(event)}
-                                      </div>
-                                      {event.timelineScore &&
-                                        event.type !== "end" &&
-                                        event.type !== "start" &&
-                                        !isBasketball && (
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "var(--accent-color)",
-                                              fontWeight: 700,
-                                              marginTop: "4px",
-                                            }}
-                                          >
-                                            Placar no momento:{" "}
-                                            {event.timelineScore}
-                                          </div>
-                                        )}
-                                      {event.teamId &&
-                                        !isBeachTennis &&
-                                        !isBasketball && (
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "var(--text-secondary)",
-                                            }}
-                                          >
-                                            {teamLabel}
-                                            {event.type === "set_win"
-                                              ? " venceu o set"
-                                              : ""}
-                                          </div>
-                                        )}
-                                    </div>
-                                  </div>
-                                  {!hideTimelineMinute && (
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        fontWeight: 700,
-                                        color: "var(--accent-color)",
-                                        marginLeft: isTeamB ? "0" : "12px",
-                                        marginRight: isTeamB ? "12px" : "0",
-                                        minWidth: "40px",
-                                        textAlign: isTeamB ? "left" : "right",
-                                      }}
-                                    >
-                                      {formatEventClock(event.minute)}
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "40px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <Clock
-                    size={32}
-                    style={{ opacity: 0.2, marginBottom: "10px" }}
-                  />
-                  <div>Nenhum evento registrado ainda.</div>
                 </div>
               );
             })()}
-          </div>
 
-          {/* Match Stats / History */}
-          {!isSwimming && (
+            {/* Timeline Body */}
             <div
               style={{
                 padding: "20px",
-                borderTop:
-                  currentMatch.sport !== "Basquete 3x3"
-                    ? "1px solid var(--border-color)"
-                    : "none",
-                background: "var(--bg-card)",
               }}
             >
               <h3
@@ -1698,350 +1372,659 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   color: "var(--text-primary)",
                 }}
               >
-                Confrontos diretos
+                Cronologia
               </h3>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "40px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "8px",
-                    flex: 1,
-                  }}
-                >
-                  {teamAWins > teamBWins && (
-                    <Trophy
-                      size={16}
-                      color="#ffd700"
-                      style={{ marginBottom: "-4px" }}
+              {(() => {
+                const matchEvents: MatchEvent[] = currentMatch.events
+                  ? [...currentMatch.events]
+                  : [];
+                if (
+                  currentMatch.status === "finished" &&
+                  !matchEvents.some((e) => e.type === "end")
+                ) {
+                  const maxMin = matchEvents.reduce(
+                    (max, e) => Math.max(max, e.minute),
+                    0,
+                  );
+                  matchEvents.push({
+                    id: "end-event",
+                    type: "end",
+                    minute: maxMin + 1,
+                  });
+                }
+
+                const timelineEvents = getTimelineEventsWithScore(matchEvents);
+
+                return timelineEvents.length > 0 ? (
+                  <div style={{ position: "relative" }}>
+                    {/* Vertical Line */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "50%",
+                        top: "10px",
+                        bottom: "10px",
+                        width: "2px",
+                        background: "var(--border-color)",
+                        transform: "translateX(-50%)",
+                      }}
                     />
-                  )}
-                  <div style={{ fontSize: "32px", fontWeight: 900 }}>
-                    {teamAWins}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-secondary)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Vitórias
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {currentMatch.teamA.name.split(" - ")[0]}
-                  </div>
-                </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "8px",
-                    flex: 1,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "32px",
-                      fontWeight: 900,
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {draws}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-secondary)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Empates
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      marginTop: "8px",
-                      color: "transparent",
-                    }}
-                  >
-                    -
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "8px",
-                    flex: 1,
-                  }}
-                >
-                  {teamBWins > teamAWins && (
-                    <Trophy
-                      size={16}
-                      color="#ffd700"
-                      style={{ marginBottom: "-4px" }}
-                    />
-                  )}
-                  <div style={{ fontSize: "32px", fontWeight: 900 }}>
-                    {teamBWins}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-secondary)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Vitórias
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {currentMatch.teamB.name.split(" - ")[0]}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Form */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "stretch",
-                  gap: "40px",
-                }}
-              >
-                {/* Team A Form */}
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-secondary)",
-                      marginBottom: "15px",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Últimos 5 jogos
-                  </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {teamAForm.length > 0 ? (
-                      teamAForm.map((form: any, i: number) => {
-                        let bgColor = "";
-                        let letter = "";
-                        if (form.result === "win") {
-                          bgColor = "#22c55e";
-                          letter = "V";
-                        } else if (form.result === "loss") {
-                          bgColor = "#ef4444";
-                          letter = "D";
-                        } else {
-                          bgColor = "#eab308";
-                          letter = "E";
-                        }
-
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px",
+                      }}
+                    >
+                      {timelineEvents.map((event) => {
+                        const isTeamA = event.teamId === currentMatch.teamA.id;
+                        const isTeamB = event.teamId === currentMatch.teamB.id;
+                        const isGeneral = !event.teamId;
+                        const rowJustify = isGeneral
+                          ? "center"
+                          : isTeamA
+                            ? "flex-start"
+                            : "flex-end";
+                        const cardWidth = isGeneral ? "56%" : "48%";
+                        const teamLabel = isTeamA
+                          ? currentMatch.teamA.name.split(" - ")[0]
+                          : isTeamB
+                            ? currentMatch.teamB.name.split(" - ")[0]
+                            : "Jogo";
                         return (
                           <div
-                            key={i}
+                            key={event.id}
                             style={{
-                              width: "24px",
-                              height: "24px",
-                              borderRadius: "4px",
-                              background: bgColor,
-                              color: "#fff",
                               display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "12px",
-                              fontWeight: "bold",
+                              justifyContent: rowJustify,
+                              position: "relative",
+                              zIndex: 1,
                             }}
-                            title={`${form.myScore} - ${form.oppScore} vs ${form.opponent.name}`}
                           >
-                            {letter}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                position: "relative",
+                                marginBottom: "6px",
+                                width: cardWidth,
+                                padding: "8px 10px",
+                                borderRadius: "10px",
+                                background: "var(--bg-main)",
+                                border: "1px solid var(--border-color)",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  flex: 1,
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  flexDirection: isTeamB ? "row-reverse" : "row",
+                                }}
+                              >
+                                {isBasketball && event.type === "goal" ? (
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "repeat(3, minmax(0, 1fr))",
+                                      width: "100%",
+                                      gap: "6px",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    {(() => {
+                                      const data = getBasketballEventData(event);
+                                      return (
+                                        <>
+                                          {isTeamA ? (
+                                            <>
+                                              <span
+                                                style={{
+                                                  fontSize: "13px",
+                                                  fontWeight: 700,
+                                                  color: "var(--text-primary)",
+                                                }}
+                                              >
+                                                {data.tempo}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: "12px",
+                                                  fontWeight: 800,
+                                                  color: "var(--accent-color)",
+                                                  textAlign: "center",
+                                                }}
+                                              >
+                                                {data.pontuacaoLabel}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  display: "inline-flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "flex-end",
+                                                  gap: "6px",
+                                                  fontSize: "13px",
+                                                  fontWeight: 800,
+                                                  color: "var(--text-primary)",
+                                                  textAlign: "right",
+                                                }}
+                                              >
+                                                <span>{data.placar}</span>
+                                                <span
+                                                  style={{
+                                                    width: "3px",
+                                                    height: "14px",
+                                                    borderRadius: "999px",
+                                                    background: "#3b82f6",
+                                                  }}
+                                                />
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span
+                                                style={{
+                                                  display: "inline-flex",
+                                                  alignItems: "center",
+                                                  gap: "6px",
+                                                  fontSize: "13px",
+                                                  fontWeight: 800,
+                                                  color: "var(--text-primary)",
+                                                }}
+                                              >
+                                                <span
+                                                  style={{
+                                                    width: "3px",
+                                                    height: "14px",
+                                                    borderRadius: "999px",
+                                                    background: "#ef4444",
+                                                  }}
+                                                />
+                                                <span>{data.placar}</span>
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: "12px",
+                                                  fontWeight: 800,
+                                                  color: "var(--accent-color)",
+                                                  textAlign: "center",
+                                                }}
+                                              >
+                                                {data.pontuacaoLabel}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: "13px",
+                                                  fontWeight: 700,
+                                                  color: "var(--text-primary)",
+                                                  textAlign: "right",
+                                                }}
+                                              >
+                                                {data.tempo}
+                                              </span>
+                                            </>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "12px",
+                                        textAlign: isTeamB
+                                          ? "right"
+                                          : isGeneral
+                                            ? "center"
+                                            : "left",
+                                        flexDirection: isTeamB
+                                          ? "row-reverse"
+                                          : "row",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          minWidth: "20px",
+                                        }}
+                                      >
+                                        {getEventIcon(event.type)}
+                                      </div>
+                                      <div>
+                                        <div
+                                          style={{
+                                            fontSize: "14px",
+                                            fontWeight: 700,
+                                            color: "var(--text-primary)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            justifyContent: isTeamB
+                                              ? "flex-end"
+                                              : isGeneral
+                                                ? "center"
+                                                : "flex-start",
+                                          }}
+                                        >
+                                          {getTimelinePrimaryText(event)}
+                                        </div>
+                                        {event.timelineScore &&
+                                          event.type !== "end" &&
+                                          event.type !== "start" &&
+                                          !isBasketball && (
+                                            <div
+                                              style={{
+                                                fontSize: "12px",
+                                                color: "var(--accent-color)",
+                                                fontWeight: 700,
+                                                marginTop: "4px",
+                                              }}
+                                            >
+                                              Placar no momento:{" "}
+                                              {event.timelineScore}
+                                            </div>
+                                          )}
+                                        {event.teamId &&
+                                          !isBeachTennis &&
+                                          !isBasketball && (
+                                            <div
+                                              style={{
+                                                fontSize: "12px",
+                                                color: "var(--text-secondary)",
+                                              }}
+                                            >
+                                              {teamLabel}
+                                              {event.type === "set_win"
+                                                ? " venceu o set"
+                                                : ""}
+                                            </div>
+                                          )}
+                                      </div>
+                                    </div>
+                                    {!hideTimelineMinute && (
+                                      <div
+                                        style={{
+                                          fontSize: "14px",
+                                          fontWeight: 700,
+                                          color: "var(--accent-color)",
+                                          marginLeft: isTeamB ? "0" : "12px",
+                                          marginRight: isTeamB ? "12px" : "0",
+                                          minWidth: "40px",
+                                          textAlign: isTeamB ? "left" : "right",
+                                        }}
+                                      >
+                                        {formatEventClock(event.minute)}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         );
-                      })
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        Sem histórico
-                      </div>
-                    )}
+                      })}
+                    </div>
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    width: "1px",
-                    background: "var(--border-color)",
-                    margin: "0 10px",
-                  }}
-                />
-
-                {/* Team B Form */}
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                  }}
-                >
+                ) : (
                   <div
                     style={{
-                      fontSize: "12px",
+                      textAlign: "center",
+                      padding: "40px",
                       color: "var(--text-secondary)",
-                      marginBottom: "15px",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
                     }}
                   >
-                    Últimos 5 jogos
+                    <Clock
+                      size={32}
+                      style={{ opacity: 0.2, marginBottom: "10px" }}
+                    />
+                    <div>Nenhum evento registrado ainda.</div>
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {teamBForm.length > 0 ? (
-                      teamBForm.map((form: any, i: number) => {
-                        let bgColor = "";
-                        let letter = "";
-                        if (form.result === "win") {
-                          bgColor = "#22c55e";
-                          letter = "V";
-                        } else if (form.result === "loss") {
-                          bgColor = "#ef4444";
-                          letter = "D";
-                        } else {
-                          bgColor = "#eab308";
-                          letter = "E";
-                        }
-
-                        return (
-                          <div
-                            key={i}
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              borderRadius: "4px",
-                              background: bgColor,
-                              color: "#fff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "12px",
-                              fontWeight: "bold",
-                            }}
-                            title={`${form.myScore} - ${form.oppScore} vs ${form.opponent.name}`}
-                          >
-                            {letter}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        Sem histórico
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
-          )}
+
+            {/* Match Stats / History */}
+            {!isSwimming && (
+              <div
+                style={{
+                  padding: "20px",
+                  borderTop:
+                    currentMatch.sport !== "Basquete 3x3"
+                      ? "1px solid var(--border-color)"
+                      : "none",
+                  background: "var(--bg-card)",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    marginBottom: "20px",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Confrontos diretos
+                </h3>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "40px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      flex: 1,
+                    }}
+                  >
+                    {teamAWins > teamBWins && (
+                      <Trophy
+                        size={16}
+                        color="#ffd700"
+                        style={{ marginBottom: "-4px" }}
+                      />
+                    )}
+                    <div style={{ fontSize: "32px", fontWeight: 900 }}>
+                      {teamAWins}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Vitórias
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        marginTop: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {currentMatch.teamA.name.split(" - ")[0]}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      flex: 1,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "32px",
+                        fontWeight: 900,
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {draws}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Empates
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        marginTop: "8px",
+                        color: "transparent",
+                      }}
+                    >
+                      -
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      flex: 1,
+                    }}
+                  >
+                    {teamBWins > teamAWins && (
+                      <Trophy
+                        size={16}
+                        color="#ffd700"
+                        style={{ marginBottom: "-4px" }}
+                      />
+                    )}
+                    <div style={{ fontSize: "32px", fontWeight: 900 }}>
+                      {teamBWins}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Vitórias
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        marginTop: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {currentMatch.teamB.name.split(" - ")[0]}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Form */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "stretch",
+                    gap: "40px",
+                  }}
+                >
+                  {/* Team A Form */}
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        marginBottom: "15px",
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Últimos 5 jogos
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      {teamAForm.length > 0 ? (
+                        teamAForm.map((form: any, i: number) => {
+                          let bgColor = "";
+                          let letter = "";
+                          if (form.result === "win") {
+                            bgColor = "#22c55e";
+                            letter = "V";
+                          } else if (form.result === "loss") {
+                            bgColor = "#ef4444";
+                            letter = "D";
+                          } else {
+                            bgColor = "#eab308";
+                            letter = "E";
+                          }
+
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "4px",
+                                background: bgColor,
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                              }}
+                              title={`${form.myScore} - ${form.oppScore} vs ${form.opponent.name}`}
+                            >
+                              {letter}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          Sem histórico
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      width: "1px",
+                      background: "var(--border-color)",
+                      margin: "0 10px",
+                    }}
+                  />
+
+                  {/* Team B Form */}
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        marginBottom: "15px",
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Últimos 5 jogos
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      {teamBForm.length > 0 ? (
+                        teamBForm.map((form: any, i: number) => {
+                          let bgColor = "";
+                          let letter = "";
+                          if (form.result === "win") {
+                            bgColor = "#22c55e";
+                            letter = "V";
+                          } else if (form.result === "loss") {
+                            bgColor = "#ef4444";
+                            letter = "D";
+                          } else {
+                            bgColor = "#eab308";
+                            letter = "E";
+                          }
+
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "4px",
+                                background: bgColor,
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                              }}
+                              title={`${form.myScore} - ${form.oppScore} vs ${form.opponent.name}`}
+                            >
+                              {letter}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          Sem histórico
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Chat lateral */}
+        {showChat && (
+          <div
+            style={{
+              width: "340px",
+              minWidth: "340px",
+              background: "var(--bg-card)",
+              borderRadius: "12px",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.15)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              animation: "modalSlideUp 0.3s ease-out",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <LiveChat matchId={currentMatch.id} />
+          </div>
+        )}
       </div>
-
-      {/* Chat lateral */}
-      {showChat && (
-        <div
-          style={{
-            width: 340,
-            maxWidth: "90vw",
-            height: "80vh",
-            background: "var(--bg-card)",
-            borderRadius: "12px",
-            marginLeft: "16px",
-            boxShadow: "0 2px 16px rgba(0,0,0,0.15)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            animation: "modalSlideUp 0.3s ease-out",
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div style={{
-            padding: "16px",
-            borderBottom: "1px solid var(--border-color)",
-            fontWeight: 700,
-            fontSize: "16px",
-            color: "var(--accent-color)",
-            background: "var(--bg-hover)",
-            textAlign: "center"
-          }}>
-            Chat da Partida
-          </div>
-          <div style={{ flex: 1, padding: "16px", overflowY: "auto", color: "var(--text-secondary)", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ opacity: 0.7 }}>Nenhuma mensagem ainda.</span>
-          </div>
-          <div style={{ padding: "12px", borderTop: "1px solid var(--border-color)", background: "var(--bg-primary)" }}>
-            <input
-              type="text"
-              placeholder="Digite uma mensagem... (em breve)"
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--border-color)",
-                background: "var(--bg-main)",
-                color: "var(--text-primary)",
-                fontSize: "14px",
-                outline: "none"
-              }}
-              disabled
-            />
-          </div>
-        </div>
-      )}
 
       {/* Player Stats Modal */}
       {showPlayerStats && (
