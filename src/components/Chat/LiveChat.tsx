@@ -116,7 +116,13 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
             'arrombado', 'fdp', 'cacete', 'desgracado', 'idiota', 'imbecil',
             'macaco', 'macaca', 'macacos', 'macacada', 'crioulo', 'crioula',
             'neguinho', 'neguinha', 'preto', 'preta', 'pretos', 'pretas',
-            'favelado', 'favelada', 'senzala', 'nigga', 'nigger'
+            'favelado', 'favelada', 'senzala', 'nigga', 'nigger', 'pica',
+            'vagabunda', 'traveco', 'bicha', 'sapatao', 'sapatona', 'sapata', 'chibata', 'piroca', 'pika',
+            'macumbeiro', 'macumbeira', 'paraiba', 'baiano', 'imunda',
+            'lixo', 'aberracao', 'baleia', 'porca', 'vaca', 'piriguete', 'cadela',
+            'escravos', 'escravas', 'mucama', 'nazista', 'estuprador', 'pedofilo',
+            'aidetico', 'leproso', 'cancer', 'boludo', 'suicidar', 'suicida', 'hitler',
+            'cancerigeno'
         ];
 
         // Normaliza input tirando acentos
