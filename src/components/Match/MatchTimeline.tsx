@@ -210,7 +210,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [penaltyShootoutActive, setPenaltyShootoutActive] = useState(false);
   const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
   // Feedback visual ao registrar ACE / ERRO
-  const [volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
+  const [_volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
 
   // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
@@ -861,7 +861,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   };
 
   // ACE: ponto para o time que serviu, registrado com nome do atleta
-  const handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
+  const _handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     if (!selectedMatch.events?.some((e) => e.type === "start")) {
       const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
@@ -901,7 +901,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   };
 
   // ERRO: ponto para o time adversário (erro de saque dá ponto para quem recebe)
-  const handleVolleyErro = (team: "A" | "B", playerName: string, playerId: string) => {
+  const _handleVolleyErro = (team: "A" | "B", playerName: string, playerId: string) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     const adversaryTeam: "A" | "B" = team === "A" ? "B" : "A";
     if (!selectedMatch.events?.some((e) => e.type === "start")) {
@@ -4816,6 +4816,98 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 </div>
               </div>
             )}
+
+            {isVolleyballAceSport && selectedMatch && selectedMatch.status !== "finished" && (
+              <div style={styles.eventSection}>
+                <h3 style={styles.sectionTitle}>🏐 Ações de Atletas (ACE / ERRO)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  {(["A", "B"] as const).map((team) => {
+                    const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                    const availableAthletes = athletes.filter((a) =>
+                      athleteMatchesTeamAndMatch(a, teamObj),
+                    );
+
+                    return (
+                      <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", marginBottom: "4px", color: "white", background: team === "A" ? "rgba(59, 130, 246, 0.2)" : "rgba(239, 68, 68, 0.2)", padding: "4px", borderRadius: "4px" }}>
+                          {teamObj.name.split(" - ")[0]}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {availableAthletes.map((athlete) => {
+                            const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                            const isAceFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "ace";
+                            const isErroFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "erro";
+
+                            return (
+                              <div
+                                key={athlete.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 10px',
+                                  background: 'rgba(255,255,255,0.03)',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255,255,255,0.05)'
+                                }}
+                              >
+                                <span style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                  {athlete.firstName}
+                                </span>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    className="volley-ace-btn"
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '11px',
+                                      fontWeight: 800,
+                                      borderRadius: '4px',
+                                      border: '1px solid #22c55e',
+                                      background: isAceFeedback ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
+                                      color: isAceFeedback ? 'white' : '#22c55e',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      animation: isAceFeedback ? 'volley-btn-glow 0.5s' : 'none'
+                                    }}
+                                    onClick={() => _handleVolleyAce(team, playerName, athlete.id)}
+                                  >
+                                    ACE
+                                  </button>
+                                  <button
+                                    className="volley-erro-btn"
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '11px',
+                                      fontWeight: 800,
+                                      borderRadius: '4px',
+                                      border: '1px solid #ef4444',
+                                      background: isErroFeedback ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
+                                      color: isErroFeedback ? 'white' : '#ef4444',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      animation: isErroFeedback ? 'volley-btn-glow 0.5s' : 'none'
+                                    }}
+                                    onClick={() => _handleVolleyErro(team, playerName, athlete.id)}
+                                  >
+                                    ERRO
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {availableAthletes.length === 0 && (
+                            <div style={{ fontSize: "11px", color: "#666", textAlign: "center", fontStyle: "italic" }}>
+                              Sem atletas
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
 
             {isTamboreu && (
               <div style={styles.eventSection}>
