@@ -26,7 +26,9 @@ const Estatisticas: FC = () => {
     const isBeachTennis = sportFilter === 'Beach Tennis';
     const isTamboreu = sportFilter === 'Tamboréu';
     const isTenisDeMesa = sportFilter === 'Tênis de Mesa' || sportFilter === 'Tenis de Mesa';
-    const isAnyLayout = isInvasaoLayout || isRedeLayout || isBeachTennis || isTamboreu || isTenisDeMesa;
+    const isKarate = sportFilter === 'Caratê';
+    const isJudo = sportFilter === 'Judô';
+    const isAnyLayout = isInvasaoLayout || isRedeLayout || isBeachTennis || isTamboreu || isTenisDeMesa || isKarate || isJudo;
     const isBasquete = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
     const isBasquete3x3 = sportFilter === 'Basquete 3x3';
     const isFutebol = MODALIDADES_FUTEBOL.includes(sportFilter);
@@ -61,6 +63,17 @@ const Estatisticas: FC = () => {
             topServeErrors: [] as any[],
             teamStatsList: [] as any[],
             topSetsConsistencyList: [] as any[],
+            karateStats: null as null | {
+                medalTable: { course: string; faculty: string; gold: number; silver: number; bronze: number; total: number }[];
+                topScorers: { name: string; course: string; faculty: string; yuko: number; wazaAri: number; ippon: number; total: number }[];
+                topIppons: { course: string; faculty: string; ippons: number }[];
+                topSenshu: { course: string; faculty: string; senshu: number }[];
+            },
+            judoStats: null as null | {
+                topFinishers: { name: string; course: string; faculty: string; ippons: number; wazaAri: number }[];
+                topTech: { course: string; faculty: string; score: number; ippons: number; wazaAris: number }[];
+                topDiscipline: { course: string; faculty: string; shidos: number }[];
+            },
         };
 
         const isBasqueteMemo = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
@@ -296,7 +309,7 @@ const Estatisticas: FC = () => {
             });
         });
 
-        let topScorers = Object.values(goalMap)
+        const topScorers = Object.values(goalMap)
             .map(p => {
                 const games = Math.max(p.gamesSet.size, 1);
                 return {
@@ -395,6 +408,178 @@ const Estatisticas: FC = () => {
             return { ...p, avgConceded: avg };
         }).sort((a, b) => a.avgConceded - b.avgConceded).slice(0, 20);
 
+        // ── Caratê ──────────────────────────────────────────────────────────────
+        let karateStats = null;
+        if (sportFilter === 'Caratê') {
+            const karateMatches = matches.filter(m => m.sport === 'Caratê' && m.status === 'finished' && m.category === genderFilter);
+
+            // Quadro de medalhas por curso
+            const medalMap: Record<string, { course: string; faculty: string; gold: number; silver: number; bronze: number }> = {};
+            const ensureMedal = (course: string, faculty: string) => {
+                if (!medalMap[course]) medalMap[course] = { course, faculty, gold: 0, silver: 0, bronze: 0 };
+            };
+            karateMatches.forEach(m => {
+                const courseA = (m.teamA.course || m.teamA.name).split(' - ')[0].trim();
+                const courseB = (m.teamB.course || m.teamB.name).split(' - ')[0].trim();
+                const facA = m.teamA.faculty || '';
+                const facB = m.teamB.faculty || '';
+                ensureMedal(courseA, facA);
+                ensureMedal(courseB, facB);
+                const stage = (m.stage || '').toLowerCase();
+                if (stage.includes('final') && !stage.includes('semi') && !stage.includes('quartas')) {
+                    if (m.scoreA > m.scoreB) { medalMap[courseA].gold++; medalMap[courseB].silver++; }
+                    else if (m.scoreB > m.scoreA) { medalMap[courseB].gold++; medalMap[courseA].silver++; }
+                } else if (stage.includes('semi')) {
+                    if (m.scoreA < m.scoreB) medalMap[courseA].bronze++;
+                    else if (m.scoreB < m.scoreA) medalMap[courseB].bronze++;
+                }
+            });
+            const medalTable = Object.values(medalMap)
+                .map(e => ({ ...e, total: e.gold * 3 + e.silver * 2 + e.bronze }))
+                .sort((a, b) => b.gold - a.gold || b.silver - a.silver || b.bronze - a.bronze)
+                .slice(0, 20);
+
+            // Maiores pontuadores individuais
+            // Yuko=+1, Waza-ari=+2, Ippon=+3 — lidos da description do evento goal
+            const scorerMap: Record<string, { name: string; course: string; faculty: string; yuko: number; wazaAri: number; ippon: number }> = {};
+            karateMatches.forEach(m => {
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'goal' || !evt.player) return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    const key = evt.player;
+                    if (!scorerMap[key]) scorerMap[key] = { name: evt.player, course, faculty, yuko: 0, wazaAri: 0, ippon: 0 };
+                    const desc = (evt.description || '').toLowerCase();
+                    const pts = Number((evt.description || '').match(/\+(\d)/)?.[1] || 0);
+                    if (pts === 1 || desc.includes('yuko')) scorerMap[key].yuko++;
+                    else if (pts === 2 || desc.includes('waza')) scorerMap[key].wazaAri++;
+                    else if (pts === 3 || desc.includes('ippon')) scorerMap[key].ippon++;
+                });
+            });
+            const topKarateScorers = Object.values(scorerMap)
+                .map(s => ({ ...s, total: s.yuko + s.wazaAri * 2 + s.ippon * 3 }))
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 20);
+
+            // Domínio técnico — Ippons por curso
+            const ipponMap: Record<string, { course: string; faculty: string; ippons: number }> = {};
+            karateMatches.forEach(m => {
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'goal') return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    const pts = Number((evt.description || '').match(/\+(\d)/)?.[1] || 0);
+                    const desc = (evt.description || '').toLowerCase();
+                    if (pts === 3 || desc.includes('ippon')) {
+                        if (!ipponMap[course]) ipponMap[course] = { course, faculty, ippons: 0 };
+                        ipponMap[course].ippons++;
+                    }
+                });
+            });
+            const topIppons = Object.values(ipponMap).sort((a, b) => b.ippons - a.ippons).slice(0, 20);
+
+            // Vantagem Senshu por curso
+            const senshuMap: Record<string, { course: string; faculty: string; senshu: number }> = {};
+            karateMatches.forEach(m => {
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'senshu') return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    if (!senshuMap[course]) senshuMap[course] = { course, faculty, senshu: 0 };
+                    senshuMap[course].senshu++;
+                });
+            });
+            const topSenshu = Object.values(senshuMap).sort((a, b) => b.senshu - a.senshu).slice(0, 20);
+
+            karateStats = { medalTable, topScorers: topKarateScorers, topIppons, topSenshu };
+        }
+
+        // ── Judô ────────────────────────────────────────────────────────────────
+        let judoStats = null;
+        if (sportFilter === 'Judô') {
+            const judoMatches = matches.filter(m => m.sport === 'Judô' && m.status === 'finished' && m.category === genderFilter);
+
+            // Card 1 — Maiores Finalizadores (Ippons individuais)
+            const ipponPlayerMap: Record<string, { name: string; course: string; faculty: string; ippons: number; wazaAri: number }> = {};
+            judoMatches.forEach(m => {
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'goal' || !evt.player) return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    const key = evt.player;
+                    if (!ipponPlayerMap[key]) ipponPlayerMap[key] = { name: evt.player, course, faculty, ippons: 0, wazaAri: 0 };
+                    const desc = (evt.description || '').toLowerCase();
+                    if (desc.includes('ippon') || desc.includes('ponto de ouro') || desc.includes('waza-ari-awasete')) {
+                        ipponPlayerMap[key].ippons++;
+                    } else if (desc.includes('waza-ari')) {
+                        ipponPlayerMap[key].wazaAri++;
+                    }
+                });
+                // Fallback: sem player no evento, atribuir ao vencedor da luta
+                if (m.scoreA !== m.scoreB) {
+                    const winnerTeam = m.scoreA > m.scoreB ? m.teamA : m.teamB;
+                    const winnerCourse = (winnerTeam.course || winnerTeam.name).split(' - ')[0].trim();
+                    const winnerFaculty = winnerTeam.faculty || '';
+                    const winnerKey = `__team__${winnerTeam.id}`;
+                    const hasPlayerEvent = getMatchEvents(m.events).some((e: any) => e.type === 'goal' && e.player);
+                    if (!hasPlayerEvent) {
+                        if (!ipponPlayerMap[winnerKey]) ipponPlayerMap[winnerKey] = { name: winnerTeam.name.split(' - ')[0], course: winnerCourse, faculty: winnerFaculty, ippons: 0, wazaAri: 0 };
+                        ipponPlayerMap[winnerKey].ippons++;
+                    }
+                }
+            });
+            const topFinishers = Object.values(ipponPlayerMap)
+                .sort((a, b) => b.ippons - a.ippons || b.wazaAri - a.wazaAri)
+                .slice(0, 20);
+
+            // Card 2 — Eficácia Técnica por curso (Ippon=10pts, Waza-ari=1pt)
+            const techMap: Record<string, { course: string; faculty: string; score: number; ippons: number; wazaAris: number }> = {};
+            judoMatches.forEach(m => {
+                const ensureTech = (teamObj: typeof m.teamA) => {
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    if (!techMap[course]) techMap[course] = { course, faculty, score: 0, ippons: 0, wazaAris: 0 };
+                };
+                ensureTech(m.teamA); ensureTech(m.teamB);
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'goal') return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const desc = (evt.description || '').toLowerCase();
+                    if (desc.includes('ippon') || desc.includes('ponto de ouro') || desc.includes('waza-ari-awasete')) {
+                        techMap[course].score += 10; techMap[course].ippons++;
+                    } else if (desc.includes('waza-ari')) {
+                        techMap[course].score += 1; techMap[course].wazaAris++;
+                    }
+                });
+            });
+            const topTech = Object.values(techMap).sort((a, b) => b.score - a.score).slice(0, 20);
+
+            // Card 3 — Índice de Disciplina (menos Shidos)
+            const shidoMap: Record<string, { course: string; faculty: string; shidos: number }> = {};
+            judoMatches.forEach(m => {
+                const ensureShido = (teamObj: typeof m.teamA) => {
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    const faculty = teamObj.faculty || '';
+                    if (!shidoMap[course]) shidoMap[course] = { course, faculty, shidos: 0 };
+                };
+                ensureShido(m.teamA); ensureShido(m.teamB);
+                getMatchEvents(m.events).forEach((evt: any) => {
+                    if (evt.type !== 'shido' && evt.type !== 'hansoku_make') return;
+                    const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
+                    const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
+                    shidoMap[course].shidos += evt.type === 'hansoku_make' ? 3 : 1;
+                });
+            });
+            const topDiscipline = Object.values(shidoMap).sort((a, b) => a.shidos - b.shidos).slice(0, 20);
+
+            judoStats = { topFinishers, topTech, topDiscipline };
+        }
+
         return {
             bestAttack,
             bestDefense,
@@ -417,6 +602,8 @@ const Estatisticas: FC = () => {
             topAces,
             topServeErrors,
             topSetsConsistencyList,
+            karateStats,
+            judoStats,
             teamStatsList: Object.values(teamStats).filter(t => !courseFilter || t.course === courseFilter),
         };
     }, [matches, sportFilter, courseFilter, genderFilter, isAnyLayout]);
@@ -462,7 +649,7 @@ const Estatisticas: FC = () => {
                                 {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        {(isInvasaoLayout || isRedeLayout || isBeachTennis || isTenisDeMesa || isTamboreu) && (
+                        {(isInvasaoLayout || isRedeLayout || isBeachTennis || isTenisDeMesa || isTamboreu || isKarate || isJudo) && (
                             <div style={{ flex: '1 1 220px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Curso (Opcional)</label>
                                 <select style={selectStyle} value={courseFilter} onChange={e => setCourseFilter(e.target.value)}>
@@ -486,7 +673,206 @@ const Estatisticas: FC = () => {
                         </div>
                     ) : (
                         <>
-                            {!isBeachTennis && !isFutevolei && !isTamboreu && !isTenisDeMesa && (
+                            {/* ── Layout Caratê ─────────────────────────────────────── */}
+                            {isKarate && stats.karateStats && (() => {
+                                const ks = stats.karateStats;
+                                const maxIppons = Math.max(...ks.topIppons.map(t => t.ippons), 1);
+                                const maxSenshu = Math.max(...ks.topSenshu.map(t => t.senshu), 1);
+                                const cardS: React.CSSProperties = { background: 'var(--bg-card)', borderRadius: '16px', padding: '24px', border: '1px solid var(--border-color)' };
+                                const hdrS: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' };
+                                const titleS: React.CSSProperties = { fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' };
+                                const scrollS: React.CSSProperties = { maxHeight: '320px', overflowY: 'auto' };
+                                return (
+                                    <>
+                                        {/* Grid 3 colunas */}
+                                        <section style={{ marginBottom: '30px' }}>
+                                            <h2 style={sectionTitleStyle}>🥋 Caratê — Performance Individual & por Curso</h2>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+
+                                                {/* Card 1 — Maiores Pontuadores */}
+                                                <div style={cardS}>
+                                                    <div style={hdrS}>
+                                                        <BarChart2 size={22} color="#fbbf24" />
+                                                        <div>
+                                                            <h2 style={titleS}>🥋 Maiores Pontuadores</h2>
+                                                            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Yuko +1 · Waza-ari +2 · Ippon +3</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={scrollS}>
+                                                        {ks.topScorers.length === 0 ? <EmptyState /> : ks.topScorers.map((s, idx) => (
+                                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent' }}>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {s.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                                        <span style={{ color: '#6b7280' }}>Y:{s.yuko}</span>
+                                                                        {' · '}
+                                                                        <span style={{ color: '#f59e0b' }}>W:{s.wazaAri}</span>
+                                                                        {' · '}
+                                                                        <span style={{ color: '#ef4444' }}>I:{s.ippon}</span>
+                                                                        {' · '}{formatTeamLabel(s.course, s.faculty)}
+                                                                    </div>
+                                                                </div>
+                                                                <div style={{ fontSize: '18px', fontWeight: 900, color: idx === 0 ? '#ffd700' : 'var(--accent-color)' }}>{s.total} pts</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Card 2 — Domínio Técnico (Ippons) */}
+                                                <div style={cardS}>
+                                                    <div style={hdrS}>
+                                                        <Sword size={22} color="#ef4444" />
+                                                        <div>
+                                                            <h2 style={titleS}>Domínio Técnico</h2>
+                                                            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ippons aplicados por curso</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={scrollS}>
+                                                        {ks.topIppons.length === 0 ? <EmptyState /> : ks.topIppons.map((t, idx) => (
+                                                            <div key={idx} style={{ marginBottom: '10px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(t.course, t.faculty)}</span>
+                                                                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#ef4444' }}>{t.ippons}</span>
+                                                                </div>
+                                                                <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>
+                                                                    <div style={{ height: '100%', borderRadius: '3px', background: 'linear-gradient(90deg, #ef4444, #b91c1c)', width: `${(t.ippons / maxIppons) * 100}%`, transition: 'width 0.4s' }} />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Card 3 — Vantagem Senshu */}
+                                                <div style={cardS}>
+                                                    <div style={hdrS}>
+                                                        <Target size={22} color="#f59e0b" />
+                                                        <div>
+                                                            <h2 style={titleS}>Vantagem Senshu</h2>
+                                                            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Primeiro ponto da luta por curso</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={scrollS}>
+                                                        {ks.topSenshu.length === 0 ? <EmptyState /> : ks.topSenshu.map((t, idx) => (
+                                                            <div key={idx} style={{ marginBottom: '10px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(t.course, t.faculty)}</span>
+                                                                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#f59e0b' }}>{t.senshu}</span>
+                                                                </div>
+                                                                <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>
+                                                                    <div style={{ height: '100%', borderRadius: '3px', background: 'linear-gradient(90deg, #f59e0b, #d97706)', width: `${(t.senshu / maxSenshu) * 100}%`, transition: 'width 0.4s' }} />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </section>
+                                    </>
+                                );
+                            })()}
+
+                            {/* ── Layout Judô ───────────────────────────────────────── */}
+                            {isJudo && stats.judoStats && (() => {
+                                const js = stats.judoStats;
+                                const maxTech = Math.max(...js.topTech.map(t => t.score), 1);
+                                const maxShidos = Math.max(...js.topDiscipline.map(t => t.shidos), 1);
+                                const cardS: React.CSSProperties = { background: 'var(--bg-card)', borderRadius: '16px', padding: '24px', border: '1px solid var(--border-color)' };
+                                const hdrS: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' };
+                                const titleS: React.CSSProperties = { fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' };
+                                const scrollS: React.CSSProperties = { maxHeight: '320px', overflowY: 'auto' };
+                                return (
+                                    <section style={{ marginBottom: '30px' }}>
+                                        <h2 style={sectionTitleStyle}>🥋 Judô — Performance Individual & por Curso</h2>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+
+                                            {/* Card 1 — Maiores Finalizadores */}
+                                            <div style={cardS}>
+                                                <div style={hdrS}>
+                                                    <BarChart2 size={22} color="#fbbf24" />
+                                                    <div>
+                                                        <h2 style={titleS}>🏆 Maiores Finalizadores</h2>
+                                                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Vitórias por Ippon / Waza-ari</p>
+                                                    </div>
+                                                </div>
+                                                <div style={scrollS}>
+                                                    {js.topFinishers.length === 0 ? <EmptyState /> : js.topFinishers.map((s, idx) => (
+                                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {s.name}</div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                                    <span style={{ color: '#ef4444' }}>Ippon: {s.ippons}</span>
+                                                                    {' · '}
+                                                                    <span style={{ color: '#f59e0b' }}>Waza-ari: {s.wazaAri}</span>
+                                                                    {' · '}{formatTeamLabel(s.course, s.faculty)}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: '18px', fontWeight: 900, color: idx === 0 ? '#ffd700' : 'var(--accent-color)' }}>{s.ippons}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 2 — Eficácia Técnica */}
+                                            <div style={cardS}>
+                                                <div style={hdrS}>
+                                                    <Sword size={22} color="#f59e0b" />
+                                                    <div>
+                                                        <h2 style={titleS}>⚡ Eficácia Técnica</h2>
+                                                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ippon=10pts · Waza-ari=1pt</p>
+                                                    </div>
+                                                </div>
+                                                <div style={scrollS}>
+                                                    {js.topTech.length === 0 ? <EmptyState /> : js.topTech.map((t, idx) => (
+                                                        <div key={idx} style={{ marginBottom: '10px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(t.course, t.faculty)}</span>
+                                                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                                    <span style={{ color: '#ef4444', fontWeight: 700 }}>{t.ippons}I</span>
+                                                                    {' '}
+                                                                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>{t.wazaAris}W</span>
+                                                                    {' = '}
+                                                                    <span style={{ color: 'white', fontWeight: 800 }}>{t.score}</span>
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>
+                                                                <div style={{ height: '100%', borderRadius: '3px', background: 'linear-gradient(90deg, #f59e0b, #d97706)', width: `${(t.score / maxTech) * 100}%`, transition: 'width 0.4s' }} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Card 3 — Índice de Disciplina */}
+                                            <div style={cardS}>
+                                                <div style={hdrS}>
+                                                    <Shield size={22} color="#22c55e" />
+                                                    <div>
+                                                        <h2 style={titleS}>🎽 Índice de Disciplina</h2>
+                                                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Menos Shidos = mais disciplinado</p>
+                                                    </div>
+                                                </div>
+                                                <div style={scrollS}>
+                                                    {js.topDiscipline.length === 0 ? <EmptyState /> : js.topDiscipline.map((t, idx) => (
+                                                        <div key={idx} style={{ marginBottom: '10px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(t.course, t.faculty)}</span>
+                                                                <span style={{ fontSize: '13px', fontWeight: 800, color: t.shidos === 0 ? '#22c55e' : '#ef4444' }}>{t.shidos} shido{t.shidos !== 1 ? 's' : ''}</span>
+                                                            </div>
+                                                            <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>
+                                                                <div style={{ height: '100%', borderRadius: '3px', background: t.shidos === 0 ? 'linear-gradient(90deg, #22c55e, #16a34a)' : 'linear-gradient(90deg, #ef4444, #b91c1c)', width: `${maxShidos > 0 ? (t.shidos / maxShidos) * 100 : 0}%`, transition: 'width 0.4s' }} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </section>
+                                );
+                            })()}
+
+                            {!isBeachTennis && !isFutevolei && !isTamboreu && !isTenisDeMesa && !isKarate && !isJudo && (
                             <section style={{ marginBottom: '30px' }}>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Jogadores</h2>
                                 <div style={twoCardsGridStyle}>
@@ -842,7 +1228,7 @@ const Estatisticas: FC = () => {
                             </section>
                             )}
 
-                            <section>
+                            {!isKarate && !isJudo && <section>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Equipes</h2>
                                 <div style={twoCardsGridStyle}>
                                     {isTamboreu ? (
@@ -1439,7 +1825,7 @@ const Estatisticas: FC = () => {
                                         </>
                                     )}
                                 </div>
-                            </section>
+                            </section>}
                         </>
                     )}
                 </div>
