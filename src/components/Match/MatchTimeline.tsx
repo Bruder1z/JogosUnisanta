@@ -211,6 +211,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
   // Feedback visual ao registrar ACE / ERRO
   const [_volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
+  // Seletor de jogador para ponto no Vôlei de Praia
+  const [beachPointPicker, setBeachPointPicker] = useState<{ team: "A" | "B" } | null>(null);
 
   // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
@@ -230,6 +232,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       }
     }
     prevScoreRef.current = curr;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch?.scoreA, selectedMatch?.scoreB, selectedMatch?.id]);
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
@@ -404,6 +407,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     return () => {
       if (interval) clearInterval(interval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, isBasketball, isFutebolX1, isNoTimerSport, isKarate]);
 
   useEffect(() => {
@@ -430,6 +434,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
       finishMatch(finishedMatch);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch?.scoreA, selectedMatch?.scoreB, isKarate]);
 
   useEffect(() => {
@@ -460,6 +465,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     return () => {
       if (interval) clearInterval(interval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [osaekomiTeam, selectedMatch?.status]);
 
   const handleSelectMatch = (match: Match) => {
@@ -1032,6 +1038,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleVolleyPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    // Para Vôlei de Praia e Vôlei, abrir seletor de jogador antes de registrar
+    if (selectedMatch.sport === "Vôlei de Praia" || selectedMatch.sport === "Vôlei") {
+      setBeachPointPicker({ team });
+      return;
+    }
+    handleVolleyPointWithPlayer(team, null);
+  };
+
+  const handleVolleyPointWithPlayer = (team: "A" | "B", playerName: string | null) => {
+    if (!selectedMatch || selectedMatch.status === "finished") return;
 
     if (!selectedMatch.events?.some((e) => e.type === "start")) {
       const started = pushMatchEvent({
@@ -1049,7 +1065,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const scoringTeamId =
       scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
 
-    const description = `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
+    const description = (playerName && playerName.trim())
+      ? `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]} — ${playerName.trim()}`
+      : `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
 
     // Calculate current set points for the snapshot
     const lastSetWinEvent = [...(selectedMatch.events || [])]
@@ -1081,6 +1099,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           type: "goal",
           minute: getCurrentEventMinute(),
           teamId: scoringTeamId,
+          player: playerName || undefined,
           description: description,
           score: `${selectedMatch.scoreA}x${selectedMatch.scoreB} (${nextPtsA}-${nextPtsB})`,
         } as MatchEvent,
@@ -2435,7 +2454,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           break;
         }
         if (isVolleyball) {
-          label = event.description || `Ponto - ${teamName}`;
+          if (event.player && event.player.trim()) {
+            const teamShort = teamName.split(" - ")[0];
+            label = `🏐 ${event.player} (${teamShort})`;
+          } else {
+            label = event.description || `Ponto - ${teamName}`;
+          }
           break;
         }
         if (isTamboreu) {
@@ -2606,8 +2630,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     let setScoreB = 0;
     let setPointsA = 0;
     let setPointsB = 0;
-    let beachSetsA = 0;
-    let beachSetsB = 0;
+    let beachSetsA = 0; // eslint-disable-line @typescript-eslint/no-unused-vars
+    let beachSetsB = 0; // eslint-disable-line @typescript-eslint/no-unused-vars
     let beachGamesA = 0;
     let beachGamesB = 0;
     let beachPointsA = 0;
@@ -2841,7 +2865,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       }
     }
 
-    let newMatch: any;
+    let newMatch: Match;
 
     if (isSwimming) {
       const participants = newMatchForm.swimmingTeams
@@ -2853,7 +2877,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             name: name,
             course: course,
             faculty: faculty,
-            logo: getTeamEmblem(course),
+            logo: getTeamEmblem(course) ?? undefined,
           };
         });
 
@@ -3682,7 +3706,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     onChange={(e) =>
                       setNewMatchForm({
                         ...newMatchForm,
-                        category: e.target.value as any,
+                        category: e.target.value as "Masculino" | "Feminino",
                       })
                     }
                     style={{
@@ -4784,39 +4808,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )}
 
-            {isSetSport && (
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>🏆 Sets</h3>
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleSetWin("A")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set Ganho {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleSetWin("B")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set Ganho {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {isVolleyballAceSport && selectedMatch && selectedMatch.status !== "finished" && (
               <div style={styles.eventSection}>
                 <h3 style={styles.sectionTitle}>🏐 Ações de Atletas (ACE / ERRO)</h3>
@@ -4908,6 +4899,38 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </div>
             )}
 
+            {isSetSport && (
+              <div style={styles.eventSection}>
+                <h3 style={styles.sectionTitle}>🏆 Sets</h3>
+                <div
+                  style={styles.eventButtons}
+                  className="match-timeline-event-grid"
+                >
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "var(--accent-color)",
+                      borderColor: "var(--accent-color)",
+                    }}
+                    onClick={() => handleSetWin("A")}
+                  >
+                    <Trophy size={18} style={{ marginRight: "8px" }} />
+                    Set Ganho {selectedMatch.teamA.name.split(" - ")[0]}
+                  </button>
+                  <button
+                    style={{
+                      ...styles.eventBtn,
+                      background: "var(--accent-color)",
+                      borderColor: "var(--accent-color)",
+                    }}
+                    onClick={() => handleSetWin("B")}
+                  >
+                    <Trophy size={18} style={{ marginRight: "8px" }} />
+                    Set Ganho {selectedMatch.teamB.name.split(" - ")[0]}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isTamboreu && (
               <div style={styles.eventSection}>
@@ -5739,7 +5762,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               const value = e.target.value;
                               setSwimmingRankings((prev) => {
                                 if (!value) {
-                                  const { [entry.id]: _removed, ...rest } = prev;
+                                  const { [entry.id]: _removed, ...rest } = prev; // eslint-disable-line @typescript-eslint/no-unused-vars
                                   return rest;
                                 }
                                 return { ...prev, [entry.id]: parseInt(value, 10) };
@@ -5914,7 +5937,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             storedSwimmingParticipants[0] || selectedMatch.teamA,
                           teamB:
                             storedSwimmingParticipants[1] || selectedMatch.teamB,
-                          status: "finished" as "finished",
+                          status: "finished" as const,
                           events: [...filteredEvents, ...resultEvents, endEvent],
                         } as Match;
 
@@ -6565,6 +6588,68 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         )
       }
+
+      {/* Modal seletor de jogador para ponto no Vôlei de Praia */}
+      {beachPointPicker && selectedMatch && (() => {
+        const team = beachPointPicker.team;
+        const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+        const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
+        const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
+        return (
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 }}
+            onClick={() => setBeachPointPicker(null)}
+          >
+            <div
+              style={{ background: "var(--bg-card)", borderRadius: "14px", padding: "24px", minWidth: "280px", maxWidth: "360px", width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: teamColor, marginBottom: "4px" }}>
+                  🏐 Ponto — {teamObj.name.split(" - ")[0]}
+                </div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>
+                  Quem fez o ponto?
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto" }}>
+                {availableAthletes.length === 0 ? (
+                  <div style={{ color: "var(--text-secondary)", fontSize: "13px", textAlign: "center", padding: "12px 0" }}>
+                    Nenhum atleta cadastrado para este time.
+                  </div>
+                ) : (
+                  availableAthletes.map((athlete) => {
+                    const name = `${athlete.firstName} ${athlete.lastName}`;
+                    return (
+                      <button
+                        key={athlete.id}
+                        style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${teamColor}44`, borderRadius: "8px", padding: "10px 14px", color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}
+                        onMouseOver={(e) => (e.currentTarget.style.background = `${teamColor}22`)}
+                        onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                        onClick={() => {
+                          setBeachPointPicker(null);
+                          handleVolleyPointWithPlayer(team, name);
+                        }}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })
+                )}
+                <button
+                  style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "10px 14px", color: "var(--text-secondary)", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}
+                  onClick={() => {
+                    setBeachPointPicker(null);
+                    handleVolleyPointWithPlayer(team, null);
+                  }}
+                >
+                  Registrar sem jogador
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div >
   );
 };

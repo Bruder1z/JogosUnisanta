@@ -191,7 +191,7 @@ const AdminDashboard: React.FC = () => {
             const validSportsLower = AVAILABLE_SPORTS.map(s => s.toLowerCase());
             
             let successCount = 0;
-            let errors: string[] = [];
+            const errors: string[] = [];
             const validLinesCount = lines.length - 1; // Header ignorado
             setImportStatus({ current: 0, total: validLinesCount, message: 'Validando dados...', errors: [] });
             
