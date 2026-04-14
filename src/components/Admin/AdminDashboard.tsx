@@ -1715,19 +1715,6 @@ const AdminDashboard: React.FC = () => {
                     <h2 style={{ marginBottom: '16px' }}>Adicionar Melhor Atleta</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Instuição / Faculdade *</label>
-                            <select
-                                style={inputStyle}
-                                value={newFeatured.institution}
-                                onChange={e => setNewFeatured({ ...newFeatured, institution: e.target.value, course: '', sport: '', name: '' })}
-                            >
-                                <option value="">Selecione a instituição...</option>
-                                {Array.from(new Set(coursesList.map(c => c.split(' - ')[1]))).filter(Boolean).sort().map(inst => (
-                                    <option key={inst} value={inst}>{inst}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Faculdade *</label>
                             <select
                                 style={inputStyle}

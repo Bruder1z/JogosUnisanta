@@ -63,7 +63,7 @@ const Estatisticas: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     const { matches, courses: allCourses } = useData();
 
-    const [sportFilter, setSportFilter] = useState<string>(AVAILABLE_SPORTS[3]);
+    const [sportFilter, setSportFilter] = useState<string>(AVAILABLE_SPORTS[0]);
     const [courseFilter, setCourseFilter] = useState<string>('');
     const [genderFilter, setGenderFilter] = useState<string>('Masculino');
 
@@ -94,10 +94,13 @@ const Estatisticas: FC = () => {
             topScorers: [],
             topSingleGamePerformances: [],
             topThreePointers: [],
+            topTwoPointers: [],
             topFreeThrows: [],
             topPenaltyScorers: [],
             topYellowPlayers: [],
             topRedPlayers: [],
+            topShootoutScored: [] as { name: string; course: string; faculty: string; scored: number }[],
+            topShootoutMissed: [] as { name: string; course: string; faculty: string; missed: number }[],
             topWins: [],
             topPlusMinusPerGame: [],
             teamGoalsFor: [],
@@ -203,10 +206,13 @@ const Estatisticas: FC = () => {
         const goalMap: Record<string, { name: string; course: string; faculty: string; goals: number; gamesSet: Set<string> }> = {};
         const singleGameMap: Record<string, { name: string; course: string; faculty: string; points: number; matchLabel: string }> = {};
         const threePointersMap: Record<string, { name: string; course: string; faculty: string; threes: number }> = {};
+        const twoPointersMap: Record<string, { name: string; course: string; faculty: string; twos: number }> = {};
         const freeThrowsMap: Record<string, { name: string; course: string; faculty: string; freeThrows: number }> = {};
         const penaltyGoalMap: Record<string, { name: string; course: string; faculty: string; penalties: number }> = {};
         const yellowPlayerMap: Record<string, { name: string; course: string; faculty: string; yellowCards: number }> = {};
         const redPlayerMap: Record<string, { name: string; course: string; faculty: string; redCards: number }> = {};
+        const shootoutScoredMap: Record<string, { name: string; course: string; faculty: string; scored: number }> = {};
+        const shootoutMissedMap: Record<string, { name: string; course: string; faculty: string; missed: number }> = {};
         // Mapas de Aces e Erros de Saque (vôlei)
         const aceMap: Record<string, { name: string; course: string; faculty: string; aces: number }> = {};
         const serveErrorMap: Record<string, { name: string; course: string; faculty: string; errors: number }> = {};
@@ -303,6 +309,18 @@ const Estatisticas: FC = () => {
                         threePointersMap[key].threes += 1;
                     }
 
+                    if (sportFilter === 'Basquetebol' && pts === 2) {
+                        if (!twoPointersMap[key]) {
+                            twoPointersMap[key] = {
+                                name: evt.player,
+                                course: teamInfo.course,
+                                faculty: teamInfo.faculty,
+                                twos: 0,
+                            };
+                        }
+                        twoPointersMap[key].twos += 1;
+                    }
+
                     if (pts === 1) {
                         if (!freeThrowsMap[key]) {
                             freeThrowsMap[key] = {
@@ -363,6 +381,18 @@ const Estatisticas: FC = () => {
                     teamRedMap[teamObj.name] = (teamRedMap[teamObj.name] || 0) + 1;
                 }
 
+                if (evt.type === 'shootout_scored' && evt.player) {
+                    const key = evt.player;
+                    if (!shootoutScoredMap[key]) shootoutScoredMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, scored: 0 };
+                    shootoutScoredMap[key].scored += 1;
+                }
+
+                if (evt.type === 'shootout_missed' && evt.player) {
+                    const key = evt.player;
+                    if (!shootoutMissedMap[key]) shootoutMissedMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, missed: 0 };
+                    shootoutMissedMap[key].missed += 1;
+                }
+
                 // Aces: eventos goal com descrição iniciando em '🏐 ACE!'
                 if (evt.type === 'goal' && evt.player && String(evt.description || '').includes('ACE!')) {
                     const key = evt.player;
@@ -411,6 +441,12 @@ const Estatisticas: FC = () => {
             .sort((a, b) => b.threes - a.threes)
             .slice(0, 20);
 
+        let topTwoPointers = sportFilter === 'Basquetebol' ? Object.values(twoPointersMap) : [];
+        if (courseFilter) topTwoPointers = topTwoPointers.filter(p => p.course === courseFilter);
+        topTwoPointers = topTwoPointers
+            .sort((a, b) => b.twos - a.twos)
+            .slice(0, 20);
+
         let topFreeThrows = isBasqueteMemo ? Object.values(freeThrowsMap) : [];
         if (courseFilter) topFreeThrows = topFreeThrows.filter(p => p.course === courseFilter);
         topFreeThrows = topFreeThrows
@@ -445,6 +481,14 @@ const Estatisticas: FC = () => {
         let topRedPlayers = Object.values(redPlayerMap);
         if (courseFilter) topRedPlayers = topRedPlayers.filter(p => p.course === courseFilter);
         topRedPlayers = topRedPlayers.sort((a, b) => b.redCards - a.redCards).slice(0, 20);
+
+        let topShootoutScored = Object.values(shootoutScoredMap);
+        if (courseFilter) topShootoutScored = topShootoutScored.filter(p => p.course === courseFilter);
+        topShootoutScored = topShootoutScored.sort((a, b) => b.scored - a.scored).slice(0, 20);
+
+        let topShootoutMissed = Object.values(shootoutMissedMap);
+        if (courseFilter) topShootoutMissed = topShootoutMissed.filter(p => p.course === courseFilter);
+        topShootoutMissed = topShootoutMissed.sort((a, b) => b.missed - a.missed).slice(0, 20);
 
         const teamGoalsFor = [...teams].sort((a, b) => b.scored - a.scored).slice(0, 20);
         const teamGoalsAgainst = [...teams].sort((a, b) => a.conceded - b.conceded).slice(0, 20);
@@ -706,10 +750,13 @@ const Estatisticas: FC = () => {
             topScorers,
             topSingleGamePerformances,
             topThreePointers,
+            topTwoPointers,
             topFreeThrows,
             topPenaltyScorers,
             topYellowPlayers,
             topRedPlayers,
+            topShootoutScored,
+            topShootoutMissed,
             topWins,
             topPlusMinusPerGame,
             teamGoalsFor,
@@ -1125,7 +1172,50 @@ const Estatisticas: FC = () => {
                             <section style={{ marginBottom: '30px' }}>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Jogadores</h2>
                                 <div style={twoCardsGridStyle}>
-                                    {/* Coluna 1 — Artilheiros / Cestinhas / Maiores Pontuadores */}
+                                    {/* Coluna 1 — Cestinha (primeiro card para basquete) */}
+                                    {isBasquete && (
+                                        <div style={cardStyle}>
+                                            <div style={cardHeaderStyle}>
+                                                <Trophy size={22} color="#fbbf24" />
+                                                <div>
+                                                    <h2 style={cardTitleStyle}>🏀 Cestinha</h2>
+                                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Maior pontuador da competição</p>
+                                                </div>
+                                            </div>
+                                            <div style={cardListScrollStyle}>
+                                                {stats.topScorers.length === 0 ? (
+                                                    <EmptyState />
+                                                ) : stats.topScorers
+                                                    .slice()
+                                                    .sort((a, b) => b.goals - a.goals)
+                                                    .slice(0, 20)
+                                                    .map((player, idx) => (
+                                                    <div key={idx} style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '6px',
+                                                        background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)',
+                                                        border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#fbbf24' }}>
+                                                                {player.goals} pts
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Artilheiros / Maiores Pontuadores */}
                                     <div style={cardStyle}>
                                         <div style={cardHeaderStyle}>
                                             <BarChart2 size={22} color="#fbbf24" />
@@ -1249,7 +1339,44 @@ const Estatisticas: FC = () => {
                                                                 </div>
                                                             </div>
                                                             <span style={{ fontSize: '14px', fontWeight: 800, color: '#38bdf8' }}>
-                                                                {player.threes} {isBasquete3x3 ? '2PT' : '3PT'}
+                                                                {player.threes} {isBasquete3x3 ? `${player.threes * 2}PT` : `${player.threes * 3}PT`}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {isBasquete && !isBasquete3x3 && (
+                                        <div style={cardStyle}>
+                                            <div style={cardHeaderStyle}>
+                                                <Target size={22} color="#a78bfa" />
+                                                <div>
+                                                    <h2 style={cardTitleStyle}>Total de Bolas de 2</h2>
+                                                </div>
+                                            </div>
+                                            <div style={cardListScrollStyle}>
+                                                {stats.topTwoPointers.length === 0 ? (
+                                                    <EmptyState />
+                                                ) : stats.topTwoPointers.map((player, idx) => (
+                                                    <div key={idx} style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '6px',
+                                                        background: idx === 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+                                                        border: idx === 0 ? '1px solid rgba(167,139,250,0.35)' : '1px solid transparent',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#a78bfa' }}>
+                                                                {player.twos} {`${player.twos * 2}PT`}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -1286,7 +1413,7 @@ const Estatisticas: FC = () => {
                                                                 </div>
                                                             </div>
                                                             <span style={{ fontSize: '14px', fontWeight: 800, color: '#22c55e' }}>
-                                                                {player.freeThrows} {isBasquete3x3 ? '1PT' : 'LL'}
+                                                                {player.freeThrows} {isBasquete3x3 ? `${player.freeThrows * 1}PT` : 'LL'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -1330,6 +1457,76 @@ const Estatisticas: FC = () => {
                                         </div>
                                     )}
 
+                                    {sportFilter === 'Futebol X1' && (
+                                        <div style={cardStyle}>
+                                            <div style={cardHeaderStyle}>
+                                                <Target size={22} color="#22c55e" />
+                                                <div>
+                                                    <h2 style={cardTitleStyle}>🎯 Shoot-out Marcado</h2>
+                                                </div>
+                                            </div>
+                                            <div style={cardListScrollStyle}>
+                                                {stats.topShootoutScored.length === 0 ? (
+                                                    <EmptyState />
+                                                ) : stats.topShootoutScored.map((player, idx) => (
+                                                    <div key={idx} style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '6px',
+                                                        background: idx === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                                                        border: idx === 0 ? '1px solid rgba(34,197,94,0.35)' : '1px solid transparent',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#22c55e' }}>{player.scored} 🎯</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {sportFilter === 'Futebol X1' && (
+                                        <div style={cardStyle}>
+                                            <div style={cardHeaderStyle}>
+                                                <Target size={22} color="#ef4444" />
+                                                <div>
+                                                    <h2 style={cardTitleStyle}>❌ Shoot-out Perdido</h2>
+                                                </div>
+                                            </div>
+                                            <div style={cardListScrollStyle}>
+                                                {stats.topShootoutMissed.length === 0 ? (
+                                                    <EmptyState />
+                                                ) : stats.topShootoutMissed.map((player, idx) => (
+                                                    <div key={idx} style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '6px',
+                                                        background: idx === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                                                        border: idx === 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid transparent',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#ef4444' }}>{player.missed} ❌</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {(isFutebol || isHandebol) && (
                                         <div style={cardStyle}>
                                             <div style={cardHeaderStyle}>
@@ -1358,6 +1555,41 @@ const Estatisticas: FC = () => {
                                                                 </div>
                                                             </div>
                                                             <span style={{ fontSize: '14px', fontWeight: 800, color: '#facc15' }}>{player.yellowCards} CA</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(isFutebol || isHandebol) && (
+                                        <div style={cardStyle}>
+                                            <div style={cardHeaderStyle}>
+                                                <Target size={22} color="#ef4444" />
+                                                <div>
+                                                    <h2 style={cardTitleStyle}>Cartões Vermelhos</h2>
+                                                </div>
+                                            </div>
+                                            <div style={cardListScrollStyle}>
+                                                {stats.topRedPlayers.length === 0 ? (
+                                                    <EmptyState />
+                                                ) : stats.topRedPlayers.map((player, idx) => (
+                                                    <div key={idx} style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '6px',
+                                                        background: idx === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                                                        border: idx === 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid transparent',
+                                                    }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{player.name}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{`${player.course} | ${player.faculty || '-'}`}</div>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#ef4444' }}>{player.redCards} CV</span>
                                                         </div>
                                                     </div>
                                                 ))}

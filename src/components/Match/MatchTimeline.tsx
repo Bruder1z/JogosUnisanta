@@ -5504,6 +5504,50 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   </div>
                 </div>
 
+                {isFutebolX1 && (
+                  <div style={styles.eventSection}>
+                    <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
+                    <div
+                      style={styles.eventButtons}
+                      className="match-timeline-event-grid"
+                    >
+                      <button
+                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                        onClick={() => handleShootout("shootout_scored", "A")}
+                      >
+                        🎯 Shoot-out Marcado{" "}
+                        {selectedMatch.teamA.name.split(" - ")[0]}
+                      </button>
+                      <button
+                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                        onClick={() => handleShootout("shootout_scored", "B")}
+                      >
+                        🎯 Shoot-out Marcado{" "}
+                        {selectedMatch.teamB.name.split(" - ")[0]}
+                      </button>
+                    </div>
+                    <div
+                      style={{ ...styles.eventButtons, marginTop: "12px" }}
+                      className="match-timeline-event-grid"
+                    >
+                      <button
+                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                        onClick={() => handleShootout("shootout_missed", "A")}
+                      >
+                        ❌ Shoot-out Perdido{" "}
+                        {selectedMatch.teamA.name.split(" - ")[0]}
+                      </button>
+                      <button
+                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                        onClick={() => handleShootout("shootout_missed", "B")}
+                      >
+                        ❌ Shoot-out Perdido{" "}
+                        {selectedMatch.teamB.name.split(" - ")[0]}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={styles.eventSection}>
                   <h3 style={styles.sectionTitle}>
                     🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênaltis"}
@@ -5588,50 +5632,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
-                )}
-
-                {isFutebolX1 && (
-                  <div style={styles.eventSection}>
-                    <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
-                    <div
-                      style={styles.eventButtons}
-                      className="match-timeline-event-grid"
-                    >
-                      <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                        onClick={() => handleShootout("shootout_scored", "A")}
-                      >
-                        🎯 Shoot-out Marcado{" "}
-                        {selectedMatch.teamA.name.split(" - ")[0]}
-                      </button>
-                      <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                        onClick={() => handleShootout("shootout_scored", "B")}
-                      >
-                        🎯 Shoot-out Marcado{" "}
-                        {selectedMatch.teamB.name.split(" - ")[0]}
-                      </button>
-                    </div>
-                    <div
-                      style={{ ...styles.eventButtons, marginTop: "12px" }}
-                      className="match-timeline-event-grid"
-                    >
-                      <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                        onClick={() => handleShootout("shootout_missed", "A")}
-                      >
-                        ❌ Shoot-out Perdido{" "}
-                        {selectedMatch.teamA.name.split(" - ")[0]}
-                      </button>
-                      <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                        onClick={() => handleShootout("shootout_missed", "B")}
-                      >
-                        ❌ Shoot-out Perdido{" "}
-                        {selectedMatch.teamB.name.split(" - ")[0]}
-                      </button>
                     </div>
                   </div>
                 )}
@@ -7037,7 +7037,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   timelineItem: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "8px",
     padding: "8px 10px",
     backgroundColor: "var(--bg-main)",
@@ -7054,6 +7054,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--accent-color)",
     borderRadius: "999px",
     padding: "4px 8px",
+    flexShrink: 0,
   },
   eventIconBubble: {
     fontSize: "18px",
@@ -7071,14 +7072,16 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minWidth: 0,
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: "6px",
   },
   eventText: {
     flex: 1,
+    minWidth: 0,
     fontSize: "14px",
-    lineHeight: 1.35,
+    lineHeight: 1.4,
+    wordBreak: "break-word",
   },
   eventMetaTag: {
     fontSize: "11px",
@@ -7088,6 +7091,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "999px",
     padding: "4px 8px",
     whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   noEvents: {
     color: "var(--text-secondary)",
