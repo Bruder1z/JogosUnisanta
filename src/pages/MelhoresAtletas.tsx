@@ -14,6 +14,7 @@ interface AtletaDestaque {
     modalidade: string;
     valor: number | string;
     votos?: number;
+    rotulo?: string;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ function getRotulo(modalidade: string): string {
 const ROTULO_COLOR: Record<string, string> = {
     'Artilheiro':        '#e30613',
     'Cestinha':          '#f59e0b',
+    'Pontos por Jogo':   '#22c55e',
     'Maior Pontuador':   '#3b82f6',
     'Destaque da Rodada':'#8b5cf6',
 };
@@ -116,6 +118,7 @@ const MelhoresAtletas: FC = () => {
             'Futebol', 'Futebol Society', 'Futebol X1', 'Futsal',
             'Basquete 3x3', 'Basquetebol', 'Handebol', 'Vôlei', 'Vôlei de Praia',
         ]);
+        const basketballSports = new Set(['Basquete 3x3', 'Basquetebol']);
 
         const getPoints = (desc: string | undefined, sport: string): number => {
             if (sport !== 'Basquete 3x3' && sport !== 'Basquetebol') return 1;
@@ -136,11 +139,27 @@ const MelhoresAtletas: FC = () => {
 
         type Stat = { name: string; institution: string; course: string; sport: string; value: number };
         const bySport = new Map<string, Map<string, Stat>>();
+        const bySportPpg = new Map<string, Map<string, {
+            name: string;
+            institution: string;
+            course: string;
+            totalPoints: number;
+            games: Set<string>;
+        }>>();
 
         matches
             .filter((m) => m.status === 'finished' && supportedSports.has(m.sport))
             .forEach((match) => {
                 const sportMap: Map<string, Stat> = bySport.get(match.sport) ?? new Map<string, Stat>();
+                const sportPpgMap = basketballSports.has(match.sport)
+                    ? (bySportPpg.get(match.sport) ?? new Map<string, {
+                        name: string;
+                        institution: string;
+                        course: string;
+                        totalPoints: number;
+                        games: Set<string>;
+                    }>())
+                    : null;
                 parseEvents(match.events).forEach((ev) => {
                     if (!ev.player || !ev.teamId) return;
                     if (!['goal', 'penalty_scored', 'shootout_scored'].includes(ev.type)) return;
@@ -150,8 +169,25 @@ const MelhoresAtletas: FC = () => {
                     const cur = sportMap.get(key);
                     if (!cur) sportMap.set(key, { name: ev.player, institution: team.faculty ?? '', course: team.course, sport: match.sport, value: inc });
                     else cur.value += inc;
+
+                    if (sportPpgMap) {
+                        const curPpg = sportPpgMap.get(key);
+                        if (!curPpg) {
+                            sportPpgMap.set(key, {
+                                name: ev.player,
+                                institution: team.faculty ?? '',
+                                course: team.course,
+                                totalPoints: inc,
+                                games: new Set([match.id]),
+                            });
+                        } else {
+                            curPpg.totalPoints += inc;
+                            curPpg.games.add(match.id);
+                        }
+                    }
                 });
                 bySport.set(match.sport, sportMap);
+                if (sportPpgMap) bySportPpg.set(match.sport, sportPpgMap);
             });
 
         const result: AtletaDestaque[] = [];
@@ -163,6 +199,30 @@ const MelhoresAtletas: FC = () => {
             const isVolley = sport === 'Vôlei' || sport === 'Vôlei de Praia';
             const unit = isBall || isVolley ? (top.value === 1 ? 'ponto' : 'pontos') : (top.value === 1 ? 'gol' : 'gols');
             result.push({ nome: top.name, curso: top.course, modalidade: sport, valor: `${top.value} ${unit}` });
+        });
+
+        bySportPpg.forEach((playersMap, sport) => {
+            const top = Array.from(playersMap.values())
+                .map((player) => {
+                    const gamesCount = player.games.size;
+                    const ppg = gamesCount > 0 ? player.totalPoints / gamesCount : 0;
+                    return { ...player, gamesCount, ppg };
+                })
+                .sort((a, b) => {
+                    if (b.ppg !== a.ppg) return b.ppg - a.ppg;
+                    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+                    return a.name.localeCompare(b.name);
+                })[0];
+
+            if (!top || top.gamesCount === 0) return;
+
+            result.push({
+                nome: top.name,
+                curso: top.course,
+                modalidade: sport,
+                valor: `${top.ppg.toFixed(1)} PPG`,
+                rotulo: 'Pontos por Jogo',
+            });
         });
 
         featuredAthletes.forEach((fa) => {
@@ -289,7 +349,7 @@ const MelhoresAtletas: FC = () => {
                             <div>
                                 <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Líderes de Estatísticas</h2>
                                 <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    Artilheiros, Cestinhas, Maiores Pontuadores e Destaques da Rodada
+                                    Artilheiros, Cestinhas, Pontos por Jogo, Maiores Pontuadores e Destaques da Rodada
                                 </p>
                             </div>
                         </div>
@@ -301,8 +361,8 @@ const MelhoresAtletas: FC = () => {
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '16px' }}>
                                 {lideres.map((atleta, i) => {
-                                    const rotulo = getRotulo(atleta.modalidade);
-                                    const rotuloColor = getRotuloColor(atleta.modalidade);
+                                    const rotulo = atleta.rotulo ?? getRotulo(atleta.modalidade);
+                                    const rotuloColor = ROTULO_COLOR[rotulo] ?? getRotuloColor(atleta.modalidade);
                                     const emoji = SPORT_ICONS[atleta.modalidade] ?? '🏅';
                                     return (
                                         <div

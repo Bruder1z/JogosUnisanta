@@ -4,6 +4,7 @@ import {
   Clock,
   MapPin,
   Trophy,
+  Award,
   Play,
   CheckCircle,
   Pause,
@@ -205,6 +206,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     "Futebol X1",
     "Handebol",
   ].includes(currentMatch.sport);
+  const isGoalBasedMvpSport = ["Futsal", "Futebol Society", "Futebol X1", "Futebol"].includes(
+    currentMatch.sport,
+  );
+  const getMvpPerformanceLabel = (value: number) => {
+    if (isGoalBasedMvpSport) return value === 1 ? "gol" : "gols";
+    return value === 1 ? "ponto" : "pontos";
+  };
   const isSwimming = currentMatch.sport === "Natação";
   const isKarate = currentMatch.sport === "Caratê";
   const isJudo = currentMatch.sport === "Judô";
@@ -1592,7 +1600,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                           {candidate.playerName}
                         </div>
                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                          {candidate.teamName} • {candidate.points} {candidate.points === 1 ? "ponto" : "pontos"}
+                          {candidate.teamName} • {candidate.points} {getMvpPerformanceLabel(candidate.points)}
                         </div>
                       </div>
 
@@ -1680,10 +1688,17 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
                     <div
                       style={{
-                        fontSize: "32px",
+                        width: "38px",
+                        height: "38px",
+                        borderRadius: "999px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "rgba(234, 179, 8, 0.18)",
+                        border: "1px solid rgba(234, 179, 8, 0.35)",
                       }}
                     >
-                      🏆
+                      <Award size={20} color="#eab308" />
                     </div>
 
                     <div style={{ textAlign: "center", width: "100%" }}>
@@ -1731,7 +1746,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                           style={{
                             fontSize: "18px",
                             fontWeight: 900,
-                            color: "var(--accent-color)",
+                            color: "#eab308",
                             marginBottom: "2px",
                           }}
                         >
@@ -1745,7 +1760,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                             textTransform: "uppercase",
                           }}
                         >
-                          {currentLeader.points === 1 ? "Pt" : "Pts"}
+                          {getMvpPerformanceLabel(currentLeader.points)}
                         </div>
                       </div>
 
