@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useMemo, useState } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
@@ -7,7 +7,62 @@ import { Trophy } from 'lucide-react';
 
 const MelhoresAtletas: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
-    const { featuredAthletes } = useData();
+    const { featuredAthletes, mvpCandidates } = useData();
+
+    const mvpLeaders = useMemo(() => {
+        const byMatch = new Map<string, typeof mvpCandidates>();
+
+        mvpCandidates.forEach((candidate) => {
+            const bucket = byMatch.get(candidate.matchId) || [];
+            bucket.push(candidate);
+            byMatch.set(candidate.matchId, bucket);
+        });
+
+        const winners = Array.from(byMatch.values())
+            .map((candidates) =>
+                [...candidates].sort((a, b) => {
+                    if (b.votes !== a.votes) return b.votes - a.votes;
+                    if (b.points !== a.points) return b.points - a.points;
+                    return a.playerName.localeCompare(b.playerName);
+                })[0],
+            )
+            .filter((winner) => winner && winner.votes > 0);
+
+        const grouped = new Map<string, {
+            playerName: string;
+            institution: string;
+            course: string;
+            sportSample: string;
+            mvpCount: number;
+            totalVotes: number;
+        }>();
+
+        winners.forEach((winner) => {
+            const key = `${winner.playerName.toLowerCase()}::${winner.course.toLowerCase()}::${winner.institution.toLowerCase()}`;
+            const current = grouped.get(key);
+
+            if (!current) {
+                grouped.set(key, {
+                    playerName: winner.playerName,
+                    institution: winner.institution,
+                    course: winner.course,
+                    sportSample: winner.sport,
+                    mvpCount: 1,
+                    totalVotes: winner.votes,
+                });
+                return;
+            }
+
+            current.mvpCount += 1;
+            current.totalVotes += winner.votes;
+        });
+
+        return Array.from(grouped.values()).sort((a, b) => {
+            if (b.mvpCount !== a.mvpCount) return b.mvpCount - a.mvpCount;
+            if (b.totalVotes !== a.totalVotes) return b.totalVotes - a.totalVotes;
+            return a.playerName.localeCompare(b.playerName);
+        });
+    }, [mvpCandidates]);
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
@@ -20,6 +75,48 @@ const MelhoresAtletas: FC = () => {
                     </div>
 
                     <div>
+                        <div style={{ marginBottom: '40px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                <Trophy size={20} color="var(--accent-color)" />
+                                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Melhores jogadores</h2>
+                            </div>
+
+                            <div className="premium-card" style={{ overflow: 'hidden' }}>
+                                {mvpLeaders.length === 0 ? (
+                                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        Ainda não há jogadores com MVP contabilizado.
+                                    </div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr style={{ background: 'var(--bg-hover)' }}>
+                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>#</th>
+                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Jogador</th>
+                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Curso / Instituicao</th>
+                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Esporte</th>
+                                                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>MVPs</th>
+                                                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Votos</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {mvpLeaders.map((athlete, index) => (
+                                                    <tr key={`${athlete.playerName}-${athlete.course}-${athlete.institution}`} style={{ borderTop: '1px solid var(--border-color)' }}>
+                                                        <td style={{ padding: '12px 16px', fontWeight: 800 }}>{index + 1}</td>
+                                                        <td style={{ padding: '12px 16px', fontWeight: 700 }}>{athlete.playerName}</td>
+                                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{athlete.course} - {athlete.institution}</td>
+                                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{athlete.sportSample}</td>
+                                                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--accent-color)' }}>{athlete.mvpCount}</td>
+                                                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>{athlete.totalVotes}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div style={{ marginBottom: '40px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                                 <Trophy size={20} color="var(--accent-color)" />

@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect } from "react";
+import { type FC, useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Clock,
@@ -14,7 +14,8 @@ import {
   type MatchEvent,
   COURSE_EMBLEMS,
 } from "../../data/mockData";
-import { useData } from "../context/DataContext";
+import { type MatchMvpCandidateInput, useData } from "../context/DataContext";
+import { useAuth } from "../../context/AuthContext";
 import PlayerStats from "./PlayerStats";
 import LiveChat from "../Chat/LiveChat";
 
@@ -24,16 +25,58 @@ interface MatchModalProps {
 }
 
 const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
-  const { matches: allMatches } = useData();
+  const {
+    matches: allMatches,
+    mvpCandidates,
+    ensureMatchMvpCandidates,
+    hasUserVotedMatch,
+    voteMatchMvpCandidate,
+  } = useData();
+  const { user, openLoginModal } = useAuth();
   const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
   const [showChat, setShowChat] = useState(false);
   const [showPlayerStats, setShowPlayerStats] = useState(false);
+  const [isSavingMvpCandidates, setIsSavingMvpCandidates] = useState(false);
+  const [mvpCandidatesLoadError, setMvpCandidatesLoadError] = useState<string | null>(null);
+  const [isVotingCandidateId, setIsVotingCandidateId] = useState<string | null>(null);
+  const [mvpVoteFeedback, setMvpVoteFeedback] = useState<string | null>(null);
+  const [isMvpVotingActive, setIsMvpVotingActive] = useState(false);
+  const [mvpVotingSecondsRemaining, setMvpVotingSecondsRemaining] = useState(60);
+  const attemptedMvpSeedMatchIdsRef = useRef<Set<string>>(new Set());
 
   // Sync state if initialMatch changes in context
   useEffect(() => {
     const liveMatch = allMatches.find((m) => m.id === initialMatch.id);
     if (liveMatch) setCurrentMatch(liveMatch);
   }, [allMatches, initialMatch.id]);
+
+  // MVP Voting Timer: baseado no timestamp real da partida finalizada
+  useEffect(() => {
+    // Se partida não terminou ou não tem timestamp, retorna
+    if (currentMatch.status !== "finished" || !currentMatch.mvpVotingStartedAt) {
+      setIsMvpVotingActive(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - currentMatch.mvpVotingStartedAt!) / 1000);
+      const remainingSeconds = Math.max(0, 60 - elapsedSeconds);
+
+      setMvpVotingSecondsRemaining(remainingSeconds);
+
+      // Se o tempo acabou
+      if (remainingSeconds <= 0) {
+        setIsMvpVotingActive(false);
+        clearInterval(interval);
+        return;
+      }
+
+      // Se tempo ainda está rolando, ativa a votação
+      setIsMvpVotingActive(true);
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [currentMatch.status, currentMatch.mvpVotingStartedAt]);
   const normalizeText = (value?: string) => (value || "").trim().toLowerCase();
 
   const teamIdentityMatches = (
@@ -154,6 +197,14 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const isBasketball =
     currentMatch.sport === "Basquetebol" ||
     currentMatch.sport === "Basquete 3x3";
+  const isMvpVotingSport = [
+    "Basquetebol",
+    "Basquete 3x3",
+    "Futebol Society",
+    "Futsal",
+    "Futebol X1",
+    "Handebol",
+  ].includes(currentMatch.sport);
   const isSwimming = currentMatch.sport === "Natação";
   const isKarate = currentMatch.sport === "Caratê";
   const isJudo = currentMatch.sport === "Judô";
@@ -614,44 +665,211 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
 
-  // Calculate MVP (player with most points)
-  const calculateMVP = (): { player: string; points: number; teamId: string; teamName: string } | null => {
-    if (!currentMatch.events || currentMatch.events.length === 0) return null;
+  const getEventsForMvp = (): MatchEvent[] => {
+    const raw = currentMatch.events;
 
-    // Only calculate MVP for basketball and volleyball
-    if (!isBasketball && !isVolleyballFamilySport) return null;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
 
-    const playerPoints: { [key: string]: { points: number; teamId: string; teamName: string } } = {};
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw) as MatchEvent[];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
 
-    currentMatch.events.forEach((event) => {
-      if (event.type === "goal" && event.player && event.teamId) {
-        if (!playerPoints[event.player]) {
-          const teamName = event.teamId === currentMatch.teamA.id
-            ? currentMatch.teamA.name.split(" - ")[0]
-            : currentMatch.teamB.name.split(" - ")[0];
-          playerPoints[event.player] = { points: 0, teamId: event.teamId, teamName };
+    return [];
+  };
+
+  const calculateTopMvpCandidates = (): Array<{
+    playerName: string;
+    points: number;
+    teamId: string;
+    teamName: string;
+    institution: string;
+    course: string;
+  }> => {
+    const events = getEventsForMvp();
+    if (events.length === 0) return [];
+
+    if (!isMvpVotingSport) return [];
+
+    const playerPoints: {
+      [key: string]: {
+        playerName: string;
+        points: number;
+        teamId: string;
+        teamName: string;
+        institution: string;
+        course: string;
+      };
+    } = {};
+
+    const getTeamMeta = (teamId: string) => {
+      const matchTeam =
+        teamId === currentMatch.teamA.id ? currentMatch.teamA : currentMatch.teamB;
+      const nameParts = matchTeam.name.split(" - ");
+      const institution = matchTeam.faculty || nameParts[1] || "Não informado";
+      return {
+        teamName: nameParts[0] || matchTeam.name,
+        institution,
+        course: matchTeam.course || nameParts[0] || "Não informado",
+      };
+    };
+
+    const isCountableEvent = (eventType: MatchEvent["type"]) =>
+      eventType === "goal" ||
+      eventType === "penalty_scored" ||
+      eventType === "shootout_scored";
+
+    events.forEach((event) => {
+      if (isCountableEvent(event.type) && event.player && event.teamId) {
+        const key = `${event.teamId}::${event.player.trim().toLowerCase()}`;
+        if (!playerPoints[key]) {
+          const teamMeta = getTeamMeta(event.teamId);
+          playerPoints[key] = {
+            playerName: event.player.trim(),
+            points: 0,
+            teamId: event.teamId,
+            teamName: teamMeta.teamName,
+            institution: teamMeta.institution,
+            course: teamMeta.course,
+          };
         }
 
-        // For basketball, extract point value from description
         if (isBasketball) {
-          const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 2);
-          playerPoints[event.player].points += pointValue;
+          const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
+          playerPoints[key].points += pointValue;
         } else {
-          // For volleyball, each goal is 1 point
-          playerPoints[event.player].points += 1;
+          playerPoints[key].points += 1;
         }
       }
     });
 
-    // Find player with most points
-    let mvpResult: { player: string; points: number; teamId: string; teamName: string } | null = null;
-    Object.entries(playerPoints).forEach(([player, data]) => {
-      if (!mvpResult || data.points > mvpResult.points) {
-        mvpResult = { player, ...data };
-      }
-    });
+    return Object.values(playerPoints)
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.playerName.localeCompare(b.playerName);
+      })
+      .slice(0, 3);
+  };
 
-    return mvpResult;
+  const matchMvpCandidates = useMemo(
+    () =>
+      mvpCandidates
+        .filter((candidate) => candidate.matchId === currentMatch.id)
+        .sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          if (b.votes !== a.votes) return b.votes - a.votes;
+          return a.playerName.localeCompare(b.playerName);
+        }),
+    [mvpCandidates, currentMatch.id],
+  );
+
+  const topCandidatesPreview = useMemo(
+    () => calculateTopMvpCandidates(),
+    [currentMatch.events, currentMatch.id, currentMatch.sport],
+  );
+
+  const currentLeader = useMemo(() => {
+    if (matchMvpCandidates.length === 0) return null;
+    return [...matchMvpCandidates].sort((a, b) => {
+      if (b.votes !== a.votes) return b.votes - a.votes;
+      if (b.points !== a.points) return b.points - a.points;
+      return a.playerName.localeCompare(b.playerName);
+    })[0];
+  }, [matchMvpCandidates]);
+
+  const voterUserId = (user?.id || user?.email || "").toString();
+  const voterEmail = user?.email || null;
+  const userAlreadyVotedThisMatch = useMemo(() => {
+    if (!voterUserId && !voterEmail) return false;
+    return hasUserVotedMatch(currentMatch.id, voterUserId, voterEmail);
+  }, [currentMatch.id, hasUserVotedMatch, voterEmail, voterUserId]);
+
+  useEffect(() => {
+    setMvpCandidatesLoadError(null);
+    attemptedMvpSeedMatchIdsRef.current.delete(currentMatch.id);
+  }, [currentMatch.id]);
+
+  useEffect(() => {
+    if (currentMatch.status !== "finished" || !isMvpVotingSport) return;
+    if (matchMvpCandidates.length > 0) return;
+    if (attemptedMvpSeedMatchIdsRef.current.has(currentMatch.id)) return;
+
+    const payload: MatchMvpCandidateInput[] = topCandidatesPreview.map((candidate) => ({
+      matchId: currentMatch.id,
+      sport: currentMatch.sport,
+      playerName: candidate.playerName,
+      teamId: candidate.teamId,
+      teamName: candidate.teamName,
+      institution: candidate.institution,
+      course: candidate.course,
+      points: candidate.points,
+    }));
+
+    if (payload.length === 0) return;
+
+    const saveCandidates = async () => {
+      attemptedMvpSeedMatchIdsRef.current.add(currentMatch.id);
+      setIsSavingMvpCandidates(true);
+      setMvpCandidatesLoadError(null);
+      const success = await ensureMatchMvpCandidates(payload);
+      if (!success) {
+        setMvpCandidatesLoadError("Nao foi possivel carregar os candidatos MVP desta partida.");
+      }
+      setIsSavingMvpCandidates(false);
+    };
+
+    saveCandidates();
+  }, [
+    currentMatch.status,
+    currentMatch.id,
+    currentMatch.sport,
+    isMvpVotingSport,
+    matchMvpCandidates.length,
+    topCandidatesPreview,
+    ensureMatchMvpCandidates,
+  ]);
+
+  const handleVoteForCandidate = async (candidateId: string, currentVotes: number) => {
+    if (!user) {
+      setMvpVoteFeedback("Faca login para votar no MVP.");
+      openLoginModal();
+      return;
+    }
+
+    if (userAlreadyVotedThisMatch) {
+      setMvpVoteFeedback("Voce ja votou nesta partida.");
+      return;
+    }
+
+    setIsVotingCandidateId(candidateId);
+    const result = await voteMatchMvpCandidate(
+      candidateId,
+      currentVotes,
+      currentMatch.id,
+      voterUserId,
+      voterEmail,
+    );
+    setIsVotingCandidateId(null);
+
+    if (!result.success && result.reason === "already-voted") {
+      setMvpVoteFeedback("Voce ja votou nesta partida.");
+      setTimeout(() => setMvpVoteFeedback(null), 2500);
+      return;
+    }
+
+    if (!result.success) {
+      setMvpVoteFeedback("Nao foi possivel registrar seu voto agora.");
+      setTimeout(() => setMvpVoteFeedback(null), 2500);
+      return;
+    }
+
+    setMvpVoteFeedback("Voto registrado com sucesso.");
+    setTimeout(() => setMvpVoteFeedback(null), 2500);
   };
 
   const compareEventsAsc = (a: MatchEvent, b: MatchEvent) => {
@@ -1292,71 +1510,284 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
               </div>
             )}
 
-            {/* MVP Card - Show only when match is finished */}
-            {currentMatch.status === "finished" && (() => {
-              const mvp = calculateMVP();
-              if (!mvp) return null;
-
-              return (
+            {currentMatch.status === "finished" && isMvpVotingSport && isMvpVotingActive && (
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderTop: "1px solid var(--border-color)",
+                  background: "linear-gradient(135deg, rgba(234, 179, 8, 0.1), rgba(59, 130, 246, 0.1))",
+                  border: "1px solid rgba(234, 179, 8, 0.3)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
                 <div
                   style={{
-                    padding: "16px 20px",
-                    borderTop: "1px solid var(--border-color)",
-                    background: "var(--bg-card)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px",
                   }}
                 >
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      gap: "12px",
-                      padding: "12px 16px",
-                      borderRadius: "8px",
-                      background: "rgba(255, 215, 0, 0.1)",
-                      border: "1px solid rgba(255, 215, 0, 0.3)",
+                      gap: "8px",
+                      fontSize: "14px",
+                      fontWeight: 800,
                     }}
                   >
-                    <Trophy size={18} color="#ffd700" />
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      Destaque:
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 900,
-                        color: "var(--accent-color)",
-                      }}
-                    >
-                      {mvp.player}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      ({mvp.teamName})
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        color: "#ffd700",
-                      }}
-                    >
-                      • {mvp.points} {isBasketball ? "pts" : mvp.points === 1 ? "pt" : "pts"}
-                    </span>
+                    <Trophy size={16} color="#ffd700" />
+                    Votação para MVP em andamento
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      color: mvpVotingSecondsRemaining <= 10 ? "#ef4444" : "var(--accent-color)",
+                    }}
+                  >
+                    <Clock size={16} />
+                    {mvpVotingSecondsRemaining}s
                   </div>
                 </div>
-              );
-            })()}
+                {currentLeader && (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--text-secondary)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Lider atual: {currentLeader.playerName} ({currentLeader.votes} votos)
+                  </div>
+                )}
+
+                {isSavingMvpCandidates && matchMvpCandidates.length === 0 ? (
+                  <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+                    Preparando candidatos para votacao...
+                  </div>
+                ) : (
+                  (matchMvpCandidates.length > 0 ? matchMvpCandidates : []).map((candidate) => (
+                    <div
+                      key={candidate.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        alignItems: "center",
+                        gap: "10px",
+                        border: "1px solid var(--border-color)",
+                        borderRadius: "10px",
+                        padding: "10px 12px",
+                        background: "var(--bg-primary)",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>
+                          {candidate.playerName}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                          {candidate.teamName} • {candidate.points} {candidate.points === 1 ? "ponto" : "pontos"}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleVoteForCandidate(candidate.id, candidate.votes)}
+                        disabled={isVotingCandidateId === candidate.id || userAlreadyVotedThisMatch}
+                        style={{
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "8px 12px",
+                          background:
+                            isVotingCandidateId === candidate.id || userAlreadyVotedThisMatch
+                              ? "var(--bg-hover)"
+                              : "var(--accent-color)",
+                          color: "#fff",
+                          cursor:
+                            isVotingCandidateId === candidate.id || userAlreadyVotedThisMatch
+                              ? "not-allowed"
+                              : "pointer",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {userAlreadyVotedThisMatch
+                          ? `Votado (${candidate.votes})`
+                          : isVotingCandidateId === candidate.id
+                          ? "Votando..."
+                          : `Votar (${candidate.votes})`}
+                      </button>
+                    </div>
+                  ))
+                )}
+
+                {!isSavingMvpCandidates && matchMvpCandidates.length === 0 && topCandidatesPreview.length === 0 && (
+                  <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                    Nenhum jogador com pontuacao individual foi encontrado para esta partida.
+                  </div>
+                )}
+
+                {!isSavingMvpCandidates && matchMvpCandidates.length === 0 && mvpCandidatesLoadError && (
+                  <div style={{ fontSize: "12px", color: "#f97316", fontWeight: 700 }}>
+                    {mvpCandidatesLoadError}
+                  </div>
+                )}
+
+                {mvpVoteFeedback && (
+                  <div style={{ fontSize: "12px", color: "var(--accent-color)", fontWeight: 700 }}>
+                    {mvpVoteFeedback}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentMatch.status === "finished" && isMvpVotingSport && !isMvpVotingActive && matchMvpCandidates.length > 0 && (
+              <div
+                style={{
+                  padding: "12px 16px",
+                  borderTop: "1px solid var(--border-color)",
+                  background: "linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)",
+                  border: "2px solid rgba(234, 179, 8, 0.4)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "10px",
+                  borderRadius: "12px",
+                }}
+              >
+                {currentLeader ? (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#eab308",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      <CheckCircle size={14} />
+                      MVP
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "32px",
+                      }}
+                    >
+                      🏆
+                    </div>
+
+                    <div style={{ textAlign: "center", width: "100%" }}>
+                      <div
+                        style={{
+                          fontSize: "15px",
+                          fontWeight: 900,
+                          color: "var(--text-primary)",
+                          marginBottom: "2px",
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {currentLeader.playerName}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                          fontWeight: 700,
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {currentLeader.teamName}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "8px",
+                        width: "100%",
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: "rgba(255, 255, 255, 0.06)",
+                          border: "1px solid rgba(234, 179, 8, 0.2)",
+                          borderRadius: "8px",
+                          padding: "8px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 900,
+                            color: "var(--accent-color)",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          {currentLeader.points}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            color: "var(--text-secondary)",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {currentLeader.points === 1 ? "Pt" : "Pts"}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          background: "rgba(234, 179, 8, 0.08)",
+                          border: "1px solid rgba(234, 179, 8, 0.3)",
+                          borderRadius: "8px",
+                          padding: "8px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 900,
+                            color: "#eab308",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          {currentLeader.votes}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            color: "var(--text-secondary)",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {currentLeader.votes === 1 ? "Voto" : "Votos"}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 700, textAlign: "center" }}>
+                    Nenhum voto registrado
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Timeline Body */}
             <div

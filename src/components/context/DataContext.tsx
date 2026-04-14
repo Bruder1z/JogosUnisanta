@@ -25,6 +25,38 @@ export interface FeaturedAthlete {
   reason: string;
 }
 
+export interface MatchMvpCandidate {
+  id: string;
+  matchId: string;
+  sport: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  institution: string;
+  course: string;
+  points: number;
+  votes: number;
+}
+
+export interface MatchMvpCandidateInput {
+  matchId: string;
+  sport: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  institution: string;
+  course: string;
+  points: number;
+}
+
+export interface MatchMvpVote {
+  id: string;
+  matchId: string;
+  candidateId: string;
+  voterUserId: string;
+  voterEmail: string | null;
+}
+
 export interface Athlete {
   id: string;
   firstName: string;
@@ -53,6 +85,17 @@ interface DataContextType {
   featuredAthletes: FeaturedAthlete[];
   addFeaturedAthlete: (athlete: FeaturedAthlete) => Promise<void>;
   removeFeaturedAthlete: (id: string) => Promise<void>;
+  mvpCandidates: MatchMvpCandidate[];
+  ensureMatchMvpCandidates: (candidates: MatchMvpCandidateInput[]) => Promise<boolean>;
+  mvpVotes: MatchMvpVote[];
+  hasUserVotedMatch: (matchId: string, voterUserId: string, voterEmail?: string | null) => boolean;
+  voteMatchMvpCandidate: (
+    candidateId: string,
+    currentVotes: number,
+    matchId: string,
+    voterUserId: string,
+    voterEmail?: string | null,
+  ) => Promise<{ success: boolean; reason?: "already-voted" | "error" }>;
   resetRankingPoints: () => Promise<void>;
   restoreOfficialRanking: () => Promise<void>;
 }
@@ -76,6 +119,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     return sorted.map((e, idx) => ({ ...e, rank: idx + 1 }));
   });
   const [featuredAthletes, setFeaturedAthletes] = useState<FeaturedAthlete[]>([]);
+  const [mvpCandidates, setMvpCandidates] = useState<MatchMvpCandidate[]>([]);
+  const [mvpVotes, setMvpVotes] = useState<MatchMvpVote[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   const pendingMatchIdsRef = useRef<Set<string>>(new Set());
@@ -129,6 +174,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             location: m.location,
             events: m.events || [],
             participants: m.participants || [],
+            mvpVotingStartedAt: m.mvp_voting_started_at || undefined,
           }));
           const fetchedIds = new Set(fetchedMatches.map((m: Match) => m.id));
 
@@ -201,6 +247,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             }))
           );
         }
+
+        const { data: mvpData, error: mvpError } = await supabase
+          .from("match_mvp_candidates")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (mvpData && !mvpError) {
+          setMvpCandidates(
+            mvpData.map((row: any) => ({
+              id: row.id,
+              matchId: row.match_id,
+              sport: row.sport,
+              playerName: row.player_name,
+              teamId: row.team_id,
+              teamName: row.team_name,
+              institution: row.institution,
+              course: row.course,
+              points: row.points || 0,
+              votes: row.votes || 0,
+            })),
+          );
+        }
+
+        const { data: mvpVotesData, error: mvpVotesError } = await supabase
+          .from("match_mvp_votes")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (mvpVotesData && !mvpVotesError) {
+          setMvpVotes(
+            mvpVotesData.map((row: any) => ({
+              id: row.id,
+              matchId: row.match_id,
+              candidateId: row.candidate_id,
+              voterUserId: row.voter_user_id,
+              voterEmail: row.voter_email || null,
+            })),
+          );
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -266,6 +349,213 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeFeaturedAthlete = async (id: string) => {
     setFeaturedAthletes((prev) => prev.filter((a) => a.id !== id));
     await supabase.from("featured_athletes").delete().match({ id });
+  };
+
+  const ensureMatchMvpCandidates = async (
+    candidates: MatchMvpCandidateInput[],
+  ): Promise<boolean> => {
+    if (candidates.length === 0) return false;
+
+    const uniqueCandidates = Array.from(
+      new Map(
+        candidates.map((candidate) => [
+          `${candidate.matchId}::${candidate.teamId}::${candidate.playerName.toLowerCase()}`,
+          candidate,
+        ]),
+      ).values(),
+    );
+
+    const payload = uniqueCandidates.map((candidate) => ({
+      match_id: candidate.matchId,
+      sport: candidate.sport,
+      player_name: candidate.playerName,
+      team_id: candidate.teamId,
+      team_name: candidate.teamName,
+      institution: candidate.institution,
+      course: candidate.course,
+      points: candidate.points,
+    }));
+
+    const { error } = await supabase
+      .from("match_mvp_candidates")
+      .upsert(payload, {
+        onConflict: "match_id,player_name,team_id",
+      });
+
+    if (error) {
+      // Some environments may not have the unique index required for onConflict.
+      // In this case, fallback to plain insert and continue with best-effort sync.
+      const upsertNeedsConstraint =
+        (error.message || "")
+          .toLowerCase()
+          .includes("no unique or exclusion constraint");
+
+      if (!upsertNeedsConstraint) {
+        console.error("Error ensuring MVP candidates:", error);
+        return false;
+      }
+
+      const { error: insertError } = await supabase
+        .from("match_mvp_candidates")
+        .insert(payload);
+
+      if (insertError) {
+        console.error("Error inserting MVP candidates (fallback):", insertError);
+        return false;
+      }
+    }
+
+    const matchIds = new Set(uniqueCandidates.map((candidate) => candidate.matchId));
+    const { data, error: refetchError } = await supabase
+      .from("match_mvp_candidates")
+      .select("*")
+      .in("match_id", Array.from(matchIds));
+
+    if (refetchError || !data) {
+      if (refetchError) console.error("Error reloading MVP candidates:", refetchError);
+      const fallbackMapped = uniqueCandidates.map((candidate) => ({
+        id: `local-${candidate.matchId}-${candidate.teamId}-${candidate.playerName}`,
+        matchId: candidate.matchId,
+        sport: candidate.sport,
+        playerName: candidate.playerName,
+        teamId: candidate.teamId,
+        teamName: candidate.teamName,
+        institution: candidate.institution,
+        course: candidate.course,
+        points: candidate.points,
+        votes: 0,
+      }));
+
+      setMvpCandidates((prev) => {
+        const next = prev.filter((item) => !matchIds.has(item.matchId));
+        return [...fallbackMapped, ...next];
+      });
+
+      return true;
+    }
+
+    const mapped = data.map((row: any) => ({
+      id: row.id,
+      matchId: row.match_id,
+      sport: row.sport,
+      playerName: row.player_name,
+      teamId: row.team_id,
+      teamName: row.team_name,
+      institution: row.institution,
+      course: row.course,
+      points: row.points || 0,
+      votes: row.votes || 0,
+    }));
+
+    setMvpCandidates((prev) => {
+      const next = prev.filter((item) => !matchIds.has(item.matchId));
+      return [...mapped, ...next];
+    });
+
+    return true;
+  };
+
+  const hasUserVotedMatch = (
+    matchId: string,
+    voterUserId: string,
+    voterEmail?: string | null,
+  ) => {
+    const normalizedUserId = (voterUserId || "").trim().toLowerCase();
+    const normalizedEmail = (voterEmail || "").trim().toLowerCase();
+
+    return mvpVotes.some((vote) => {
+      if (vote.matchId !== matchId) return false;
+
+      const voteUserId = (vote.voterUserId || "").trim().toLowerCase();
+      const voteEmail = (vote.voterEmail || "").trim().toLowerCase();
+
+      if (normalizedUserId && voteUserId && normalizedUserId === voteUserId) {
+        return true;
+      }
+
+      if (normalizedEmail && voteEmail && normalizedEmail === voteEmail) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
+  const voteMatchMvpCandidate = async (
+    candidateId: string,
+    currentVotes: number,
+    matchId: string,
+    voterUserId: string,
+    voterEmail?: string | null,
+  ): Promise<{ success: boolean; reason?: "already-voted" | "error" }> => {
+    const normalizedUserId = (voterUserId || "").trim();
+    const normalizedEmail = (voterEmail || "").trim().toLowerCase();
+
+    if (!normalizedUserId) {
+      return { success: false, reason: "error" };
+    }
+
+    if (hasUserVotedMatch(matchId, normalizedUserId, normalizedEmail || null)) {
+      return { success: false, reason: "already-voted" };
+    }
+
+    const { data: voteInsert, error: voteInsertError } = await supabase
+      .from("match_mvp_votes")
+      .insert([
+        {
+          match_id: matchId,
+          candidate_id: candidateId,
+          voter_user_id: normalizedUserId,
+          voter_email: normalizedEmail || null,
+        },
+      ])
+      .select("*")
+      .single();
+
+    if (voteInsertError) {
+      const duplicate =
+        voteInsertError.code === "23505" ||
+        voteInsertError.message.toLowerCase().includes("duplicate");
+
+      if (duplicate) {
+        return { success: false, reason: "already-voted" };
+      }
+
+      console.error("Error inserting MVP vote:", voteInsertError);
+      return { success: false, reason: "error" };
+    }
+
+    const nextVotes = currentVotes + 1;
+    const { error } = await supabase
+      .from("match_mvp_candidates")
+      .update({ votes: nextVotes })
+      .eq("id", candidateId);
+
+    if (error) {
+      console.error("Error updating MVP vote:", error);
+      return { success: false, reason: "error" };
+    }
+
+    setMvpVotes((prev) => [
+      {
+        id: voteInsert.id,
+        matchId: voteInsert.match_id,
+        candidateId: voteInsert.candidate_id,
+        voterUserId: voteInsert.voter_user_id,
+        voterEmail: voteInsert.voter_email || null,
+      },
+      ...prev,
+    ]);
+
+    setMvpCandidates((prev) =>
+      prev.map((candidate) =>
+        candidate.id === candidateId
+          ? { ...candidate, votes: nextVotes }
+          : candidate,
+      ),
+    );
+
+    return { success: true };
   };
 
   const addCustomEmblem = (course: string, base64: string) => {
@@ -335,7 +625,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           location: updatedMatch.location,
           events: updatedMatch.events || [],
           participants: updatedMatch.participants || [],
-          stage: updatedMatch.stage, 
+          stage: updatedMatch.stage,
+          mvp_voting_started_at: updatedMatch.mvpVotingStartedAt || null,
         })
         .match({ id: updatedMatch.id });
 
@@ -444,6 +735,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         featuredAthletes,
         addFeaturedAthlete,
         removeFeaturedAthlete,
+        mvpCandidates,
+        mvpVotes,
+        ensureMatchMvpCandidates,
+        hasUserVotedMatch,
+        voteMatchMvpCandidate,
       }}
     >
       {children}

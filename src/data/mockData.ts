@@ -81,7 +81,8 @@ export interface Match {
   time: string;
   location: string;
   events?: MatchEvent[];
-  stage?: string; 
+  stage?: string;
+  mvpVotingStartedAt?: number; // Timestamp quando a votação MVP iniciou (status = finished)
 }
 
 export const mockUsers: User[] = [

@@ -34,13 +34,132 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     athletes,
     addMatch,
     courses: coursesList,
+    ensureMatchMvpCandidates,
   } = useData();
 
+  const MVP_ELIGIBLE_SPORTS = new Set([
+    "Basquetebol",
+    "Basquete 3x3",
+    "Futebol Society",
+    "Futsal",
+    "Futebol X1",
+    "Handebol",
+  ]);
+
+  const seedMvpCandidatesOnFinish = async (finishedMatch: Match) => {
+    if (!MVP_ELIGIBLE_SPORTS.has(finishedMatch.sport)) return;
+
+    const rawEvents = finishedMatch.events;
+    let events: MatchEvent[] = [];
+
+    if (Array.isArray(rawEvents)) {
+      events = rawEvents;
+    } else if (typeof rawEvents === "string") {
+      try {
+        const parsed = JSON.parse(rawEvents) as MatchEvent[];
+        events = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        events = [];
+      }
+    }
+
+    const playerPoints: Record<
+      string,
+      {
+        playerName: string;
+        teamId: string;
+        teamName: string;
+        institution: string;
+        course: string;
+        points: number;
+      }
+    > = {};
+
+    const isBasketball =
+      finishedMatch.sport === "Basquetebol" ||
+      finishedMatch.sport === "Basquete 3x3";
+
+    const countableEvents = new Set<MatchEvent["type"]>([
+      "goal",
+      "penalty_scored",
+      "shootout_scored",
+    ]);
+
+    events.forEach((event) => {
+      if (!countableEvents.has(event.type) || !event.player || !event.teamId) {
+        return;
+      }
+
+      const key = `${event.teamId}::${event.player.trim().toLowerCase()}`;
+      if (!playerPoints[key]) {
+        const team =
+          event.teamId === finishedMatch.teamA.id
+            ? finishedMatch.teamA
+            : finishedMatch.teamB;
+        const nameParts = team.name.split(" - ");
+        playerPoints[key] = {
+          playerName: event.player.trim(),
+          teamId: event.teamId,
+          teamName: nameParts[0] || team.name,
+          institution: team.faculty || nameParts[1] || "Nao informado",
+          course: team.course || nameParts[0] || "Nao informado",
+          points: 0,
+        };
+      }
+
+      if (isBasketball) {
+        const parsed = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
+        playerPoints[key].points += parsed;
+      } else {
+        playerPoints[key].points += 1;
+      }
+    });
+
+    const top3 = Object.values(playerPoints)
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.playerName.localeCompare(b.playerName);
+      })
+      .slice(0, 3)
+      .map((candidate) => ({
+        matchId: finishedMatch.id,
+        sport: finishedMatch.sport,
+        playerName: candidate.playerName,
+        teamId: candidate.teamId,
+        teamName: candidate.teamName,
+        institution: candidate.institution,
+        course: candidate.course,
+        points: candidate.points,
+      }));
+
+    if (top3.length === 0) {
+      showNotification(
+        "Partida finalizada, mas não encontrei eventos válidos para gerar candidatos MVP.",
+      );
+      return;
+    }
+
+    const success = await ensureMatchMvpCandidates(top3);
+    if (!success) {
+      showNotification(
+        "Não foi possível salvar os candidatos ao MVP. Verifique as permissões/políticas no banco.",
+      );
+      return;
+    }
+
+    showNotification("Candidatos MVP salvos para esta partida.", "success");
+  };
+
   const finishMatch = (updatedMatch: Match) => {
+    if (updatedMatch.status === "finished" && !updatedMatch.mvpVotingStartedAt) {
+      // Registra o timestamp quando a partida foi finalizada para votação MVP
+      updatedMatch.mvpVotingStartedAt = Date.now();
+    }
+    if (updatedMatch.status === "finished") {
+      void seedMvpCandidatesOnFinish(updatedMatch);
+    }
     updateMatch(updatedMatch);
     setIsRunning(false);
-    // setActiveMatchId(null);
-    // navigate("/");
   };
 
   // Helper to get team emblem with strict matching
