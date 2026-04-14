@@ -15,7 +15,8 @@ import {
     Award,
     Plus,
     Upload,
-    Info
+    Info,
+    Download
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -34,6 +35,7 @@ const AdminDashboard: React.FC = () => {
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     const [importStatus, setImportStatus] = useState<{current: number, total: number, message: string, errors: string[]} | null>(null);
+    const [showImportInfo, setShowImportInfo] = useState(false);
     // DataContext
     const { 
         courses: coursesList, 
@@ -99,6 +101,15 @@ const AdminDashboard: React.FC = () => {
     });
 
     const [notification, setNotification] = useState('');
+
+    const importCsvColumns = [
+        'Primeiro Nome',
+        'Sobrenome',
+        'Instituição (Ex: Unisanta)',
+        'Curso (Ex: Direito)',
+        'Gênero (Masculino ou Feminino)',
+        'Modalidades (separadas por "/")'
+    ];
 
     const showNotification = (msg: string) => {
         setNotification(msg);
@@ -886,10 +897,17 @@ const AdminDashboard: React.FC = () => {
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Atletas</h2>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                    <div style={{ position: 'relative' }}>
+                                    <div
+                                        style={{ position: 'relative' }}
+                                        onMouseLeave={() => setShowImportInfo(false)}
+                                    >
                                         <button
                                             title="Como importar planilha?"
-                                            onClick={() => showNotification('Salvar planilha Excel como .CSV!\nOrdem das Colunas:\n1. Primeiro Nome\n2. Sobrenome\n3. Instituição (Ex: Unisanta)\n4. Curso (Ex: Direito)\n5. Gênero (Masculino ou Feminino)\n6. Modalidades (separadas por "/")')}
+                                            onMouseEnter={() => setShowImportInfo(true)}
+                                            onFocus={() => setShowImportInfo(true)}
+                                            onBlur={() => setShowImportInfo(false)}
+                                            onTouchStart={() => setShowImportInfo(prev => !prev)}
+                                            onClick={() => setShowImportInfo(prev => !prev)}
                                             style={{
                                                 background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
                                                 borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
@@ -897,7 +915,49 @@ const AdminDashboard: React.FC = () => {
                                         >
                                             <Info size={16} />
                                         </button>
+                                        {showImportInfo && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '42px',
+                                                    left: '0',
+                                                    zIndex: 9999,
+                                                    width: '340px',
+                                                    padding: '14px 16px',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid #334155',
+                                                    background: 'rgba(15, 23, 42, 0.98)',
+                                                    boxShadow: '0 14px 30px rgba(2, 6, 23, 0.45)',
+                                                    color: '#f8fafc',
+                                                    fontSize: '13px',
+                                                    lineHeight: 1.45
+                                                }}
+                                            >
+                                                <div style={{ fontWeight: 700, marginBottom: '8px' }}>
+                                                    Salvar planilha Excel como .CSV
+                                                </div>
+                                                <div style={{ marginBottom: '6px', color: '#cbd5e1' }}>Ordem das colunas:</div>
+                                                <ol style={{ margin: 0, paddingLeft: '18px' }}>
+                                                    {importCsvColumns.map((column, index) => (
+                                                        <li key={index} style={{ marginBottom: '3px' }}>{column}</li>
+                                                    ))}
+                                                </ol>
+                                            </div>
+                                        )}
                                     </div>
+                                    <a
+                                        href="/tabela_unisanta.csv"
+                                        download="tabela_unisanta.csv"
+                                        style={{
+                                            background: 'transparent', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
+                                            fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-color)',
+                                            transition: 'all 0.2s', textDecoration: 'none'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.color = 'var(--accent-color)'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                                    >
+                                        <Download size={16} /> Baixar planilha exemplo
+                                    </a>
                                     <label style={{
                                         background: 'transparent', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
                                         fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-color)',
