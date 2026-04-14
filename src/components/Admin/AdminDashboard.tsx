@@ -1852,7 +1852,6 @@ const AdminDashboard: React.FC = () => {
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Motivo do Destaque *</label>
                             <input
                                 type="text"
-                                placeholder="Ex: Artilheiro, MVP, Destaque da Rodada"
                                 style={inputStyle}
                                 value={newFeatured.reason}
                                 onChange={e => setNewFeatured({ ...newFeatured, reason: e.target.value })}

@@ -3,19 +3,78 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { useData } from '../components/context/DataContext';
-import { Trophy } from 'lucide-react';
+import { SPORT_ICONS } from '../data/mockData';
+import { Trophy, Star, Medal } from 'lucide-react';
+
+// ─── Interface ─────────────────────────────────────────────────────────────────
+
+interface AtletaDestaque {
+    nome: string;
+    curso: string;
+    modalidade: string;
+    valor: number | string;
+    votos?: number;
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function getInitials(name: string): string {
+    return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0].toUpperCase()).join('');
+}
+
+function getRotulo(modalidade: string): string {
+    if (['Futebol', 'Futebol Society', 'Futebol X1', 'Futsal', 'Handebol'].includes(modalidade)) return 'Artilheiro';
+    if (['Basquetebol', 'Basquete 3x3'].includes(modalidade)) return 'Cestinha';
+    if (['Vôlei', 'Vôlei de Praia'].includes(modalidade)) return 'Maior Pontuador';
+    return 'Destaque da Rodada';
+}
+
+// cor do rótulo por categoria
+const ROTULO_COLOR: Record<string, string> = {
+    'Artilheiro':        '#e30613',
+    'Cestinha':          '#f59e0b',
+    'Maior Pontuador':   '#3b82f6',
+    'Destaque da Rodada':'#8b5cf6',
+};
+
+function getRotuloColor(modalidade: string): string {
+    return ROTULO_COLOR[getRotulo(modalidade)] ?? '#e30613';
+}
+
+// ─── Sub-componentes ───────────────────────────────────────────────────────────
+
+const Avatar: FC<{ name: string; size?: number }> = ({ name, size = 48 }) => (
+    <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #3f3f46 0%, #27272a 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize: size * 0.32, fontWeight: 800,
+        flexShrink: 0, letterSpacing: '0.04em',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+        border: '2px solid rgba(255,255,255,0.08)',
+    }}>
+        {getInitials(name)}
+    </div>
+);
+
+const SportEmoji: FC<{ modalidade: string }> = ({ modalidade }) => {
+    const emoji = SPORT_ICONS[modalidade] ?? '🏅';
+    return <span style={{ fontSize: '13px', lineHeight: 1 }}>{emoji}</span>;
+};
+
+// ─── Componente Principal ──────────────────────────────────────────────────────
 
 const MelhoresAtletas: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
     const { featuredAthletes, mvpCandidates, matches } = useData();
 
+    // ── Seção 1: MVPs da Galera ─────────────────────────────────────────────────
     const mvpLeaders = useMemo(() => {
         const byMatch = new Map<string, typeof mvpCandidates>();
-
-        mvpCandidates.forEach((candidate) => {
-            const bucket = byMatch.get(candidate.matchId) || [];
-            bucket.push(candidate);
-            byMatch.set(candidate.matchId, bucket);
+        mvpCandidates.forEach((c) => {
+            const b = byMatch.get(c.matchId) ?? [];
+            b.push(c);
+            byMatch.set(c.matchId, b);
         });
 
         const winners = Array.from(byMatch.values())
@@ -26,35 +85,22 @@ const MelhoresAtletas: FC = () => {
                     return a.playerName.localeCompare(b.playerName);
                 })[0],
             )
-            .filter((winner) => winner && winner.votes > 0);
+            .filter((w) => w && w.votes > 0);
 
         const grouped = new Map<string, {
-            playerName: string;
-            institution: string;
-            course: string;
-            sportSample: string;
-            mvpCount: number;
-            totalVotes: number;
+            playerName: string; institution: string; course: string;
+            sportSample: string; mvpCount: number; totalVotes: number;
         }>();
 
         winners.forEach((winner) => {
             const key = `${winner.playerName.toLowerCase()}::${winner.course.toLowerCase()}::${winner.institution.toLowerCase()}`;
-            const current = grouped.get(key);
-
-            if (!current) {
-                grouped.set(key, {
-                    playerName: winner.playerName,
-                    institution: winner.institution,
-                    course: winner.course,
-                    sportSample: winner.sport,
-                    mvpCount: 1,
-                    totalVotes: winner.votes,
-                });
-                return;
+            const cur = grouped.get(key);
+            if (!cur) {
+                grouped.set(key, { playerName: winner.playerName, institution: winner.institution, course: winner.course, sportSample: winner.sport, mvpCount: 1, totalVotes: winner.votes });
+            } else {
+                cur.mvpCount += 1;
+                cur.totalVotes += winner.votes;
             }
-
-            current.mvpCount += 1;
-            current.totalVotes += winner.votes;
         });
 
         return Array.from(grouped.values()).sort((a, b) => {
@@ -64,265 +110,333 @@ const MelhoresAtletas: FC = () => {
         });
     }, [mvpCandidates]);
 
-    const automaticHighlights = useMemo(() => {
+    // ── Seção 2: Líderes de Estatísticas ───────────────────────────────────────
+    const lideres = useMemo((): AtletaDestaque[] => {
         const supportedSports = new Set([
-            'Futebol Society',
-            'Futsal',
-            'Futebol X1',
-            'Basquete 3x3',
-            'Handebol',
-            'Vôlei',
-            'Vôlei de Praia',
+            'Futebol', 'Futebol Society', 'Futebol X1', 'Futsal',
+            'Basquete 3x3', 'Basquetebol', 'Handebol', 'Vôlei', 'Vôlei de Praia',
         ]);
 
-        const playerStatsBySport = new Map<string, Map<string, {
-            id: string;
-            name: string;
-            institution: string;
-            course: string;
-            sport: string;
-            value: number;
-        }>>();
-
-        const getPointsFromBasketballDescription = (description?: string) => {
-            const text = (description || '').toLowerCase();
-            const match = text.match(/\+\s*([123])|([123])\s*ponto/);
-            if (!match) return 1;
-            return Number(match[1] || match[2] || 1);
+        const getPoints = (desc: string | undefined, sport: string): number => {
+            if (sport !== 'Basquete 3x3' && sport !== 'Basquetebol') return 1;
+            const m = (desc ?? '').toLowerCase().match(/\+\s*([123])|([123])\s*ponto/);
+            return Number(m?.[1] ?? m?.[2] ?? 1);
         };
 
-        const getEvents = (rawEvents: unknown) => {
-            if (!rawEvents) return [] as Array<any>;
-            if (Array.isArray(rawEvents)) return rawEvents;
-            if (typeof rawEvents === 'string') {
-                try {
-                    const parsed = JSON.parse(rawEvents);
-                    return Array.isArray(parsed) ? parsed : [];
-                } catch {
-                    return [];
-                }
+        type RawEvent = { type: string; player?: string; teamId?: string; description?: string };
+        const parseEvents = (raw: unknown): RawEvent[] => {
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw as RawEvent[];
+            if (typeof raw === 'string') {
+                try { const p: unknown = JSON.parse(raw); return Array.isArray(p) ? (p as RawEvent[]) : []; }
+                catch { return []; }
             }
-            return [] as Array<any>;
+            return [];
         };
+
+        type Stat = { name: string; institution: string; course: string; sport: string; value: number };
+        const bySport = new Map<string, Map<string, Stat>>();
 
         matches
-            .filter((match) => match.status === 'finished' && supportedSports.has(match.sport))
+            .filter((m) => m.status === 'finished' && supportedSports.has(m.sport))
             .forEach((match) => {
-                const events = getEvents(match.events);
-                const sportMap = playerStatsBySport.get(match.sport) || new Map();
-
-                events.forEach((event) => {
-                    if (!event?.player || !event?.teamId) return;
-
-                    const isGoalLikeEvent =
-                        event.type === 'goal' ||
-                        event.type === 'penalty_scored' ||
-                        event.type === 'shootout_scored';
-
-                    if (!isGoalLikeEvent) return;
-
-                    const team = event.teamId === match.teamA.id ? match.teamA : match.teamB;
-                    const key = `${event.player.toLowerCase()}::${team.course.toLowerCase()}::${(team.faculty || '').toLowerCase()}`;
-                    const current = sportMap.get(key);
-                    const increment = match.sport === 'Basquete 3x3'
-                        ? getPointsFromBasketballDescription(event.description)
-                        : 1;
-
-                    if (!current) {
-                        sportMap.set(key, {
-                            id: `auto-${match.sport}-${key}`,
-                            name: event.player,
-                            institution: team.faculty || '',
-                            course: team.course,
-                            sport: match.sport,
-                            value: increment,
-                        });
-                        return;
-                    }
-
-                    current.value += increment;
+                const sportMap: Map<string, Stat> = bySport.get(match.sport) ?? new Map<string, Stat>();
+                parseEvents(match.events).forEach((ev) => {
+                    if (!ev.player || !ev.teamId) return;
+                    if (!['goal', 'penalty_scored', 'shootout_scored'].includes(ev.type)) return;
+                    const team = ev.teamId === match.teamA.id ? match.teamA : match.teamB;
+                    const key = `${ev.player.toLowerCase()}::${team.course.toLowerCase()}::${(team.faculty ?? '').toLowerCase()}`;
+                    const inc = getPoints(ev.description, match.sport);
+                    const cur = sportMap.get(key);
+                    if (!cur) sportMap.set(key, { name: ev.player, institution: team.faculty ?? '', course: team.course, sport: match.sport, value: inc });
+                    else cur.value += inc;
                 });
-
-                playerStatsBySport.set(match.sport, sportMap);
+                bySport.set(match.sport, sportMap);
             });
 
-        const reasonBySport = (sport: string, value: number) => {
-            if (sport === 'Basquete 3x3') {
-                return `Cestinha: ${value} ${value === 1 ? 'ponto' : 'pontos'}`;
-            }
+        const result: AtletaDestaque[] = [];
 
-            if (sport === 'Vôlei' || sport === 'Vôlei de Praia') {
-                return `Maior pontuador: ${value} ${value === 1 ? 'ponto' : 'pontos'}`;
-            }
+        bySport.forEach((playersMap, sport) => {
+            const top = Array.from(playersMap.values()).sort((a, b) => b.value !== a.value ? b.value - a.value : a.name.localeCompare(b.name))[0];
+            if (!top || top.value <= 0) return;
+            const isBall = sport === 'Basquete 3x3' || sport === 'Basquetebol';
+            const isVolley = sport === 'Vôlei' || sport === 'Vôlei de Praia';
+            const unit = isBall || isVolley ? (top.value === 1 ? 'ponto' : 'pontos') : (top.value === 1 ? 'gol' : 'gols');
+            result.push({ nome: top.name, curso: top.course, modalidade: sport, valor: `${top.value} ${unit}` });
+        });
 
-            return `Artilheiro: ${value} ${value === 1 ? 'gol' : 'gols'}`;
-        };
+        featuredAthletes.forEach((fa) => {
+            result.push({ nome: fa.name, curso: fa.course, modalidade: fa.sport, valor: fa.reason });
+        });
 
-        return Array.from(playerStatsBySport.entries())
-            .map(([sport, playersMap]) => {
-                const topPlayer = Array.from(playersMap.values()).sort((a, b) => {
-                    if (b.value !== a.value) return b.value - a.value;
-                    return a.name.localeCompare(b.name);
-                })[0];
+        return result.sort((a, b) => {
+            const aDestaque = getRotulo(a.modalidade) === 'Destaque da Rodada' ? 1 : 0;
+            const bDestaque = getRotulo(b.modalidade) === 'Destaque da Rodada' ? 1 : 0;
+            if (aDestaque !== bDestaque) return aDestaque - bDestaque;
+            return a.modalidade.localeCompare(b.modalidade);
+        });
+    }, [matches, featuredAthletes]);
 
-                if (!topPlayer || topPlayer.value <= 0) return null;
-
-                return {
-                    id: topPlayer.id,
-                    name: topPlayer.name,
-                    institution: topPlayer.institution,
-                    course: topPlayer.course,
-                    sport,
-                    reason: reasonBySport(sport, topPlayer.value),
-                };
-            })
-            .filter((item): item is { id: string; name: string; institution: string; course: string; sport: string; reason: string } => Boolean(item))
-            .sort((a, b) => a.sport.localeCompare(b.sport));
-    }, [matches]);
-
-    const highlightsForRender = useMemo(
-        () => [...automaticHighlights, ...featuredAthletes],
-        [automaticHighlights, featuredAthletes],
-    );
+    // ── Render ──────────────────────────────────────────────────────────────────
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
             <Header />
             <Sidebar onShowRanking={() => setShowRanking(true)} />
+
             <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-                    <div style={{ marginBottom: '30px' }}>
-                        <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '10px' }}>Melhores Atletas</h1>
-                        <p style={{ color: 'var(--text-secondary)' }}>Os destaques desta edição dos Jogos Unisanta</p>
+
+                    {/* ── Cabeçalho ── */}
+                    <div style={{ marginBottom: '36px' }}>
+                        <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '6px' }}>Melhores Atletas</h1>
+                        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Os destaques desta edição dos Jogos Unisanta</p>
                     </div>
 
-                    <div>
-                        <div style={{ marginBottom: '40px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Trophy size={20} color="var(--accent-color)" />
-                                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Melhores jogadores</h2>
-                            </div>
-
-                            <div className="premium-card" style={{ overflow: 'hidden' }}>
-                                {mvpLeaders.length === 0 ? (
-                                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                        Ainda não há jogadores com MVP contabilizado.
-                                    </div>
-                                ) : (
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ background: 'var(--bg-hover)' }}>
-                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>#</th>
-                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Jogador</th>
-                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Curso / Instituicao</th>
-                                                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Esporte</th>
-                                                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>MVPs</th>
-                                                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>Votos</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {mvpLeaders.map((athlete, index) => (
-                                                    <tr key={`${athlete.playerName}-${athlete.course}-${athlete.institution}`} style={{ borderTop: '1px solid var(--border-color)' }}>
-                                                        <td style={{ padding: '12px 16px', fontWeight: 800 }}>{index + 1}</td>
-                                                        <td style={{ padding: '12px 16px', fontWeight: 700 }}>{athlete.playerName}</td>
-                                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{athlete.course}</td>
-                                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{athlete.sportSample}</td>
-                                                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--accent-color)' }}>{athlete.mvpCount}</td>
-                                                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>{athlete.totalVotes}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
+                    {/* ══ TOPO: MVPs da Galera ══ */}
+                    <section style={{ marginBottom: '52px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '20px' }}>
+                            <Star size={20} color="var(--accent-color)" fill="var(--accent-color)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                            <div>
+                                <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>MVPs da Galera</h2>
+                                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    Atletas escolhidos por votação na Cronologia das partidas
+                                </p>
                             </div>
                         </div>
 
-                        <div style={{ marginBottom: '40px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Trophy size={20} color="var(--accent-color)" />
-                                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Destaques dos Jogos</h2>
+                        <div className="premium-card" style={{ overflow: 'hidden' }}>
+                            {mvpLeaders.length === 0 ? (
+                                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    Ainda não há jogadores com MVP contabilizado.
+                                </div>
+                            ) : (
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--border-color)' }}>
+                                                <th style={thStyle}>#</th>
+                                                <th style={thStyle}>Jogador</th>
+                                                <th style={thStyle}>Curso / Instituição</th>
+                                                <th style={thStyle}>Esporte</th>
+                                                <th style={{ ...thStyle, textAlign: 'right' }}>MVPs</th>
+                                                <th style={{ ...thStyle, textAlign: 'right' }}>Votos</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {mvpLeaders.map((athlete, index) => {
+                                                const isTop3 = index < 3;
+                                                const medalColors = ['#f59e0b', '#9ca3af', '#cd7c3a'];
+                                                return (
+                                                    <tr
+                                                        key={`${athlete.playerName}-${athlete.course}-${athlete.institution}`}
+                                                        style={{
+                                                            borderTop: '1px solid var(--border-color)',
+                                                            background: isTop3 ? 'rgba(227,6,19,0.03)' : undefined,
+                                                            transition: 'background 0.15s',
+                                                        }}
+                                                    >
+                                                        <td style={{ ...tdStyle, width: '48px' }}>
+                                                            {isTop3 ? (
+                                                                <Medal size={16} color={medalColors[index]} fill={medalColors[index]} />
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>{index + 1}</span>
+                                                            )}
+                                                        </td>
+                                                        <td style={tdStyle}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                <Avatar name={athlete.playerName} size={38} />
+                                                                <div>
+                                                                    <div style={{ fontWeight: 700, fontSize: '14px' }}>{athlete.playerName}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                                            {athlete.course}{athlete.institution ? ` · ${athlete.institution}` : ''}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, fontSize: '13px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <SportEmoji modalidade={athlete.sportSample} />
+                                                                <span style={{ color: 'var(--text-secondary)' }}>{athlete.sportSample}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                                            <span style={{
+                                                                background: 'rgba(227,6,19,0.12)',
+                                                                color: 'var(--accent-color)',
+                                                                padding: '3px 10px', borderRadius: '20px',
+                                                                fontWeight: 800, fontSize: '13px',
+                                                            }}>
+                                                                {athlete.mvpCount}×
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontSize: '14px' }}>
+                                                            {athlete.totalVotes}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* ══ BASE: Líderes de Estatísticas ══ */}
+                    <section style={{ marginBottom: '40px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '20px' }}>
+                            <Trophy size={20} color="var(--accent-color)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                            <div>
+                                <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Líderes de Estatísticas</h2>
+                                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    Artilheiros, Cestinhas, Maiores Pontuadores e Destaques da Rodada
+                                </p>
                             </div>
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                gap: '20px'
-                            }}>
-                                {highlightsForRender.length === 0 ? (
-                                    <div className="premium-card" style={{ padding: '40px', gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                        Nenhum atleta em destaque no momento.
-                                    </div>
-                                ) : (
-                                    highlightsForRender.map(athlete => (
-                                        <div key={athlete.id} className="premium-card hover-glow" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                        </div>
+
+                        {lideres.length === 0 ? (
+                            <div className="premium-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                Nenhum líder de estatísticas registrado ainda.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '16px' }}>
+                                {lideres.map((atleta, i) => {
+                                    const rotulo = getRotulo(atleta.modalidade);
+                                    const rotuloColor = getRotuloColor(atleta.modalidade);
+                                    const emoji = SPORT_ICONS[atleta.modalidade] ?? '🏅';
+                                    return (
+                                        <div
+                                            key={`${atleta.modalidade}-${atleta.nome}-${i}`}
+                                            className="premium-card athlete-card"
+                                            style={{ padding: '0', overflow: 'hidden', position: 'relative' }}
+                                        >
+                                            {/* Faixa colorida no topo */}
                                             <div style={{
-                                                position: 'absolute',
-                                                top: '-20px',
-                                                right: '-20px',
-                                                background: 'var(--accent-color)',
-                                                width: '50px',
-                                                height: '50px',
-                                                borderRadius: '50%',
-                                                opacity: 0.1
+                                                height: '4px',
+                                                background: `linear-gradient(90deg, ${rotuloColor}, transparent)`,
                                             }} />
-                                            <div style={{
-                                                width: '72px',
-                                                height: '72px',
-                                                borderRadius: '50%',
-                                                background: 'var(--bg-hover)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: 'var(--accent-color)',
-                                                fontSize: '28px',
-                                                fontWeight: 800,
-                                                margin: '0 auto 15px',
-                                                border: '2px solid var(--accent-color)'
-                                            }}>
-                                                {athlete.name.split(' ').map(n => n[0]).join('')}
-                                            </div>
-                                            <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>
-                                                {athlete.name}
-                                            </div>
-                                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                                {athlete.course}
-                                            </div>
-                                            <div style={{ fontSize: '14px', color: 'var(--accent-color)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '15px' }}>
-                                                <Trophy size={14} /> {athlete.reason}
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                                <span style={{
-                                                    background: 'var(--bg-hover)',
-                                                    color: 'white',
-                                                    padding: '6px 14px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    border: '1px solid var(--border-color)',
-                                                    textTransform: 'uppercase'
-                                                }}>
-                                                    {athlete.sport}
-                                                </span>
+
+                                            <div style={{ padding: '18px 20px 20px' }}>
+                                                {/* Header do card: badge modalidade + emoji inline */}
+                                                <div style={{ marginBottom: '16px' }}>
+                                                    <span style={{
+                                                        background: 'rgba(255,255,255,0.05)',
+                                                        color: 'var(--text-secondary)',
+                                                        padding: '3px 10px',
+                                                        borderRadius: '20px',
+                                                        fontSize: '10px',
+                                                        fontWeight: 700,
+                                                        border: '1px solid rgba(255,255,255,0.08)',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.07em',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                    }}>
+                                                        {atleta.modalidade}
+                                                        <span style={{ fontSize: '10px', lineHeight: 1 }}>{emoji}</span>
+                                                    </span>
+                                                </div>
+
+                                                {/* Avatar + nome + curso */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                                    <Avatar name={atleta.nome} size={48} />
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <div style={{
+                                                            fontSize: '15px', fontWeight: 800, lineHeight: 1.25,
+                                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        }}>
+                                                            {atleta.nome}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px',
+                                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        }}>
+                                                            {atleta.curso}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Divisor */}
+                                                <div style={{ height: '1px', background: 'var(--border-color)', marginBottom: '14px' }} />
+
+                                                {/* Rótulo + valor */}
+                                                {rotulo === 'Destaque da Rodada' ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <span style={{
+                                                            fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+                                                            letterSpacing: '0.05em', color: rotuloColor,
+                                                            background: `${rotuloColor}18`,
+                                                            padding: '3px 8px', borderRadius: '20px',
+                                                            border: `1px solid ${rotuloColor}30`,
+                                                            whiteSpace: 'nowrap',
+                                                            alignSelf: 'flex-start',
+                                                        }}>
+                                                            {rotulo}
+                                                        </span>
+                                                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+                                                            {atleta.valor}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <span style={{
+                                                            fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+                                                            letterSpacing: '0.05em', color: rotuloColor,
+                                                            background: `${rotuloColor}18`,
+                                                            padding: '3px 8px', borderRadius: '20px',
+                                                            border: `1px solid ${rotuloColor}30`,
+                                                            whiteSpace: 'nowrap',
+                                                        }}>
+                                                            {rotulo}
+                                                        </span>
+                                                        <span style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>
+                                                            {atleta.valor}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                    );
+                                })}
                             </div>
-                        </div>
-                    </div>
+                        )}
+                    </section>
+
                 </div>
             </main>
+
             <style>{`
-                .hover-glow:hover {
-                    transform: translateY(-4px);
-                    border-color: var(--accent-color);
-                    background: var(--bg-hover);
-                    box-shadow: 0 10px 30px rgba(227, 6, 19, 0.1);
+                .athlete-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+                .athlete-card:hover {
+                    transform: translateY(-3px);
+                    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+                    border-color: rgba(255,255,255,0.12);
                 }
+                tbody tr:hover { background: rgba(255,255,255,0.02) !important; }
             `}</style>
+
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
-        </div >
+        </div>
     );
+};
+
+// ─── Estilos de tabela ─────────────────────────────────────────────────────────
+
+const thStyle: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '11px 16px',
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+};
+
+const tdStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    verticalAlign: 'middle',
 };
 
 export default MelhoresAtletas;
