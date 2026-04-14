@@ -2945,7 +2945,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     setNewMatchForm({
       teamA: "",
       teamB: "",
-      swimmingTeams: Array(10).fill(""),
+      swimmingTeams: Array(8).fill(""),
       sport: "",
       category: "Masculino",
       stage: "Fase de Classificação",

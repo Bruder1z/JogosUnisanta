@@ -3,8 +3,54 @@ import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { useData } from '../components/context/DataContext';
-import { BarChart2, Shield, Sword, FileSearch, Target, Trophy } from 'lucide-react';
+import { BarChart2, Shield, Sword, FileSearch, Target, Trophy, Timer } from 'lucide-react';
 import { AVAILABLE_SPORTS } from '../data/mockData';
+
+// Tipo local para eventos de partida usados no useMemo
+interface RawMatchEvent {
+    type: string;
+    player?: string;
+    teamId?: string;
+    description?: string;
+    minute?: number;
+    id?: string;
+}
+
+// Tipos para listas de estatísticas
+interface PlayerStat {
+    name: string;
+    course: string;
+    faculty: string;
+}
+interface AceStat extends PlayerStat { aces: number }
+interface ServeErrorStat extends PlayerStat { errors: number }
+interface SetsConsistencyStat {
+    name: string;
+    course: string;
+    faculty: string;
+    pointsConceded: number;
+    setsPlayed: number;
+    avgConceded: number;
+}
+interface VolleyDefenseStat {
+    name: string;
+    course: string;
+    faculty: string;
+    pointsConceded: number;
+    games: number;
+    avgConceded: number;
+}
+interface TeamAceStat { name: string; course: string; faculty: string; aces: number }
+interface TeamServeErrorStat { name: string; course: string; faculty: string; errors: number }
+interface TeamStatEntry {
+    name: string;
+    course: string;
+    faculty: string;
+    scored: number;
+    conceded: number;
+    games: number;
+    wins: number;
+}
 
 // Modalidades que usam gols/pontos por atleta (LAYOUT_INVASAO)
 const MODALIDADES_GOLS = ['Futsal', 'Futebol Society', 'Futebol X1', 'Handebol', 'Basquetebol', 'Basquete 3x3'];
@@ -28,7 +74,9 @@ const Estatisticas: FC = () => {
     const isTenisDeMesa = sportFilter === 'Tênis de Mesa' || sportFilter === 'Tenis de Mesa';
     const isKarate = sportFilter === 'Caratê';
     const isJudo = sportFilter === 'Judô';
-    const isAnyLayout = isInvasaoLayout || isRedeLayout || isBeachTennis || isTamboreu || isTenisDeMesa || isKarate || isJudo;
+    const isXadrez = sportFilter === 'Xadrez';
+    const isNatacao = sportFilter === 'Natação';
+    const isAnyLayout = isInvasaoLayout || isRedeLayout || isBeachTennis || isTamboreu || isTenisDeMesa || isKarate || isJudo || isXadrez || isNatacao;
     const isBasquete = sportFilter === 'Basquetebol' || sportFilter === 'Basquete 3x3';
     const isBasquete3x3 = sportFilter === 'Basquete 3x3';
     const isFutebol = MODALIDADES_FUTEBOL.includes(sportFilter);
@@ -59,10 +107,14 @@ const Estatisticas: FC = () => {
             teamYellowCards: [],
             teamRedCards: [],
             gamesPlayed: {} as Record<string, number>,
-            topAces: [] as any[],
-            topServeErrors: [] as any[],
-            teamStatsList: [] as any[],
-            topSetsConsistencyList: [] as any[],
+            topAces: [] as AceStat[],
+            topServeErrors: [] as ServeErrorStat[],
+            teamStatsList: [] as TeamStatEntry[],
+            topSetsConsistencyList: [] as SetsConsistencyStat[],
+            volleyDefenseList: [] as VolleyDefenseStat[],
+            teamTopAces: [] as TeamAceStat[],
+            teamTopServeErrors: [] as TeamServeErrorStat[],
+            swimTopTimes: [] as { athlete: string; course: string; timeStr: string; timeMs: number }[],
             karateStats: null as null | {
                 medalTable: { course: string; faculty: string; gold: number; silver: number; bronze: number; total: number }[];
                 topScorers: { name: string; course: string; faculty: string; yuko: number; wazaAri: number; ippon: number; total: number }[];
@@ -158,15 +210,34 @@ const Estatisticas: FC = () => {
         // Mapas de Aces e Erros de Saque (vôlei)
         const aceMap: Record<string, { name: string; course: string; faculty: string; aces: number }> = {};
         const serveErrorMap: Record<string, { name: string; course: string; faculty: string; errors: number }> = {};
+        const teamAceMap: Record<string, { course: string; faculty: string; aces: number }> = {};
+        const teamServeErrorMap: Record<string, { course: string; faculty: string; errors: number }> = {};
         const teamCleanSheetsMap: Record<string, number> = {};
         const teamYellowMap: Record<string, number> = {};
         const teamRedMap: Record<string, number> = {};
         const teamPenaltyMap: Record<string, number> = {};
         const setsEfficacyMap: Record<string, { pointsConceded: number; setsPlayed: number; course: string; name: string; faculty: string }> = {};
+        const volleyPointsConcededMap: Record<string, { pointsConceded: number; games: number; course: string; name: string; faculty: string }> = {};
 
         filteredMatches.forEach(m => {
             if (m.scoreB === 0) teamCleanSheetsMap[m.teamA.name] = (teamCleanSheetsMap[m.teamA.name] || 0) + 1;
             if (m.scoreA === 0) teamCleanSheetsMap[m.teamB.name] = (teamCleanSheetsMap[m.teamB.name] || 0) + 1;
+
+            // Pontos sofridos reais no vôlei (eventos goal = ponto de rally)
+            if (MODALIDADES_REDE.includes(m.sport)) {
+                const teamAInfo = getTeamCourseFaculty(m.teamA);
+                const teamBInfo = getTeamCourseFaculty(m.teamB);
+                if (!volleyPointsConcededMap[m.teamA.name]) volleyPointsConcededMap[m.teamA.name] = { pointsConceded: 0, games: 0, course: teamAInfo.course, name: m.teamA.name, faculty: teamAInfo.faculty };
+                if (!volleyPointsConcededMap[m.teamB.name]) volleyPointsConcededMap[m.teamB.name] = { pointsConceded: 0, games: 0, course: teamBInfo.course, name: m.teamB.name, faculty: teamBInfo.faculty };
+                volleyPointsConcededMap[m.teamA.name].games += 1;
+                volleyPointsConcededMap[m.teamB.name].games += 1;
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
+                    if (evt.type === 'goal') {
+                        if (evt.teamId === m.teamB.id) volleyPointsConcededMap[m.teamA.name].pointsConceded += 1;
+                        if (evt.teamId === m.teamA.id) volleyPointsConcededMap[m.teamB.name].pointsConceded += 1;
+                    }
+                });
+            }
 
             if (m.sport === 'Tamboréu' || m.sport === 'Tênis de Mesa' || m.sport === 'Tenis de Mesa') {
                 const teamAInfo = getTeamCourseFaculty(m.teamA);
@@ -177,7 +248,7 @@ const Estatisticas: FC = () => {
                 setsEfficacyMap[m.teamA.name].setsPlayed += (m.scoreA + m.scoreB);
                 setsEfficacyMap[m.teamB.name].setsPlayed += (m.scoreA + m.scoreB);
 
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type === 'goal') {
                         if (evt.teamId === m.teamB.id) setsEfficacyMap[m.teamA.name].pointsConceded += 1;
                         if (evt.teamId === m.teamA.id) setsEfficacyMap[m.teamB.name].pointsConceded += 1;
@@ -187,7 +258,7 @@ const Estatisticas: FC = () => {
         });
 
         filteredMatches.forEach(m => {
-            getMatchEvents(m.events).forEach((evt: any) => {
+            getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                 if (evt.type !== 'goal' && evt.type !== 'penalty_scored') return;
                 if (!evt.player) return;
                 const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
@@ -246,7 +317,7 @@ const Estatisticas: FC = () => {
                 }
             });
 
-            getMatchEvents(m.events).forEach((evt: any) => {
+            getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                 const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                 const teamInfo = getTeamCourseFaculty(teamObj);
 
@@ -297,6 +368,8 @@ const Estatisticas: FC = () => {
                     const key = evt.player;
                     if (!aceMap[key]) aceMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, aces: 0 };
                     aceMap[key].aces += 1;
+                    if (!teamAceMap[teamObj.name]) teamAceMap[teamObj.name] = { course: teamInfo.course, faculty: teamInfo.faculty, aces: 0 };
+                    teamAceMap[teamObj.name].aces += 1;
                 }
 
                 // Erros de Saque: eventos goal com descrição contendo 'Erro de Saque'
@@ -305,6 +378,8 @@ const Estatisticas: FC = () => {
                     const key = evt.player;
                     if (!serveErrorMap[key]) serveErrorMap[key] = { name: evt.player, course: teamInfo.course, faculty: teamInfo.faculty, errors: 0 };
                     serveErrorMap[key].errors += 1;
+                    if (!teamServeErrorMap[teamObj.name]) teamServeErrorMap[teamObj.name] = { course: teamInfo.course, faculty: teamInfo.faculty, errors: 0 };
+                    teamServeErrorMap[teamObj.name].errors += 1;
                 }
             });
         });
@@ -401,12 +476,57 @@ const Estatisticas: FC = () => {
         if (courseFilter) topServeErrors = topServeErrors.filter(p => p.course === courseFilter);
         topServeErrors = topServeErrors.sort((a, b) => b.errors - a.errors).slice(0, 20);
 
+        let teamTopAces = Object.entries(teamAceMap).map(([name, v]) => ({ name, ...v }));
+        if (courseFilter) teamTopAces = teamTopAces.filter(t => t.course === courseFilter);
+        teamTopAces = teamTopAces.sort((a, b) => b.aces - a.aces).slice(0, 20);
+
+        let teamTopServeErrors = Object.entries(teamServeErrorMap).map(([name, v]) => ({ name, ...v }));
+        if (courseFilter) teamTopServeErrors = teamTopServeErrors.filter(t => t.course === courseFilter);
+        teamTopServeErrors = teamTopServeErrors.sort((a, b) => b.errors - a.errors).slice(0, 20);
+
         let topSetsConsistency = Object.values(setsEfficacyMap);
         if (courseFilter) topSetsConsistency = topSetsConsistency.filter(p => p.course === courseFilter);
         const topSetsConsistencyList = topSetsConsistency.map(p => {
             const avg = p.setsPlayed > 0 ? (p.pointsConceded / p.setsPlayed) : 0;
             return { ...p, avgConceded: avg };
         }).sort((a, b) => a.avgConceded - b.avgConceded).slice(0, 20);
+
+        let volleyDefense = Object.values(volleyPointsConcededMap);
+        if (courseFilter) volleyDefense = volleyDefense.filter(p => p.course === courseFilter);
+        const volleyDefenseList = volleyDefense
+            .map(p => ({ ...p, avgConceded: p.games > 0 ? p.pointsConceded / p.games : 0 }))
+            .sort((a, b) => a.avgConceded - b.avgConceded)
+            .slice(0, 20);
+
+        // ── Natação — Menores Tempos ─────────────────────────────────────────────
+        const parseSwimTime = (timeStr: string): number => {
+            // Formato esperado: MM:SS.CC (ex: 00:58.32) → converte para ms
+            const m = timeStr.match(/^(\d+):(\d+)\.(\d+)$/);
+            if (!m) return Infinity;
+            return (parseInt(m[1]) * 60 + parseInt(m[2])) * 1000 + parseInt(m[3].padEnd(2, '0').slice(0, 2)) * 10;
+        };
+        const swimTimesMap: Record<string, { athlete: string; course: string; timeStr: string; timeMs: number }> = {};
+        if (sportFilter === 'Natação') {
+            const swimMatches = matches.filter(m => m.sport === 'Natação' && m.status === 'finished' && m.category === genderFilter);
+            swimMatches.forEach(m => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
+                    if (evt.type !== 'swimming_result' || !evt.description) return;
+                    // Formato: "1º - NomeAtleta (MM:SS.CC) - NomeCurso"
+                    const match = evt.description.match(/^\d+º\s*-\s*(.+?)\s*\((\d+:\d+\.\d+)\)\s*-\s*(.+)$/);
+                    if (!match) return;
+                    const [, athlete, timeStr, course] = match;
+                    const timeMs = parseSwimTime(timeStr);
+                    const key = athlete.trim();
+                    if (!swimTimesMap[key] || timeMs < swimTimesMap[key].timeMs) {
+                        swimTimesMap[key] = { athlete: athlete.trim(), course: course.trim(), timeStr, timeMs };
+                    }
+                });
+            });
+        }
+        const swimTopTimes = Object.values(swimTimesMap)
+            .filter(t => t.timeMs !== Infinity)
+            .sort((a, b) => a.timeMs - b.timeMs)
+            .slice(0, 20);
 
         // ── Caratê ──────────────────────────────────────────────────────────────
         let karateStats = null;
@@ -443,7 +563,7 @@ const Estatisticas: FC = () => {
             // Yuko=+1, Waza-ari=+2, Ippon=+3 — lidos da description do evento goal
             const scorerMap: Record<string, { name: string; course: string; faculty: string; yuko: number; wazaAri: number; ippon: number }> = {};
             karateMatches.forEach(m => {
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'goal' || !evt.player) return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -465,7 +585,7 @@ const Estatisticas: FC = () => {
             // Domínio técnico — Ippons por curso
             const ipponMap: Record<string, { course: string; faculty: string; ippons: number }> = {};
             karateMatches.forEach(m => {
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'goal') return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -483,7 +603,7 @@ const Estatisticas: FC = () => {
             // Vantagem Senshu por curso
             const senshuMap: Record<string, { course: string; faculty: string; senshu: number }> = {};
             karateMatches.forEach(m => {
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'senshu') return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -505,7 +625,7 @@ const Estatisticas: FC = () => {
             // Card 1 — Maiores Finalizadores (Ippons individuais)
             const ipponPlayerMap: Record<string, { name: string; course: string; faculty: string; ippons: number; wazaAri: number }> = {};
             judoMatches.forEach(m => {
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'goal' || !evt.player) return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -525,7 +645,7 @@ const Estatisticas: FC = () => {
                     const winnerCourse = (winnerTeam.course || winnerTeam.name).split(' - ')[0].trim();
                     const winnerFaculty = winnerTeam.faculty || '';
                     const winnerKey = `__team__${winnerTeam.id}`;
-                    const hasPlayerEvent = getMatchEvents(m.events).some((e: any) => e.type === 'goal' && e.player);
+                    const hasPlayerEvent = getMatchEvents(m.events).some((e: RawMatchEvent) => e.type === 'goal' && e.player);
                     if (!hasPlayerEvent) {
                         if (!ipponPlayerMap[winnerKey]) ipponPlayerMap[winnerKey] = { name: winnerTeam.name.split(' - ')[0], course: winnerCourse, faculty: winnerFaculty, ippons: 0, wazaAri: 0 };
                         ipponPlayerMap[winnerKey].ippons++;
@@ -545,7 +665,7 @@ const Estatisticas: FC = () => {
                     if (!techMap[course]) techMap[course] = { course, faculty, score: 0, ippons: 0, wazaAris: 0 };
                 };
                 ensureTech(m.teamA); ensureTech(m.teamB);
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'goal') return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -568,7 +688,7 @@ const Estatisticas: FC = () => {
                     if (!shidoMap[course]) shidoMap[course] = { course, faculty, shidos: 0 };
                 };
                 ensureShido(m.teamA); ensureShido(m.teamB);
-                getMatchEvents(m.events).forEach((evt: any) => {
+                getMatchEvents(m.events).forEach((evt: RawMatchEvent) => {
                     if (evt.type !== 'shido' && evt.type !== 'hansoku_make') return;
                     const teamObj = evt.teamId === m.teamA.id ? m.teamA : m.teamB;
                     const course = (teamObj.course || teamObj.name).split(' - ')[0].trim();
@@ -602,6 +722,10 @@ const Estatisticas: FC = () => {
             topAces,
             topServeErrors,
             topSetsConsistencyList,
+            volleyDefenseList,
+            teamTopAces,
+            teamTopServeErrors,
+            swimTopTimes,
             karateStats,
             judoStats,
             teamStatsList: Object.values(teamStats).filter(t => !courseFilter || t.course === courseFilter),
@@ -649,7 +773,7 @@ const Estatisticas: FC = () => {
                                 {AVAILABLE_SPORTS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        {(isInvasaoLayout || isRedeLayout || isBeachTennis || isTenisDeMesa || isTamboreu || isKarate || isJudo) && (
+                        {(isInvasaoLayout || isRedeLayout || isBeachTennis || isTenisDeMesa || isTamboreu || isKarate || isJudo || isXadrez || isNatacao) && (
                             <div style={{ flex: '1 1 220px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Curso (Opcional)</label>
                                 <select style={selectStyle} value={courseFilter} onChange={e => setCourseFilter(e.target.value)}>
@@ -687,7 +811,29 @@ const Estatisticas: FC = () => {
                                         {/* Grid 3 colunas */}
                                         <section style={{ marginBottom: '30px' }}>
                                             <h2 style={sectionTitleStyle}>🥋 Caratê — Performance Individual & por Curso</h2>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+
+                                                {/* Card 0 — Vitórias e Aproveitamento */}
+                                                <div style={cardS}>
+                                                    <div style={hdrS}>
+                                                        <span style={{ fontSize: '22px' }}>🥋</span>
+                                                        <div>
+                                                            <h2 style={titleS}>Vitórias e Aproveitamento</h2>
+                                                            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ranking de vitórias</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={scrollS}>
+                                                        {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                            <div key={`kw-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(team.course, team.faculty)}</div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                                </div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
 
                                                 {/* Card 1 — Maiores Pontuadores */}
                                                 <div style={cardS}>
@@ -784,7 +930,29 @@ const Estatisticas: FC = () => {
                                 return (
                                     <section style={{ marginBottom: '30px' }}>
                                         <h2 style={sectionTitleStyle}>🥋 Judô — Performance Individual & por Curso</h2>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+
+                                            {/* Card 0 — Vitórias e Aproveitamento */}
+                                            <div style={cardS}>
+                                                <div style={hdrS}>
+                                                    <span style={{ fontSize: '22px' }}>🥋</span>
+                                                    <div>
+                                                        <h2 style={titleS}>Vitórias e Aproveitamento</h2>
+                                                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ranking de vitórias</p>
+                                                    </div>
+                                                </div>
+                                                <div style={scrollS}>
+                                                    {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                        <div key={`jw-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(team.course, team.faculty)}</div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
 
                                             {/* Card 1 — Maiores Finalizadores */}
                                             <div style={cardS}>
@@ -872,7 +1040,88 @@ const Estatisticas: FC = () => {
                                 );
                             })()}
 
-                            {!isBeachTennis && !isFutevolei && !isTamboreu && !isTenisDeMesa && !isKarate && !isJudo && (
+                            {/* ── Layout Xadrez ─────────────────────────────────────── */}
+                            {isXadrez && (
+                                <section style={{ marginBottom: '30px' }}>
+                                    <h2 style={sectionTitleStyle}>♟️ Xadrez — Estatísticas de Equipes</h2>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                        <div style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '24px', border: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                                                <span style={{ fontSize: '22px' }}>♟️</span>
+                                                <div>
+                                                    <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>Vitórias e Aproveitamento</h2>
+                                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ranking de vitórias</p>
+                                                </div>
+                                            </div>
+                                            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                                                {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                    <div key={`xw-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(team.course, team.faculty)}</div>
+                                                            <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* ── Layout Natação ────────────────────────────────────── */}
+                            {isNatacao && (
+                                <section style={{ marginBottom: '30px' }}>
+                                    <h2 style={sectionTitleStyle}>🏊 Natação — Estatísticas de Equipes</h2>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                        <div style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '24px', border: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                                                <span style={{ fontSize: '22px' }}>🏊</span>
+                                                <div>
+                                                    <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>Vitórias e Aproveitamento</h2>
+                                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ranking de vitórias</p>
+                                                </div>
+                                            </div>
+                                            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                                                {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                    <div key={`nw-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(56,189,248,0.35)' : '1px solid transparent' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(team.course, team.faculty)}</div>
+                                                            <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>{team.wins} V</div>
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '24px', border: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                                                <Timer size={22} color="#fbbf24" />
+                                                <div>
+                                                    <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>Menores Tempos</h2>
+                                                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Ranking dos atletas com os menores tempos registrados</p>
+                                                </div>
+                                            </div>
+                                            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                                                {stats.swimTopTimes.length === 0 ? <EmptyState /> : stats.swimTopTimes.slice(0, 10).map((entry, idx) => (
+                                                    <div key={`st-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {entry.athlete}</div>
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{entry.course}</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '14px', fontWeight: 800, color: idx === 0 ? '#fbbf24' : '#38bdf8', whiteSpace: 'nowrap' }}>{entry.timeStr}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {!isBeachTennis && !isFutevolei && !isTamboreu && !isTenisDeMesa && !isKarate && !isJudo && !isXadrez && !isNatacao && (
                             <section style={{ marginBottom: '30px' }}>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Jogadores</h2>
                                 <div style={twoCardsGridStyle}>
@@ -1228,7 +1477,7 @@ const Estatisticas: FC = () => {
                             </section>
                             )}
 
-                            {!isKarate && !isJudo && <section>
+                            {!isKarate && !isJudo && !isXadrez && !isNatacao && <section>
                                 <h2 style={sectionTitleStyle}>Estatísticas de Equipes</h2>
                                 <div style={twoCardsGridStyle}>
                                     {isTamboreu ? (
@@ -1553,6 +1802,21 @@ const Estatisticas: FC = () => {
                                     ) : isHandebol ? (
                                         <>
                                             <div style={cardStyle}>
+                                                <div style={cardHeaderStyle}><Trophy size={22} color="#fbbf24" /><div><h2 style={cardTitleStyle}>🤾 Vitórias e Aproveitamento</h2><p style={cardSubStyle}>Ranking de vitórias</p></div></div>
+                                                <div style={cardListScrollStyle}>
+                                                    {stats.topWins.length === 0 ? <EmptyState /> : stats.topWins.slice(0, 10).map((team, idx) => (
+                                                        <div key={`hw-${idx}`} style={{ padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: idx === 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', border: idx === 0 ? '1px solid rgba(251,191,36,0.35)' : '1px solid transparent' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{idx + 1}. {formatTeamLabel(team.course, team.faculty)}</div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24' }}>{team.wins} V</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.winRate.toFixed(0)}% de aproveitamento</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div style={cardStyle}>
                                                 <div style={cardHeaderStyle}><Sword size={22} color="#22c55e" /><div><h2 style={cardTitleStyle}>Gols Marcados</h2></div></div>
                                                 <div style={cardListScrollStyle}>
                                                     {stats.teamGoalsFor.length === 0 ? <EmptyState /> : stats.teamGoalsFor.slice(0, 10).map((team, idx) => (
@@ -1655,16 +1919,17 @@ const Estatisticas: FC = () => {
                                         </>
                                     ) : (
                                         <>
-                                            {/* Coluna 2 — Melhor Ataque */}
+                                            {/* Coluna 2 — Melhor Ataque (oculto para vôlei) */}
+                                            {!isRedeLayout && (
                                             <div style={cardStyle}>
                                                 <div style={cardHeaderStyle}>
                                                     <Sword size={22} color="#22c55e" />
                                                     <div>
                                                         <h2 style={cardTitleStyle}>
-                                                            {isBasquete ? 'Melhor Ataque por Jogo' : isRedeLayout ? 'Melhor Ataque por Jogo (Sets)' : 'Melhor Ataque por Jogo'}
+                                                            {isBasquete ? 'Melhor Ataque por Jogo' : 'Melhor Ataque por Jogo'}
                                                         </h2>
                                                         <p style={cardSubStyle}>
-                                                            {isBasquete ? 'Maior média de pontos por jogo' : isRedeLayout ? 'Maior média de sets por jogo' : 'Maior média de gols por jogo'}
+                                                            {isBasquete ? 'Maior média de pontos por jogo' : 'Maior média de gols por jogo'}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1683,7 +1948,7 @@ const Estatisticas: FC = () => {
                                                                 {(() => {
                                                                     const games = stats.gamesPlayed[team.name] || 1;
                                                                     const avg = team.scored / games;
-                                                                    const unit = isBasquete ? 'pts/j' : isRedeLayout ? 'sets/j' : 'g/j';
+                                                                    const unit = isBasquete ? 'pts/j' : 'g/j';
                                                                     return (
                                                                 <span style={{ fontSize: '14px', fontWeight: 800, color: '#22c55e' }}>
                                                                     {avg.toFixed(1)} {unit}
@@ -1708,6 +1973,7 @@ const Estatisticas: FC = () => {
                                                     ))}
                                                 </div>
                                             </div>
+                                            )}
 
                                             {/* Coluna 3 — Defesa */}
                                             <div style={cardStyle}>
@@ -1715,44 +1981,48 @@ const Estatisticas: FC = () => {
                                                     <Shield size={22} color="#3b82f6" />
                                                     <div>
                                                         <h2 style={cardTitleStyle}>
-                                                            {isBasquete ? 'Defesa por Jogo' : isRedeLayout ? 'Defesa por Jogo (Sets)' : 'Defesa por Jogo'}
+                                                            {isBasquete ? 'Defesa por Jogo' : isRedeLayout ? 'Defesa por Jogo (Pontos)' : 'Defesa por Jogo'}
                                                         </h2>
                                                         <p style={cardSubStyle}>
-                                                            {isBasquete ? 'Menor média de pontos sofridos por jogo' : isRedeLayout ? 'Menor média de sets sofridos por jogo' : 'Menor média de gols sofridos por jogo'}
+                                                            {isBasquete ? 'Menor média de pontos sofridos por jogo' : isRedeLayout ? 'Menor média de pontos sofridos por jogo' : 'Menor média de gols sofridos por jogo'}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div style={cardListScrollStyle}>
-                                                    {stats.bestDefense.length === 0 ? (
+                                                    {(isRedeLayout ? stats.volleyDefenseList : stats.bestDefense).length === 0 ? (
                                                         <EmptyState />
-                                                    ) : stats.bestDefense.slice(0, 10).map((team, idx) => {
-                                                        const games = stats.gamesPlayed[team.name] || 1;
-                                                        const avgConceded = team.conceded / games;
-                                                        const displayValue = isBasquete
-                                                            ? `${avgConceded.toFixed(1)} pts/j`
-                                                            : isRedeLayout
-                                                            ? `${avgConceded.toFixed(1)} sets/j`
-                                                            : `${avgConceded.toFixed(1)} g/j`;
-                                                        const barValue = avgConceded;
+                                                    ) : isRedeLayout ? stats.volleyDefenseList.slice(0, 10).map((team, idx) => {
+                                                        const avgConceded = team.avgConceded;
+                                                        const maxBar = Math.max(...stats.volleyDefenseList.map((t: { avgConceded: number }) => t.avgConceded), 1);
                                                         return (
                                                         <div key={idx} style={{ marginBottom: '12px' }}>
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                     <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
-                                                                    <div>
-                                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{formatTeamLabel(team.course, team.faculty)}</div>
-                                                                    </div>
+                                                                    <div><div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{formatTeamLabel(team.course, team.faculty)}</div></div>
                                                                 </div>
-                                                                <span style={{ fontSize: '14px', fontWeight: 800, color: '#3b82f6' }}>
-                                                                    {displayValue}
-                                                                </span>
+                                                                <span style={{ fontSize: '14px', fontWeight: 800, color: '#3b82f6' }}>{avgConceded.toFixed(1)} pts/j</span>
                                                             </div>
                                                             <div style={{ height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                                                                <div style={{
-                                                                    height: '100%', borderRadius: '999px', background: '#2563eb',
-                                                                    width: `${Math.round((barValue / maxDefense) * 100)}%`,
-                                                                    transition: 'width 0.6s ease',
-                                                                }} />
+                                                                <div style={{ height: '100%', borderRadius: '999px', background: '#2563eb', width: `${Math.round((avgConceded / maxBar) * 100)}%`, transition: 'width 0.6s ease' }} />
+                                                            </div>
+                                                        </div>
+                                                        );
+                                                    }) : stats.bestDefense.slice(0, 10).map((team, idx) => {
+                                                        const games = stats.gamesPlayed[team.name] || 1;
+                                                        const avgConceded = team.conceded / games;
+                                                        const displayValue = isBasquete ? `${avgConceded.toFixed(1)} pts/j` : `${avgConceded.toFixed(1)} g/j`;
+                                                        return (
+                                                        <div key={idx} style={{ marginBottom: '12px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', width: '18px' }}>{idx + 1}</span>
+                                                                    <div><div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{formatTeamLabel(team.course, team.faculty)}</div></div>
+                                                                </div>
+                                                                <span style={{ fontSize: '14px', fontWeight: 800, color: '#3b82f6' }}>{displayValue}</span>
+                                                            </div>
+                                                            <div style={{ height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                                                <div style={{ height: '100%', borderRadius: '999px', background: '#2563eb', width: `${Math.round((avgConceded / maxDefense) * 100)}%`, transition: 'width 0.6s ease' }} />
                                                             </div>
                                                         </div>
                                                         );
@@ -1791,6 +2061,7 @@ const Estatisticas: FC = () => {
                                                 </div>
                                             </div>
 
+                                            {!isRedeLayout && (
                                             <div style={cardStyle}>
                                                 <div style={cardHeaderStyle}>
                                                     <Trophy size={22} color="#f43f5e" />
@@ -1822,6 +2093,66 @@ const Estatisticas: FC = () => {
                                                     ))}
                                                 </div>
                                             </div>
+                                            )}
+                                            {isRedeLayout && !isFutevolei && (
+                                            <>
+                                                <div style={cardStyle}>
+                                                    <div style={cardHeaderStyle}>
+                                                        <span style={{ fontSize: '22px' }}>🏐</span>
+                                                        <div>
+                                                            <h2 style={cardTitleStyle}>Aces por Equipe</h2>
+                                                            <p style={cardSubStyle}>Equipes com mais aces no saque</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={cardListScrollStyle}>
+                                                        {stats.teamTopAces.length === 0 ? <EmptyState /> : stats.teamTopAces.slice(0, 10).map((team, idx) => (
+                                                            <div key={`ta-${idx}`} style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '10px',
+                                                                marginBottom: '6px',
+                                                                background: idx === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                                                                border: idx === 0 ? '1px solid rgba(34,197,94,0.35)' : '1px solid transparent',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                        {idx + 1}. {formatTeamLabel(team.course, team.faculty)}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#22c55e' }}>{team.aces} ACE</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div style={cardStyle}>
+                                                    <div style={cardHeaderStyle}>
+                                                        <span style={{ fontSize: '22px' }}>❌</span>
+                                                        <div>
+                                                            <h2 style={cardTitleStyle}>Erros de Saque por Equipe</h2>
+                                                            <p style={cardSubStyle}>Equipes com mais erros de saque</p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={cardListScrollStyle}>
+                                                        {stats.teamTopServeErrors.length === 0 ? <EmptyState /> : stats.teamTopServeErrors.slice(0, 10).map((team, idx) => (
+                                                            <div key={`tse-${idx}`} style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '10px',
+                                                                marginBottom: '6px',
+                                                                background: idx === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                                                                border: idx === 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid transparent',
+                                                            }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>
+                                                                        {idx + 1}. {formatTeamLabel(team.course, team.faculty)}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#ef4444' }}>{team.errors} ERRO</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </>
+                                            )}
                                         </>
                                     )}
                                 </div>
