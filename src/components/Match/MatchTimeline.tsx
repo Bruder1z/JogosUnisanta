@@ -187,6 +187,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  // Shoot-out obrigatório pendente (Futebol X1 — 2º amarelo)
+  const [pendingShootout, setPendingShootout] = useState<{
+    teamId: string;
+    team: "A" | "B";
+    playerFouled: string;
+    reason: string;
+  } | null>(null);
 
   // Filters
   const [filterSport, setFilterSport] = useState<string>("Todos");
@@ -211,12 +218,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   // Locations oficiais
   const OFFICIAL_LOCATIONS = [
-    "Centro de Treinamento",
-    "Poliesportivo Unisanta (Bloco M)",
-    "Laerte Goncalves (Bloco D)",
     "Arena Unisanta",
     "Bloco A",
+    "Centro de Treinamento",
+    "Clube dos Ingleses",
+    "Laerte Gonçalves (Bloco D)",
     "Piscina Olimpica",
+    "Poliesportivo Unisanta (Bloco M)",
     "Rebouças",
   ];
 
@@ -646,11 +654,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const existingEvents = selectedMatch.events || [];
 
-    // Lógica de Cartão Amarelo -> segundo amarelo gera expulsão automática
+    // Lógica de Cartão Amarelo
     if (type === "yellow_card" && player) {
       const currentYellowCards = existingEvents.filter(
         (e) => e.player === player && e.type === "yellow_card",
       ).length;
+
       if (currentYellowCards >= 1) {
         const eventBaseTs = Date.now();
         const yellowEvent: MatchEvent = {
@@ -660,6 +669,40 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           teamId,
           player,
         };
+
+        // Futebol X1: 2º amarelo ativa shoot-out obrigatório para o adversário
+        if (isFutebolX1) {
+          const opponentTeamId =
+            teamId === selectedMatch.teamA.id
+              ? selectedMatch.teamB.id
+              : selectedMatch.teamA.id;
+          const opponentTeam: "A" | "B" =
+            opponentTeamId === selectedMatch.teamA.id ? "A" : "B";
+          const opponentTeamName =
+            opponentTeam === "A"
+              ? selectedMatch.teamA.name.split(" - ")[0]
+              : selectedMatch.teamB.name.split(" - ")[0];
+
+          // Registra o 2º amarelo e reseta o contador do jogador
+          const eventsWithoutPlayerYellows = existingEvents.filter(
+            (e) => !(e.player === player && e.type === "yellow_card"),
+          );
+          await updateMatch({
+            ...selectedMatch,
+            events: [...eventsWithoutPlayerYellows, yellowEvent],
+          });
+
+          // Ativa o shoot-out obrigatório
+          setPendingShootout({
+            teamId: opponentTeamId,
+            team: opponentTeam,
+            playerFouled: player,
+            reason: `🟨 2º Amarelo de ${player} — ${opponentTeamName} deve cobrar o Shoot-out`,
+          });
+          return;
+        }
+
+        // Outros esportes: 2º amarelo = cartão vermelho automático
         const redEvent: MatchEvent = {
           id: `evt_${eventBaseTs + 1}_red`,
           type: "red_card",
@@ -671,34 +714,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
         const updatedEventsWithRed = [...existingEvents, yellowEvent, redEvent];
 
-        // Para X1, o segundo amarelo também encerra a partida
-        let finalStatus = "live";
-        if (isFutebolX1) {
-          finalStatus = "finished";
-          const opponentTeam =
-            teamId === selectedMatch.teamA.id
-              ? selectedMatch.teamB.name
-              : selectedMatch.teamA.name;
-          const endEvent: MatchEvent = {
-            id: `evt_${eventBaseTs + 2}_end`,
-            type: "end",
-            minute: getCurrentEventMinute(),
-            description: `🟥 Fim de jogo! Atleta expulso. Vitória automática para ${opponentTeam}`,
-          };
-          updatedEventsWithRed.push(endEvent);
-        }
-
-        const finalMatch: Match = {
+        await updateMatch({
           ...selectedMatch,
           events: updatedEventsWithRed,
-          status: finalStatus as Match["status"],
-        };
-
-        if (finalStatus === "finished") {
-          finishMatch(finalMatch);
-        } else {
-          await updateMatch(finalMatch);
-        }
+        });
         return;
       }
     }
@@ -2231,22 +2250,44 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     team: "A" | "B",
   ) => {
     if (!selectedMatch) return;
-    const teamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
 
-    if (isFutebolX1) {
-      const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
-      const availableAthletes = athletes.filter((a) =>
-        athleteMatchesTeamAndMatch(a, teamObj),
-      );
-      if (availableAthletes.length > 0) {
-        const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
-        addEvent(type, teamId, playerName);
-        return;
-      }
+    // Se há shoot-out pendente, só o time correto pode cobrar
+    if (pendingShootout && team !== pendingShootout.team) return;
+
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamName = team === "A"
+      ? selectedMatch.teamA.name.split(" - ")[0]
+      : selectedMatch.teamB.name.split(" - ")[0];
+    const isScored = type === "shootout_scored";
+
+    const newScoreA = isScored && team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
+    const newScoreB = isScored && team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
+    const scoreLabel = `${newScoreA}x${newScoreB}`;
+
+    const desc = isScored
+      ? `🎯 Shoot-out Marcado! Placar no momento: ${scoreLabel} - ${teamName}`
+      : `❌ Shoot-out Perdido - ${teamName}`;
+
+    const shootoutEvent: MatchEvent = {
+      id: `evt_${Date.now()}_shootout`,
+      type,
+      minute: getCurrentEventMinute(),
+      teamId,
+      description: desc,
+    };
+
+    // Se era pendente por 2º amarelo, limpa o pending
+    if (pendingShootout) {
+      updateMatch({
+        ...selectedMatch,
+        events: [...(selectedMatch.events || []), shootoutEvent],
+        scoreA: newScoreA,
+        scoreB: newScoreB,
+      });
+      setPendingShootout(null);
+      return;
     }
 
-    // Em teoria Shootout é só pro X1 agora, mas mantemos o fallback
     addEvent(type, teamId);
   };
 
@@ -2650,23 +2691,52 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         label = `Cartão Vermelho - ${teamName}`;
         break;
       case "penalty_scored":
+        if (isFutebolX1) {
+          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
+          const athleteInfo = event.player
+            ? `${event.player} (${teamName.split(" - ")[0]})`
+            : teamName.split(" - ")[0];
+          label = `🎯 Gol de Pênalti! Placar no momento: ${currentScore} - ${athleteInfo}`;
+          break;
+        }
         label = `${isHandebol ? "TIRO DE 7 METROS" : "Gol de Pênalti"} - ${teamName}`;
         break;
       case "penalty_missed":
+        if (isFutebolX1) {
+          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
+          const athleteInfo = event.player
+            ? `${event.player} (${teamName.split(" - ")[0]})`
+            : teamName.split(" - ")[0];
+          label = `❌ Pênalti Perdido! Placar no momento: ${currentScore} - ${athleteInfo}`;
+          break;
+        }
         label = `${isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido - ${teamName}`;
         break;
       case "shootout_scored":
+        if (event.description) {
+          label = event.description;
+          break;
+        }
         if (isFutebolX1) {
           const currentScore = (event as TimelineEvent).timelineScore || "0x0";
           const athleteInfo = event.player
             ? `${event.player} (${teamName})`
             : teamName;
-          label = `⚽ GOL de Shoot-out! Placar no momento: ${currentScore} - ${athleteInfo}`;
+          label = `🎯 Shoot-out Marcado! Placar no momento: ${currentScore} - ${athleteInfo}`;
           break;
         }
-        label = `GOL de Shoot-out - ${teamName}`;
+        label = `🎯 Shoot-out Marcado - ${teamName}`;
         break;
       case "shootout_missed":
+        if (event.description) {
+          label = event.description;
+          break;
+        }
+        if (isFutebolX1) {
+          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
+          label = `❌ Shoot-out Perdido! Placar no momento: ${currentScore} - ${teamName.split(" - ")[0]}`;
+          break;
+        }
         label = `❌ Shoot-out Perdido - ${teamName}`;
         break;
       case "set_win":
@@ -3485,9 +3555,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       paddingTop: "10px",
                     }}
                   >
-                    <span>📍 {match.location}</span>
+                    <span>📍 {match.location.replace(/\s*\(.*?\)\s*$/, '').trim()}</span>
                     <span>
-                      📅 {match.date} - {match.time}
+                      📅 {match.date.split('-').reverse().join('-')} - {match.time}
                     </span>
                   </div>
                 </div>
@@ -4046,7 +4116,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     fontWeight: 600,
                   }}
                 >
-                  {selectedMatch.category} • {selectedMatch.location}
+                  {selectedMatch.category} • {selectedMatch.location.replace(/\s*\(.*?\)\s*$/, '').trim()}
                 </div>
               </div>
             ) : (
@@ -5592,12 +5662,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
             {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
               <>
-                <div style={styles.eventSection}>
+                <div style={{
+                  ...styles.eventSection,
+                  ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
+                }}>
                   <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
-                  <div
-                    style={styles.eventButtons}
-                    className="match-timeline-event-grid"
-                  >
+                  <div style={styles.eventButtons} className="match-timeline-event-grid">
                     <button
                       style={{ ...styles.eventBtn, ...styles.yellowBtn }}
                       onClick={() => handleCard("yellow_card", "A")}
@@ -5613,7 +5683,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   </div>
                 </div>
 
-                <div style={styles.eventSection}>
+                <div style={{
+                  ...styles.eventSection,
+                  ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
+                }}>
                   <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
                   <div
                     style={styles.eventButtons}
@@ -5635,44 +5708,82 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 </div>
 
                 {isFutebolX1 && (
-                  <div style={styles.eventSection}>
+                  <div style={{
+                    ...styles.eventSection,
+                    ...(pendingShootout ? {
+                      border: '2px solid #f59e0b',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      background: 'rgba(245,158,11,0.06)',
+                    } : {}),
+                  }}>
                     <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
-                    <div
-                      style={styles.eventButtons}
-                      className="match-timeline-event-grid"
-                    >
+
+                    {/* Banner de alerta quando há shoot-out pendente */}
+                    {pendingShootout && (
+                      <div style={{
+                        background: 'rgba(245,158,11,0.15)',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        marginBottom: '12px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        ⚠️ {pendingShootout.reason}
+                      </div>
+                    )}
+
+                    <div style={styles.eventButtons} className="match-timeline-event-grid">
                       <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                        style={{
+                          ...styles.eventBtn, ...styles.penaltyBtn,
+                          ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                          ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                        }}
                         onClick={() => handleShootout("shootout_scored", "A")}
+                        disabled={!!pendingShootout && pendingShootout.team !== "A"}
                       >
-                        🎯 Shoot-out Marcado{" "}
-                        {selectedMatch.teamA.name.split(" - ")[0]}
+                        🎯 Shoot-out Marcado{" "}{selectedMatch.teamA.name.split(" - ")[0]}
                       </button>
                       <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                        style={{
+                          ...styles.eventBtn, ...styles.penaltyBtn,
+                          ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                          ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                        }}
                         onClick={() => handleShootout("shootout_scored", "B")}
+                        disabled={!!pendingShootout && pendingShootout.team !== "B"}
                       >
-                        🎯 Shoot-out Marcado{" "}
-                        {selectedMatch.teamB.name.split(" - ")[0]}
+                        🎯 Shoot-out Marcado{" "}{selectedMatch.teamB.name.split(" - ")[0]}
                       </button>
                     </div>
-                    <div
-                      style={{ ...styles.eventButtons, marginTop: "12px" }}
-                      className="match-timeline-event-grid"
-                    >
+                    <div style={{ ...styles.eventButtons, marginTop: "12px" }} className="match-timeline-event-grid">
                       <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                        style={{
+                          ...styles.eventBtn, ...styles.penaltyMissedBtn,
+                          ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                          ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                        }}
                         onClick={() => handleShootout("shootout_missed", "A")}
+                        disabled={!!pendingShootout && pendingShootout.team !== "A"}
                       >
-                        ❌ Shoot-out Perdido{" "}
-                        {selectedMatch.teamA.name.split(" - ")[0]}
+                        ❌ Shoot-out Perdido{" "}{selectedMatch.teamA.name.split(" - ")[0]}
                       </button>
                       <button
-                        style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                        style={{
+                          ...styles.eventBtn, ...styles.penaltyMissedBtn,
+                          ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                          ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                        }}
                         onClick={() => handleShootout("shootout_missed", "B")}
+                        disabled={!!pendingShootout && pendingShootout.team !== "B"}
                       >
-                        ❌ Shoot-out Perdido{" "}
-                        {selectedMatch.teamB.name.split(" - ")[0]}
+                        ❌ Shoot-out Perdido{" "}{selectedMatch.teamB.name.split(" - ")[0]}
                       </button>
                     </div>
                   </div>

@@ -1362,7 +1362,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <MapPin size={14} />
-                  {currentMatch.location}
+                  {currentMatch.location.replace(/\s*\(.*?\)\s*$/, '').trim()}
                 </div>
               </div>
 

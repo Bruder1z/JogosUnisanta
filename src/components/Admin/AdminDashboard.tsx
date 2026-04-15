@@ -734,7 +734,7 @@ const AdminDashboard: React.FC = () => {
                                             <tr key={match.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                 <td style={{ padding: '16px 20px' }}>
                                                     <div className="admin-match-title" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{match.teamA.course} {match.scoreA} x {match.scoreB} {match.teamB.course}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location} - {match.date ? `${match.date} ` : ''}{match.time}</div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{match.location.replace(/\s*\(.*?\)\s*$/, '').trim()} - {match.date ? `${match.date.split('-').reverse().join('-')} ` : ''}{match.time}</div>
                                                 </td>
                                                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{match.sport} {match.category}</td>
                                                 <td style={{ padding: '16px 20px' }}>
@@ -1650,14 +1650,14 @@ const AdminDashboard: React.FC = () => {
                         </div>
                         <select style={inputStyle} value={newMatchForm.location} onChange={e => setNewMatchForm({ ...newMatchForm, location: e.target.value })}>
                             <option value="">Selecione o Local</option>
-                            <option value="Centro de Treinamento">Centro de Treinamento</option>
-                            <option value="Poliesportivo Unisanta (Bloco M)">Poliesportivo Unisanta (Bloco M)</option>
-                            <option value="Laerte Gonçalves (Bloco D)">Laerte Gonçalves (Bloco D)</option>
-                            <option value="Clube dos Ingleses">Clube dos Ingleses</option>
                             <option value="Arena Unisanta">Arena Unisanta</option>
-                            <option value="Rebouças">Rebouças</option>
-                            <option value="Piscina Olímpica">Piscina Olímpica</option>
                             <option value="Bloco A">Bloco A</option>
+                            <option value="Centro de Treinamento">Centro de Treinamento</option>
+                            <option value="Clube dos Ingleses">Clube dos Ingleses</option>
+                            <option value="Laerte Gonçalves (Bloco D)">Laerte Gonçalves (Bloco D)</option>
+                            <option value="Piscina Olímpica">Piscina Olímpica</option>
+                            <option value="Poliesportivo Unisanta (Bloco M)">Poliesportivo Unisanta (Bloco M)</option>
+                            <option value="Rebouças">Rebouças</option>
                         </select>
 
                         <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>

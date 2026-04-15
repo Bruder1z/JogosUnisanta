@@ -453,7 +453,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <MapPin size={14} />
-                    {match.location}
+                    {match.location.replace(/\s*\(.*?\)\s*$/, '').trim()}
                 </div>
             </div>
         </div>

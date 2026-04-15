@@ -6,13 +6,14 @@ import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 
 const MAIN_VENUES = [
-    'Centro de Treinamento',
-    'Poliesportivo Unisanta (Bloco M)',
-    'Laerte Goncalves (Bloco D)',
     'Arena Unisanta',
-    'Reboucas',
     'Bloco A',
-    'Piscina Olimpica'
+    'Centro de Treinamento',
+    'Clube dos Ingleses',
+    'Laerte Gonçalves (Bloco D)',
+    'Piscina Olimpica',
+    'Poliesportivo Unisanta (Bloco M)',
+    'Rebouças',
 ];
 
 const Calendario: FC = () => {
