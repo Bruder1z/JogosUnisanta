@@ -468,10 +468,7 @@ const AdminDashboard: React.FC = () => {
                     <div
                         key={stat.label}
                         className="premium-card admin-stat-card"
-                        onClick={() => setSelectedStat(stat)}
-                        style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', transition: 'transform 0.2s' }}
-                        onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                        onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}
                     >
                         <div style={{
                             width: '48px',
@@ -675,7 +672,10 @@ const AdminDashboard: React.FC = () => {
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
                                 <button
                                     className="admin-primary-action"
-                                    onClick={() => setIsNewMatchOpen(true)}
+                                    onClick={() => {
+                                        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', stage: 'Fase de Classificação', date: '', time: '', location: '' });
+                                        setIsNewMatchOpen(true);
+                                    }}
                                     style={{
                                         background: 'var(--accent-color)',
                                         color: 'white',
@@ -1596,7 +1596,14 @@ const AdminDashboard: React.FC = () => {
                             <select 
                                 style={inputStyle} 
                                 value={newMatchForm.teamA} 
-                                onChange={e => setNewMatchForm({ ...newMatchForm, teamA: e.target.value })}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setNewMatchForm(prev => ({
+                                        ...prev,
+                                        teamA: val,
+                                        teamB: prev.teamB === val ? '' : prev.teamB,
+                                    }));
+                                }}
                             >
                                 <option value="">Selecione a Equipe A</option>
                                 {[...coursesList].sort().map(course => (
@@ -1613,17 +1620,11 @@ const AdminDashboard: React.FC = () => {
                             <select 
                                 style={inputStyle} 
                                 value={newMatchForm.teamB} 
-                                onChange={e => setNewMatchForm({ ...newMatchForm, teamB: e.target.value })}
+                                onChange={e => setNewMatchForm(prev => ({ ...prev, teamB: e.target.value }))}
                             >
                                 <option value="">Selecione a Equipe B</option>
-                                {[...coursesList].sort().map(course => (
-                                    <option 
-                                        key={course} 
-                                        value={course}
-                                        disabled={course === newMatchForm.teamA}
-                                    >
-                                        {course}
-                                    </option>
+                                {[...coursesList].sort().filter(course => course !== newMatchForm.teamA).map(course => (
+                                    <option key={course} value={course}>{course}</option>
                                 ))}
                             </select>
                         </div>

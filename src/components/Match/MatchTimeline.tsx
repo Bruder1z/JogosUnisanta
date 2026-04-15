@@ -3093,6 +3093,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 // Limpar cache de emblemas ao abrir formulário
                 setEmblemA(null);
                 setEmblemB(null);
+                // Resetar form para garantir campos limpos
+                setNewMatchForm({
+                  teamA: "",
+                  teamB: "",
+                  swimmingTeams: Array(8).fill(""),
+                  sport: "",
+                  category: "Masculino",
+                  stage: "Fase de Classificação",
+                  date: new Date().toISOString().split("T")[0],
+                  time: "",
+                  location: "",
+                });
               }}
               style={{
                 background: "var(--accent-color)",
@@ -3658,15 +3670,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       <select
                         value={newMatchForm.teamA}
                         onChange={(e) => {
-                          setNewMatchForm({
-                            ...newMatchForm,
-                            teamA: e.target.value,
-                          });
-                          setEmblemA(
-                            e.target.value
-                              ? getTeamEmblem(e.target.value)
-                              : null,
-                          );
+                          const val = e.target.value;
+                          setNewMatchForm((prev) => ({
+                            ...prev,
+                            teamA: val,
+                            teamB: prev.teamB === val ? '' : prev.teamB,
+                          }));
+                          setEmblemA(val ? getTeamEmblem(val) : null);
+                          if (newMatchForm.teamB === val) setEmblemB(null);
                         }}
                         style={{
                           width: "100%",
@@ -3758,7 +3769,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         }}
                       >
                         <option value="">Selecione a Equipe B</option>
-                        {coursesList.map((c) => (
+                        {coursesList.filter((c) => c !== newMatchForm.teamA).map((c) => (
                           <option key={c} value={c}>
                             {c}
                           </option>
