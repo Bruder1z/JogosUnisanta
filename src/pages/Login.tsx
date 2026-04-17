@@ -252,13 +252,7 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                             </button>
                         </form>
 
-                        {!isRegister && (
-                            <div style={{ marginTop: '30px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                <p>Super Admin: superadmin@gmail.com</p>
-                                <p>Cliente: cliente@gmail.com</p>
-                                <p>Senha: @123123</p>
-                            </div>
-                        )}
+
                     </>
                 )}
             </div>
