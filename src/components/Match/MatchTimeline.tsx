@@ -11,6 +11,7 @@ import {
   PlusCircle,
   Trophy,
   MessageCircle,
+  ChevronLeft,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import LiveChat from "../Chat/LiveChat";
@@ -645,12 +646,24 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     setIsRunning(match.status === "live");
   };
 
+  // Guard: blocks any event unless the match has been formally started.
+  const requireGameStarted = () => {
+    if (!selectedMatch) return false;
+    const hasStarted = selectedMatch.events?.some((e) => e.type === "start");
+    if (!hasStarted) {
+      showNotification("⚠️ Aperte em 'Iniciar Jogo' para começar a partida!");
+      return false;
+    }
+    return true;
+  };
+
   const addEvent = async (
     type: MatchEvent["type"],
     teamId?: string,
     player?: string,
   ) => {
     if (!selectedMatch) return;
+    if (type !== "start" && type !== "end" && type !== "halftime" && !requireGameStarted()) return;
 
     const existingEvents = selectedMatch.events || [];
 
@@ -919,18 +932,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleBeachPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
-
-    // Add start event automatically if not started yet
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({
-        type: "start",
-        minute: getCurrentEventMinute(),
-      });
-      if (started) {
-        selectedMatch.events = started.events;
-      }
-      setIsRunning(true);
-    }
+    if (!requireGameStarted()) return;
 
     const teamId =
       team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
@@ -955,6 +957,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleSetWin = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
 
     const teamId =
       team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
@@ -1007,10 +1010,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   // ACE: ponto para o time que serviu, registrado com nome do atleta
   const _handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
-      if (started) selectedMatch.events = started.events;
-    }
+    if (!requireGameStarted()) return;
     const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
     const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
     // Recalcular pontuação do set atual antes de adicionar o ponto (igual a handleVolleyPoint)
@@ -1047,11 +1047,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   // ERRO: ponto para o time adversário (erro de saque dá ponto para quem recebe)
   const _handleVolleyErro = (team: "A" | "B", playerName: string, playerId: string) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
     const adversaryTeam: "A" | "B" = team === "A" ? "B" : "A";
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
-      if (started) selectedMatch.events = started.events;
-    }
     const adversaryTeamId = adversaryTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
     const adversaryName = adversaryTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
     const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
@@ -1176,6 +1173,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleVolleyPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
     // Para Vôlei de Praia e Vôlei, abrir seletor de jogador antes de registrar
     if (selectedMatch.sport === "Vôlei de Praia" || selectedMatch.sport === "Vôlei") {
       setBeachPointPicker({ team });
@@ -1186,17 +1184,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleVolleyPointWithPlayer = (team: "A" | "B", playerName: string | null) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
-
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({
-        type: "start",
-        minute: getCurrentEventMinute(),
-      });
-      if (started) {
-        selectedMatch.events = started.events;
-      }
-      if (!isNoTimerSport) setIsRunning(true);
-    }
+    if (!requireGameStarted()) return;
 
     const scoringTeam = team;
 
@@ -1599,6 +1587,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleBasketballPoint = (team: "A" | "B", points: 1 | 2 | 3) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
     if (isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21)) return;
     // Abre modal de seleção de atleta
     setShowPlayerInput({ type: "goal", team, points });
@@ -1608,12 +1597,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (!showPlayerInput || !selectedMatch) return;
     const points = showPlayerInput.points ?? 2;
     const team = showPlayerInput.team;
-
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({ type: "start", minute: getCurrentEventMinute() });
-      if (started) selectedMatch.events = started.events;
-      setIsRunning(true);
-    }
 
     const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
     const nextA = team === "A" ? selectedMatch.scoreA + points : selectedMatch.scoreA;
@@ -1788,6 +1771,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleJudoShido = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
 
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
     const opponentName = team === "A" ? selectedMatch.teamB.name.split(" - ")[0] : selectedMatch.teamA.name.split(" - ")[0];
@@ -1837,6 +1821,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleOsaekomi = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
     if (osaekomiTeam) return; // Prevent double Osaekomi
 
     setOsaekomiTeam(team);
@@ -1885,6 +1870,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleSenshu = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
 
     if (selectedMatch.events?.some(e => e.type === "senshu")) {
       showNotification("O Senshu (vantagem do primeiro ponto) já foi concedido nesta partida.");
@@ -1977,6 +1963,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleHantei = (team: "A" | "B") => {
     if (!selectedMatch) return;
+    if (!requireGameStarted()) return;
     const winnerName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
 
     const endEvent: MatchEvent = {
@@ -1997,6 +1984,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleChessResult = (result: "A" | "B" | "Draw", reason: string) => {
     if (!selectedMatch) return;
+    if (!requireGameStarted()) return;
 
     let scoreA = 0;
     let scoreB = 0;
@@ -2051,23 +2039,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const handleTamboreauPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
+    if (!requireGameStarted()) return;
 
     const existingEvents = selectedMatch.events || [];
-
-    // Auto-start: registra início do set atual
-    const setWinsCount = existingEvents.filter((e) => e.type === "set_win").length;
-    const currentSetNumber = setWinsCount + 1;
-    const hasSetStart = existingEvents.some(
-      (e) => e.type === "start" && e.description === `Início do Set ${currentSetNumber}`
-    );
-    if (!hasSetStart) {
-      existingEvents.push({
-        id: `evt_${Date.now()}_setstart`,
-        type: "start",
-        minute: getCurrentEventMinute(),
-        description: `Início do Set ${currentSetNumber}`,
-      } as MatchEvent);
-    }
+    const currentSetNumber = existingEvents.filter((e) => e.type === "set_win").length + 1;
 
     const currentA = team === "A" ? tamboreauPointsA + 1 : tamboreauPointsA;
     const currentB = team === "B" ? tamboreauPointsB + 1 : tamboreauPointsB;
@@ -2178,6 +2153,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   };
 
   const handleGoal = (team: "A" | "B") => {
+    if (!requireGameStarted()) return;
     if (isBeachTennis) {
       handleBeachPoint(team);
       return;
@@ -2201,6 +2177,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   };
 
   const handleCard = (type: "yellow_card" | "red_card", team: "A" | "B") => {
+    if (!requireGameStarted()) return;
     if (isFutebolX1 && selectedMatch) {
       const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
       const availableAthletes = athletes.filter((a) =>
@@ -2221,6 +2198,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     type: "penalty_scored" | "penalty_missed",
     team: "A" | "B",
   ) => {
+    if (!requireGameStarted()) return;
     if (type === "penalty_scored") {
       if (isFutebolX1 && selectedMatch) {
         const teamObj =
@@ -4054,9 +4032,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               <h1 style={styles.title}>⚽ Controle de Partida</h1>
               <button
                 style={styles.changeMatchBtn}
+                className="change-match-btn-hover"
                 onClick={() => setActiveMatchId(null)}
               >
-                ← Trocar partida
+                <ChevronLeft size={16} />
+                Trocar partida
               </button>
             </div>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -6421,6 +6401,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             </div>
 
             <style>{`
+                    .change-match-btn-hover:hover {
+                        background-color: rgba(255, 255, 255, 0.1) !important;
+                        border-color: var(--accent-color) !important;
+                        color: var(--text-primary) !important;
+                        transform: translateX(-4px);
+                        box-shadow: 0 0 15px rgba(227, 6, 19, 0.2);
+                    }
+
                     .reset-btn-hover:hover {
                         background-color: var(--bg-hover) !important;
                         border-color: var(--accent-color) !important;
@@ -6918,11 +6906,19 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
   },
   changeMatchBtn: {
-    color: "var(--accent-color)",
-    fontSize: "14px",
-    padding: "8px 0",
-    marginTop: "8px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "8px 16px",
+    borderRadius: "8px",
+    background: "rgba(255, 255, 255, 0.05)",
+    color: "var(--text-secondary)",
+    fontSize: "13px",
+    fontWeight: 600,
+    border: "1px solid var(--border-color)",
     cursor: "pointer",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    marginTop: "12px",
   },
   resetBtn: {
     backgroundColor: "var(--secondary-color)",

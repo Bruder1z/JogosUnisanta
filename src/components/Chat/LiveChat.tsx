@@ -22,7 +22,7 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
 
     const storageKey = `chat_messages_${matchId}`;
 
@@ -30,7 +30,12 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
     const isAdmin = user && user.role === 'superadmin';
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTo({
+                top: chatContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     };
 
     // Lê histórico e sincroniza mensagens entre abas locais e por supabase broadcast
@@ -196,7 +201,7 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
                 Chat da Partida {isAdmin && '👨‍⚖️ (Admin)'}
             </div>
 
-            <div className="live-chat-messages">
+            <div className="live-chat-messages" ref={chatContainerRef}>
                 {messages.length === 0 ? (
                     <div style={{ textAlign: 'center', marginTop: '20px', color: 'var(--text-secondary)', fontSize: '13px' }}>
                         Nenhuma mensagem ainda. Seja o primeiro a comentar!
@@ -231,7 +236,6 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
                         </div>
                     ))
                 )}
-                <div ref={messagesEndRef} />
             </div>
 
             <form className="live-chat-input-area" onSubmit={sendMessage}>
@@ -243,7 +247,6 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={handleKeyDown}
                     maxLength={200}
-                    autoFocus
                 />
                 <button
                     type="submit"

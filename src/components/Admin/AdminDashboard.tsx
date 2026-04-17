@@ -3,12 +3,10 @@ import { supabase } from '../../services/supabaseClient';
 import { Link } from 'react-router-dom';
 import {
     Users,
-    Settings,
     PlusCircle,
     Trophy,
     Layout,
     BookOpen,
-    Save,
     Trash2,
     Edit3,
     Check,
@@ -96,15 +94,18 @@ const AdminDashboard: React.FC = () => {
         teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', stage: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
-    const [settingsForm, setSettingsForm] = useState({
-        regulationUrl: 'https://jogos.unisanta.br/regulamento.pdf',
-        liveStreamUrl: 'https://youtube.com/santaceciliatv'
-    });
-
     const [notification, setNotification] = useState('');
-    const [adminUsers, setAdminUsers] = useState<any[]>([]);
-    const [isPromoting, setIsPromoting] = useState(false);
+    const [adminUsers, _setAdminUsers] = useState<any[]>([]);
+    const [isPromoting, _setIsPromoting] = useState(false);
     const [promoteEmail, setPromoteEmail] = useState('');
+
+    const handlePromoteUser = () => {
+        showNotification("Função para promover usuário (stub)");
+    };
+
+    const handleDemoteUser = (id: string, _role: string) => {
+        showNotification(`Função para remover acesso de ${id} (stub)`);
+    };
 
     const importCsvColumns = [
         'Primeiro Nome',
@@ -505,7 +506,7 @@ const AdminDashboard: React.FC = () => {
                         { id: 'equipe', label: 'Equipe', icon: <Shield size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
                         { id: 'featured', label: 'Melhores Atletas', icon: <Award size={18} /> },
-                        { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
+
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -1566,61 +1567,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'settings' && (
-                        <div className="premium-card" style={{ padding: '30px' }}>
-                            <div className="admin-section-header" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
-                                <Settings size={24} color="var(--accent-color)" />
-                                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configurações do Sistema</h2>
-                            </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                        Link do Regulamento Geral (PDF)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        style={inputStyle}
-                                        value={settingsForm.regulationUrl}
-                                        onChange={e => setSettingsForm({ ...settingsForm, regulationUrl: e.target.value })}
-                                        placeholder="Ex: https://dominio.com/regulamento.pdf"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                        Link da Transmissão (Padrão)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        style={inputStyle}
-                                        value={settingsForm.liveStreamUrl}
-                                        onChange={e => setSettingsForm({ ...settingsForm, liveStreamUrl: e.target.value })}
-                                        placeholder="Ex: https://youtube.com/..."
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => showNotification('Configurações salvas!')}
-                                    style={{
-                                        background: 'var(--accent-color)',
-                                        color: 'white',
-                                        padding: '12px 24px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        alignSelf: 'flex-start',
-                                        marginTop: '10px'
-                                    }}
-                                >
-                                    <Save size={18} />
-                                    Salvar Alterações
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
                 </div>
             </div>
