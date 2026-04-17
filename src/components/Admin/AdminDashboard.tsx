@@ -16,7 +16,8 @@ import {
     Plus,
     Upload,
     Info,
-    Download
+    Download,
+    Shield
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
@@ -101,6 +102,9 @@ const AdminDashboard: React.FC = () => {
     });
 
     const [notification, setNotification] = useState('');
+    const [adminUsers, setAdminUsers] = useState<any[]>([]);
+    const [isPromoting, setIsPromoting] = useState(false);
+    const [promoteEmail, setPromoteEmail] = useState('');
 
     const importCsvColumns = [
         'Primeiro Nome',
@@ -498,6 +502,7 @@ const AdminDashboard: React.FC = () => {
                         { id: 'requests', label: 'Solicitações', icon: <PlusCircle size={18} /> },
                         { id: 'teams', label: 'Equipes & Cursos', icon: <Users size={18} /> },
                         { id: 'athletes', label: 'Atletas', icon: <Users size={18} /> },
+                        { id: 'equipe', label: 'Equipe', icon: <Shield size={18} /> },
                         { id: 'ranking', label: 'Classificação Geral', icon: <Trophy size={18} /> },
                         { id: 'featured', label: 'Melhores Atletas', icon: <Award size={18} /> },
                         { id: 'settings', label: 'Configurações', icon: <Settings size={18} /> },
@@ -1065,7 +1070,138 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'equipe' && (
+                        <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <Shield size={24} color="var(--accent-color)" />
+                                    <div>
+                                        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gestão da Equipe</h2>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Gerencie quem tem permissões administrativas no sistema</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '15px', color: 'var(--text-primary)' }}>Promover Novo Administrador</h3>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <input
+                                        type="email"
+                                        placeholder="E-mail do usuário"
+                                        value={promoteEmail}
+                                        onChange={(e) => setPromoteEmail(e.target.value)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '10px 14px',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-hover)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '14px',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handlePromoteUser}
+                                        disabled={isPromoting || !promoteEmail.trim()}
+                                        style={{
+                                            padding: '10px 24px',
+                                            borderRadius: '8px',
+                                            background: 'var(--accent-color)',
+                                            color: 'white',
+                                            border: 'none',
+                                            fontWeight: 700,
+                                            fontSize: '13px',
+                                            cursor: (isPromoting || !promoteEmail.trim()) ? 'not-allowed' : 'pointer',
+                                            opacity: (isPromoting || !promoteEmail.trim()) ? 0.6 : 1,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {isPromoting ? 'PROMOVENDO...' : 'PROMOVER'}
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                                    O usuário deve estar previamente cadastrado no sistema para ser promovido.
+                                </p>
+                            </div>
+
+                            <div className="admin-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+                                <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>NOME</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>E-MAIL</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600 }}>CARGO</th>
+                                            <th style={{ padding: '16px 20px', fontWeight: 600, textAlign: 'center' }}>AÇÕES</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {adminUsers.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                                    {isPromoting ? 'Atualizando...' : 'Carregando equipe...'}
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            adminUsers.map(admin => (
+                                                <tr key={admin.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                    <td style={{ padding: '16px 20px' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{admin.name} {admin.surname}</div>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
+                                                        {admin.email}
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px' }}>
+                                                        <span style={{
+                                                            padding: '4px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            background: admin.role === 'superadmin' ? 'rgba(255, 215, 0, 0.1)' : 'rgba(227, 6, 19, 0.1)',
+                                                            color: admin.role === 'superadmin' ? '#ffd700' : 'var(--accent-color)'
+                                                        }}>
+                                                            {admin.role.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                                        {admin.role !== 'superadmin' && (
+                                                            <button
+                                                                onClick={() => handleDemoteUser(admin.id, admin.role)}
+                                                                style={{
+                                                                    padding: '6px 16px',
+                                                                    borderRadius: '6px',
+                                                                    background: 'rgba(255,255,255,0.05)',
+                                                                    color: 'var(--text-secondary)',
+                                                                    border: '1px solid var(--border-color)',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '12px',
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseOver={e => {
+                                                                    e.currentTarget.style.color = 'var(--accent-color)';
+                                                                    e.currentTarget.style.borderColor = 'var(--accent-color)';
+                                                                }}
+                                                                onMouseOut={e => {
+                                                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                                                }}
+                                                            >
+                                                                REMOVER ACESSO
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'ranking' && (
+
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
                             <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div className="admin-section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>

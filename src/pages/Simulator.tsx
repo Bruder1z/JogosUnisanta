@@ -1117,7 +1117,7 @@ const Simulator: FC = () => {
                                     cursor: 'pointer',
                                 }}
                             >
-                                <option value="">Todos os Esportes</option>
+                                <option value="">Todas as Modalidades</option>
                                 {historyFilterOptions.sports.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
 

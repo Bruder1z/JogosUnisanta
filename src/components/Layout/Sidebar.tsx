@@ -102,7 +102,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                 <div style={{ padding: '0 20px 15px', borderBottom: '1px solid var(--border-color)', marginBottom: '15px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 'bold', fontSize: '14px' }}>
                         <Trophy size={18} />
-                        ESPORTES
+                        MODALIDADES
                     </div>
                 </div>
 
@@ -153,7 +153,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <LayoutGrid size={18} />
-                            MODALIDADES
+                            VER TODAS MODALIDADES
                         </div>
                         <ChevronRight size={14} opacity={0.5} />
                     </button>

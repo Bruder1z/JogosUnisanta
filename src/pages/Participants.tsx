@@ -317,7 +317,7 @@ const Participants: FC = () => {
                                         flex: '1 1 200px'
                                     }}
                                 >
-                                    <option value="Todos">Todos os Esportes</option>
+                                    <option value="Todos">Todas as Modalidades</option>
                                     {AVAILABLE_SPORTS.map(sport => (
                                         <option key={sport} value={sport}>{sport}</option>
                                     ))}
