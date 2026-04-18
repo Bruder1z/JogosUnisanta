@@ -73,7 +73,6 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                         </div>
                         <div>
                             <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Ranking Geral</h2>
-                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Classificação do 1º ao 45º lugar</p>
                         </div>
                     </div>
                     <button

@@ -415,7 +415,7 @@ const AdminDashboard: React.FC = () => {
             return;
         }
         const fullCourseString = `${newCourseForm.name} - ${newCourseForm.university}`;
-        addCourse(fullCourseString);
+        addCourse(fullCourseString, newCourseForm.emblem || undefined);
 
         if (newCourseForm.emblem) {
             addCustomEmblem(fullCourseString, newCourseForm.emblem);

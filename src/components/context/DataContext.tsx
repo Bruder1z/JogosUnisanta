@@ -68,7 +68,7 @@ export interface Athlete {
 
 interface DataContextType {
   courses: string[];
-  addCourse: (course: string) => void;
+  addCourse: (course: string, emblem_url?: string) => void;
   removeCourse: (course: string) => void;
   athletes: Athlete[];
   addAthlete: (athlete: Athlete) => void;
@@ -124,6 +124,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const isSavingRef = useRef(false);
   const isSavingCoursesRef = useRef(false);
   const pendingMatchIdsRef = useRef<Set<string>>(new Set());
+  const latestCoursesRef = useRef<string[]>([]);
 
   // Normalization helper for institutions (specifically ESAMC)
   const normalizeInstitution = useCallback((name: string) => {
@@ -189,16 +190,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // Fetch Courses — substitui completamente pelo banco (fonte da verdade)
         // Guard: não sobrescreve durante add/remove de curso
+        let fetchedCourses: string[] = [];
         if (!isSavingCoursesRef.current) {
           const { data: coursesData, error: coursesError } = await supabase
             .from("courses")
             .select("*");
           if (coursesData && !coursesError) {
-            const formattedCourses = coursesData.map((c) =>
-              normalizeInstitution(`${c.name} - ${c.university}`),
-            );
-            setCourses(formattedCourses);
+            const nextEmblems: Record<string, string> = {};
+            fetchedCourses = coursesData.map((c) => {
+              const fullCourseString = normalizeInstitution(`${c.name} - ${c.university}`);
+              if (c.emblem_url && c.emblem_url.startsWith('data:image')) {
+                nextEmblems[fullCourseString] = c.emblem_url;
+              }
+              return fullCourseString;
+            });
+            setCustomEmblems(prev => ({ ...prev, ...nextEmblems }));
+            latestCoursesRef.current = fetchedCourses;
+            setCourses(fetchedCourses);
+          } else {
+            fetchedCourses = latestCoursesRef.current;
           }
+        } else {
+          fetchedCourses = latestCoursesRef.current;
         }
 
         // Fetch Athletes
@@ -222,11 +235,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         // Fetch Ranking
         const { data: rankingData, error: rankingError } = await supabase
           .from("ranking")
-          .select("*")
-          .order("points", { ascending: false })
-          .order("course", { ascending: true });
+          .select("*");
         if (rankingData && !rankingError) {
-          const ranked = rankingData.map((e: any, idx: number) => ({ ...e, rank: idx + 1 }));
+          const rankingMap = new Map<string, number>();
+          rankingData.forEach((r: any) => rankingMap.set(r.course, r.points || 0));
+
+          const reconciledRanking = fetchedCourses.map(c => ({
+             course: c,
+             points: rankingMap.get(c) || 0
+          }));
+
+          reconciledRanking.sort((a, b) => {
+             if (b.points !== a.points) return b.points - a.points;
+             return a.course.localeCompare(b.course);
+          });
+
+          const ranked = reconciledRanking.map((e, idx) => ({ ...e, rank: idx + 1 }));
           setRanking(ranked);
         }
 
@@ -297,11 +321,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const addCourse = async (course: string) => {
+  const addCourse = async (course: string, emblem_url?: string) => {
     const [name, university] = course.split(" - ");
     isSavingCoursesRef.current = true;
-    setCourses((prev) => [course, ...prev]);
-    const { error } = await supabase.from("courses").insert([{ id: crypto.randomUUID(), name, university }]);
+    setCourses((prev) => {
+       const next = [course, ...prev];
+       latestCoursesRef.current = next;
+       return next;
+    });
+    const payload: any = { id: crypto.randomUUID(), name, university };
+    if (emblem_url) payload.emblem_url = emblem_url;
+    
+    const { error } = await supabase.from("courses").insert([payload]);
+    await supabase.from("ranking").insert([{ course, points: 0 }]);
     if (error) console.error("Erro ao cadastrar curso no Supabase:", error);
     // Aguarda o próximo ciclo de polling propagar e então libera
     setTimeout(() => { isSavingCoursesRef.current = false; }, 4000);
@@ -310,10 +342,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeCourse = async (courseToRemove: string) => {
     const [name, university] = courseToRemove.split(" - ");
     isSavingCoursesRef.current = true;
-    setCourses((prev) => prev.filter((c) => c !== courseToRemove));
+    setCourses((prev) => {
+       const next = prev.filter((c) => c !== courseToRemove);
+       latestCoursesRef.current = next;
+       return next;
+    });
     const [courseName] = courseToRemove.split(" - ");
     setAthletes((prev) => prev.filter((a) => a.course !== courseName));
     await supabase.from("courses").delete().match({ name, university });
+    await supabase.from("ranking").delete().match({ course: courseToRemove });
     // Aguarda o próximo ciclo de polling propagar e então libera
     setTimeout(() => { isSavingCoursesRef.current = false; }, 4000);
   };
@@ -667,17 +704,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       }));
       setRanking(updatedRanking);
 
-      // Sync with Supabase (UPDATE)
+      // Sync with Supabase
       const entry = updatedRanking.find((e) => e.course === course);
       if (entry) {
-        const { error } = await supabase
-          .from("ranking")
-          .update({
-            points: entry.points
-          })
-          .eq("course", entry.course);
-          
-        if (error) console.error("Erro na atualização do ranking:", error);
+        const { data: existing } = await supabase.from("ranking").select("course").eq("course", entry.course).maybeSingle();
+        if (existing) {
+          const { error } = await supabase
+            .from("ranking")
+            .update({
+              points: entry.points
+            })
+            .eq("course", entry.course);
+          if (error) console.error("Erro na atualização do ranking:", error);
+        } else {
+          const { error } = await supabase
+            .from("ranking")
+            .insert([{ course: entry.course, points: entry.points }]);
+          if (error) console.error("Erro na inserção do ranking:", error);
+        }
       }
     },
     [ranking],
