@@ -7,7 +7,6 @@ import React, {
   useRef,
 } from "react";
 import {
-  AVAILABLE_COURSES,
   mockAthletes as initialAthletes,
   mockMatches,
   mockRanking as initialRanking,
@@ -105,7 +104,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [courses, setCourses] = useState<string[]>(AVAILABLE_COURSES);
+  const [courses, setCourses] = useState<string[]>([]);
   const [athletes, setAthletes] = useState<Athlete[]>(initialAthletes);
   const [customEmblems, setCustomEmblems] = useState<Record<string, string>>(
     {},
@@ -123,6 +122,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const [mvpVotes, setMvpVotes] = useState<MatchMvpVote[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+  const isSavingCoursesRef = useRef(false);
   const pendingMatchIdsRef = useRef<Set<string>>(new Set());
 
   // Normalization helper for institutions (specifically ESAMC)
@@ -187,18 +187,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // Fetch Courses
-        const { data: coursesData, error: coursesError } = await supabase
-          .from("courses")
-          .select("*");
-        if (coursesData && !coursesError) {
-          const formattedCourses = coursesData.map((c) =>
-            normalizeInstitution(`${c.name} - ${c.university}`),
-          );
-          setCourses((prev) => {
-            const merged = [...new Set([...prev, ...formattedCourses])];
-            return merged;
-          });
+        // Fetch Courses — substitui completamente pelo banco (fonte da verdade)
+        // Guard: não sobrescreve durante add/remove de curso
+        if (!isSavingCoursesRef.current) {
+          const { data: coursesData, error: coursesError } = await supabase
+            .from("courses")
+            .select("*");
+          if (coursesData && !coursesError) {
+            const formattedCourses = coursesData.map((c) =>
+              normalizeInstitution(`${c.name} - ${c.university}`),
+            );
+            setCourses(formattedCourses);
+          }
         }
 
         // Fetch Athletes
@@ -299,17 +299,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addCourse = async (course: string) => {
     const [name, university] = course.split(" - ");
+    isSavingCoursesRef.current = true;
     setCourses((prev) => [course, ...prev]);
-    await supabase.from("courses").insert([{ name, university }]);
+    const { error } = await supabase.from("courses").insert([{ id: crypto.randomUUID(), name, university }]);
+    if (error) console.error("Erro ao cadastrar curso no Supabase:", error);
+    // Aguarda o próximo ciclo de polling propagar e então libera
+    setTimeout(() => { isSavingCoursesRef.current = false; }, 4000);
   };
 
   const removeCourse = async (courseToRemove: string) => {
     const [name, university] = courseToRemove.split(" - ");
+    isSavingCoursesRef.current = true;
     setCourses((prev) => prev.filter((c) => c !== courseToRemove));
     const [courseName] = courseToRemove.split(" - ");
     setAthletes((prev) => prev.filter((a) => a.course !== courseName));
-
     await supabase.from("courses").delete().match({ name, university });
+    // Aguarda o próximo ciclo de polling propagar e então libera
+    setTimeout(() => { isSavingCoursesRef.current = false; }, 4000);
   };
 
   const addAthlete = async (athlete: Athlete) => {

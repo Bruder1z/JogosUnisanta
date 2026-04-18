@@ -12,7 +12,37 @@ const History: FC = () => {
             <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '40px' }}>
-                        <h1 style={{ fontSize: '36px', fontWeight: 800, marginBottom: '20px', color: 'var(--text-primary)' }}>História dos Jogos</h1>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h1 style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>História dos Jogos</h1>
+                            <button 
+                                onClick={() => setShowRanking(true)}
+                                style={{
+                                    background: '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '12px 24px',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '15px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
+                                }}
+                            >
+                                🏆 Pontuação Oficial Jogos 2025
+                            </button>
+                        </div>
 
                         <div style={{ position: 'relative' }}>
                             {/* Top Gradient Overlay */}
@@ -141,7 +171,7 @@ const History: FC = () => {
                     </div>
                 </div>
             </main>
-            {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
+            {showRanking && <RankingModal onClose={() => setShowRanking(false)} useOfficialRanking={true} />}
         </div>
     );
 };

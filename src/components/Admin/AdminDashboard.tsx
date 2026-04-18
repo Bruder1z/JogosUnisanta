@@ -54,8 +54,7 @@ const AdminDashboard: React.FC = () => {
         featuredAthletes,
         addFeaturedAthlete,
         removeFeaturedAthlete,
-        resetRankingPoints,
-        restoreOfficialRanking
+        resetRankingPoints
     } = useData();
 
     // Ranking edit state: course -> pending points value
@@ -1213,37 +1212,6 @@ const AdminDashboard: React.FC = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button
-                                        onClick={() => {
-                                            if (window.confirm("Tem certeza que deseja restaurar a pontuação oficial do ranking padrão?")) {
-                                                restoreOfficialRanking();
-                                                showNotification("Pontuação oficial restaurada com sucesso!");
-                                            }
-                                        }}
-                                        style={{
-                                            background: 'transparent',
-                                            color: '#10b981',
-                                            border: '1px solid #10b981',
-                                            padding: '8px 16px',
-                                            borderRadius: '6px',
-                                            fontSize: '13px',
-                                            fontWeight: 700,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        onMouseOver={e => {
-                                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                                        }}
-                                        onMouseOut={e => {
-                                            e.currentTarget.style.background = 'transparent';
-                                        }}
-                                    >
-                                        <Trophy size={16} />
-                                        Pontuação Oficial
-                                    </button>
                                     <button
                                         onClick={() => {
                                             if (window.confirm("Tem certeza que deseja zerar a pontuação de todos os cursos? Esta ação é irreversível e atualizará o ranking em tempo real.")) {

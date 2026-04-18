@@ -1,14 +1,16 @@
 import React from 'react';
 import { X, Trophy, Medal, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { COURSE_EMBLEMS } from '../../data/mockData';
+import { COURSE_EMBLEMS, mockRanking } from '../../data/mockData';
 import { useData } from '../context/DataContext';
 
 interface RankingModalProps {
     onClose: () => void;
+    useOfficialRanking?: boolean;
 }
 
-const RankingModal: React.FC<RankingModalProps> = ({ onClose }) => {
-    const { ranking } = useData();
+const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking }) => {
+    const { ranking: liveRanking } = useData();
+    const ranking = useOfficialRanking ? mockRanking : liveRanking;
     const getTeamEmblem = (teamName: string) => {
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
             courseKey.toLowerCase().includes(teamName.toLowerCase())
