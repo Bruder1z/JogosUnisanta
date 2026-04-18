@@ -83,7 +83,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const countableEvents = new Set<MatchEvent["type"]>([
       "goal",
       "penalty_scored",
-      "shootout_scored",
     ]);
 
     events.forEach((event) => {
@@ -91,12 +90,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         return;
       }
 
+      // Valida que o teamId do evento corresponde a um dos dois times reais
+      const isTeamA = event.teamId === finishedMatch.teamA.id;
+      const isTeamB = event.teamId === finishedMatch.teamB.id;
+      if (!isTeamA && !isTeamB) return; // evento com teamId inválido — ignora
+
       const key = `${event.teamId}::${event.player.trim().toLowerCase()}`;
       if (!playerPoints[key]) {
-        const team =
-          event.teamId === finishedMatch.teamA.id
-            ? finishedMatch.teamA
-            : finishedMatch.teamB;
+        const team = isTeamA ? finishedMatch.teamA : finishedMatch.teamB;
         const nameParts = team.name.split(" - ");
         playerPoints[key] = {
           playerName: event.player.trim(),
@@ -116,7 +117,22 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       }
     });
 
-    const top3 = Object.values(playerPoints)
+    // Valida consistência: remove candidatos cujo time não marcou nenhum gol.
+    // Em partidas 0x0, mantém todos (sem gols registrados, qualquer destaque é válido).
+    const scoreA = finishedMatch.scoreA;
+    const scoreB = finishedMatch.scoreB;
+    const isScoreless = scoreA === 0 && scoreB === 0;
+
+    const scoreByTeam: Record<string, number> = {
+      [finishedMatch.teamA.id]: scoreA,
+      [finishedMatch.teamB.id]: scoreB,
+    };
+
+    const validCandidates = isScoreless
+      ? Object.values(playerPoints)
+      : Object.values(playerPoints).filter(c => (scoreByTeam[c.teamId] ?? 0) > 0);
+
+    const top3 = validCandidates
       .sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return a.playerName.localeCompare(b.playerName);
@@ -365,6 +381,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   const getBasketballQuarterDurationSeconds = (match: Match | null) => {
     if (!match) return 15 * 60;
+    if (match.sport === "Basquete 3x3") return 10 * 60; // único tempo de 10 min
     return match.category === "Feminino" ? 10 * 60 : 15 * 60;
   };
 
@@ -1523,6 +1540,39 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleHalfTime = () => {
     addEvent("halftime");
     setIsRunning(false);
+  };
+
+  // ── Pausa/Retomada com persistência ──────────────────────────────────────
+  // Salva evento pause/resume com o minute atual e timestamp no id,
+  // permitindo que o MatchModal do usuário sincronize o estado do timer.
+  const handlePause = () => {
+    if (!selectedMatch) return;
+    const pauseEvent: MatchEvent = {
+      id: `evt_${Date.now()}_pause`,
+      type: "pause",
+      minute: getCurrentEventMinute(),
+      description: "⏸ Tempo pausado",
+    };
+    updateMatch({
+      ...selectedMatch,
+      events: [...(selectedMatch.events || []), pauseEvent],
+    });
+    setIsRunning(false);
+  };
+
+  const handleResume = () => {
+    if (!selectedMatch) return;
+    const resumeEvent: MatchEvent = {
+      id: `evt_${Date.now()}_resume`,
+      type: "resume",
+      minute: getCurrentEventMinute(),
+      description: "▶ Tempo retomado",
+    };
+    updateMatch({
+      ...selectedMatch,
+      events: [...(selectedMatch.events || []), resumeEvent],
+    });
+    setIsRunning(true);
   };
 
   const handleBasketballQuarterBreak = () => {
@@ -4164,6 +4214,17 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     style={styles.timeDisplay}
                     className="match-timeline-time-display"
                   >
+                    {/* Nome da modalidade */}
+                    <span style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-secondary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "1.5px",
+                      marginBottom: "2px",
+                    }}>
+                      {selectedMatch.sport} · {selectedMatch.category}
+                    </span>
                     <Clock size={24} />
                     <span style={styles.minute}>
                       {formatClock(currentMinute)}
@@ -4212,6 +4273,17 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     style={styles.timeDisplay}
                     className="match-timeline-time-display"
                   >
+                    {/* Nome da modalidade */}
+                    <span style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-secondary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "1.5px",
+                      marginBottom: "2px",
+                    }}>
+                      {selectedMatch.sport} · {selectedMatch.category}
+                    </span>
                     {selectedMatch.status === "live" && (
                       <span style={styles.liveBadge} className="pulse-animation">
                         AO VIVO
@@ -4556,12 +4628,12 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       }}
                       onClick={() => {
                         if (isRunning) {
-                          setIsRunning(false);
+                          handlePause();
                         } else {
                           if (!selectedMatch.events?.some((e) => e.type === "start")) {
                             handleStartMatch();
                           } else {
-                            setIsRunning(true);
+                            handleResume();
                           }
                         }
                       }}
@@ -4588,7 +4660,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         <button
                           style={{ ...styles.controlBtn, ...styles.pauseBtn }}
                           onClick={
-                            isBasketball ? () => setIsRunning(false) : handleHalfTime
+                            isBasketball ? handlePause : handleHalfTime
                           }
                           disabled={!isRunning}
                         >
@@ -4599,7 +4671,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       {!isNoTimerSport && (
                         <button
                           style={{ ...styles.controlBtn, ...styles.resumeBtn }}
-                          onClick={handleStartMatch}
+                          onClick={handleResume}
                           disabled={
                             isRunning ||
                             !selectedMatch.events?.some((e) => e.type === "start")
@@ -4656,6 +4728,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         gridTemplateColumns: "repeat(3, minmax(120px, 1fr))",
                       }}
                     >
+                      {!isBasketball3x3 && (
                       <button
                         style={{
                           ...styles.eventBtn,
@@ -4668,6 +4741,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       >
                         Intervalo entre Quartos
                       </button>
+                      )}
                       <button
                         style={{
                           ...styles.eventBtn,

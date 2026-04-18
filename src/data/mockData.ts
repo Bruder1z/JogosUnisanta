@@ -59,7 +59,9 @@ export interface MatchEvent {
     | "osaekomi"
     | "toketa"
     | "draw"
-    | "chess_result";
+    | "chess_result"
+    | "pause"
+    | "resume";
   minute: number;
   teamId?: string; // Which team the event belongs to
   player?: string; // Name of the player (optional)

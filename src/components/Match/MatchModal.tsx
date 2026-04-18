@@ -45,6 +45,120 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const [mvpVotingSecondsRemaining, setMvpVotingSecondsRemaining] = useState(60);
   const attemptedMvpSeedMatchIdsRef = useRef<Set<string>>(new Set());
 
+  // ── Timer ao vivo sincronizado com o admin ───────────────────────────────
+  // Estratégia:
+  // 1. Lê o último evento pause/resume para saber se está pausado
+  // 2. Se pausado: congela no minute do evento pause
+  // 3. Se rodando: pega o último evento resume (ou start) + elapsed desde então
+  const [liveTimerSeconds, setLiveTimerSeconds] = useState<number | null>(null);
+  const [timerPaused, setTimerPaused] = useState(false);
+
+  const isTimerCountdown =
+    currentMatch.sport === "Basquetebol" ||
+    currentMatch.sport === "Basquete 3x3" ||
+    currentMatch.sport === "Caratê" ||
+    currentMatch.sport === "Judô";
+
+  const NO_TIMER_SPORTS = new Set([
+    "Vôlei", "Vôlei de Praia", "Tênis de Mesa", "Futevôlei",
+    "Beach Tennis", "Natação", "Xadrez", "Tamboréu",
+  ]);
+
+  const getQuarterDuration = (match: Match): number => {
+    if (match.sport === "Caratê" || match.sport === "Judô") return 180;
+    if (match.sport === "Basquete 3x3") return 10 * 60; // único tempo de 10 min
+    return match.category === "Feminino" ? 10 * 60 : 15 * 60;
+  };
+
+  // Extrai o timestamp real (ms) do id do evento: "evt_<timestamp>_tipo"
+  const getEventTs = (eventId: string): number => {
+    const raw = eventId.split("_")[1] || "";
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 1_000_000_000_000 ? parsed : 0;
+  };
+
+  // Calcula o valor inicial do timer e se está pausado, sincronizado com o admin
+  const calcSyncedTimer = (match: Match): { seconds: number | null; paused: boolean } => {
+    if (NO_TIMER_SPORTS.has(match.sport)) return { seconds: null, paused: false };
+    if (match.status !== "live") return { seconds: null, paused: false };
+
+    const events = match.events ?? [];
+
+    // Só mostra timer se o admin clicou em "Iniciar Jogo" (evento start obrigatório)
+    const hasStarted = events.some(e => e.type === "start");
+    if (!hasStarted) return { seconds: null, paused: false };
+
+    // Ordena todos os eventos por timestamp real (id) para achar o mais recente
+    const sorted = [...events].sort((a, b) => {
+      const tsA = getEventTs(a.id);
+      const tsB = getEventTs(b.id);
+      if (tsA !== tsB) return tsB - tsA;
+      return b.minute - a.minute;
+    });
+
+    // Último evento de controle de timer (pause, resume, start, halftime)
+    const lastControlEvent = sorted.find(e =>
+      e.type === "pause" || e.type === "resume" || e.type === "start" || e.type === "halftime"
+    );
+
+    if (!lastControlEvent) {
+      return { seconds: isTimerCountdown ? getQuarterDuration(match) : 0, paused: false };
+    }
+
+    const isPaused = lastControlEvent.type === "pause" || lastControlEvent.type === "halftime";
+    const savedMinute = lastControlEvent.minute ?? (isTimerCountdown ? getQuarterDuration(match) : 0);
+
+    if (isPaused) {
+      return { seconds: savedMinute, paused: true };
+    }
+
+    // Timer rodando: calcula elapsed desde o evento resume/start
+    const eventTs = getEventTs(lastControlEvent.id);
+    if (eventTs > 0) {
+      const elapsedSinceEvent = Math.floor((Date.now() - eventTs) / 1000);
+      const current = isTimerCountdown
+        ? Math.max(0, savedMinute - elapsedSinceEvent)
+        : savedMinute + elapsedSinceEvent;
+      return { seconds: current, paused: false };
+    }
+
+    return { seconds: savedMinute, paused: false };
+  };
+
+  // Re-sincroniza quando eventos mudam (admin pausa, retoma, marca gol, etc.)
+  useEffect(() => {
+    const { seconds, paused } = calcSyncedTimer(currentMatch);
+    setLiveTimerSeconds(seconds);
+    setTimerPaused(paused);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentMatch.id,
+    currentMatch.status,
+    currentMatch.events?.length,
+    // Re-sincroniza quando o último evento muda (pausa/retomada)
+    currentMatch.events?.[currentMatch.events.length - 1]?.id,
+  ]);
+
+  // Tick local de 1 segundo — só corre quando não está pausado
+  useEffect(() => {
+    if (liveTimerSeconds === null || currentMatch.status !== "live" || timerPaused) return;
+    const interval = window.setInterval(() => {
+      setLiveTimerSeconds(prev => {
+        if (prev === null) return null;
+        if (isTimerCountdown) return Math.max(0, prev - 1);
+        return prev + 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMatch.status, isTimerCountdown, timerPaused, liveTimerSeconds !== null]);
+
+  const formatLiveTimer = (totalSeconds: number): string => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
   // Sync state if initialMatch changes in context
   useEffect(() => {
     const liveMatch = allMatches.find((m) => m.id === initialMatch.id);
@@ -716,8 +830,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     } = {};
 
     const getTeamMeta = (teamId: string) => {
-      const matchTeam =
-        teamId === currentMatch.teamA.id ? currentMatch.teamA : currentMatch.teamB;
+      // Valida explicitamente — não assume teamB se não for teamA
+      const isTeamA = teamId === currentMatch.teamA.id;
+      const isTeamB = teamId === currentMatch.teamB.id;
+      if (!isTeamA && !isTeamB) return null;
+      const matchTeam = isTeamA ? currentMatch.teamA : currentMatch.teamB;
       const nameParts = matchTeam.name.split(" - ");
       const institution = matchTeam.faculty || nameParts[1] || "Não informado";
       return {
@@ -729,14 +846,15 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     const isCountableEvent = (eventType: MatchEvent["type"]) =>
       eventType === "goal" ||
-      eventType === "penalty_scored" ||
-      eventType === "shootout_scored";
+      eventType === "penalty_scored";
 
     events.forEach((event) => {
       if (isCountableEvent(event.type) && event.player && event.teamId) {
+        const teamMeta = getTeamMeta(event.teamId);
+        if (!teamMeta) return; // teamId inválido — ignora
+
         const key = `${event.teamId}::${event.player.trim().toLowerCase()}`;
         if (!playerPoints[key]) {
-          const teamMeta = getTeamMeta(event.teamId);
           playerPoints[key] = {
             playerName: event.player.trim(),
             points: 0,
@@ -756,7 +874,22 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       }
     });
 
-    return Object.values(playerPoints)
+    // Valida contra o placar real: remove candidatos de times que não marcaram,
+    // exceto em partidas 0x0 onde todos os candidatos são mantidos (sem gols registrados)
+    const scoreA = currentMatch.scoreA;
+    const scoreB = currentMatch.scoreB;
+    const isScoreless = scoreA === 0 && scoreB === 0;
+
+    const scoreByTeam: Record<string, number> = {
+      [currentMatch.teamA.id]: scoreA,
+      [currentMatch.teamB.id]: scoreB,
+    };
+
+    const filtered = isScoreless
+      ? Object.values(playerPoints)
+      : Object.values(playerPoints).filter(c => (scoreByTeam[c.teamId] ?? 0) > 0);
+
+    return filtered
       .sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return a.playerName.localeCompare(b.playerName);
@@ -1323,19 +1456,51 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                           "Tênis de Mesa",
                           "Futevôlei",
                         ].includes(currentMatch.sport) && (
-                          <div
-                            style={{
-                              fontSize: "11px",
-                              color: "var(--live-color)",
-                              fontWeight: 700,
-                              background: "rgba(255, 68, 68, 0.1)",
-                              padding: "2px 8px",
-                              borderRadius: "10px",
-                              marginTop: "5px",
-                              display: "inline-block",
-                            }}
-                          >
-                            AO VIVO
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", marginTop: "5px" }}>
+                            {/* Badge AO VIVO */}
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--live-color)",
+                                fontWeight: 700,
+                                background: "rgba(255, 68, 68, 0.1)",
+                                padding: "2px 8px",
+                                borderRadius: "10px",
+                                display: "inline-block",
+                              }}
+                            >
+                              AO VIVO
+                            </div>
+                            {/* Timer ao vivo */}
+                            {liveTimerSeconds !== null && (
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                <div
+                                  style={{
+                                    fontSize: "22px",
+                                    fontWeight: 900,
+                                    color: timerPaused
+                                      ? "#f59e0b"
+                                      : liveTimerSeconds <= 60 && isTimerCountdown
+                                        ? "#ef4444"
+                                        : "var(--text-primary)",
+                                    fontVariantNumeric: "tabular-nums",
+                                    letterSpacing: "1px",
+                                    lineHeight: 1,
+                                    opacity: timerPaused ? 0.7 : 1,
+                                    animation: !timerPaused && liveTimerSeconds <= 10 && isTimerCountdown
+                                      ? "livePulse 1s infinite"
+                                      : "none",
+                                  }}
+                                >
+                                  {timerPaused ? "⏸ " : ""}{formatLiveTimer(liveTimerSeconds)}
+                                </div>
+                                {timerPaused && (
+                                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#f59e0b", letterSpacing: "0.5px" }}>
+                                    PAUSADO
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                     </div>
