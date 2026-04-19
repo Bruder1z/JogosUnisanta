@@ -365,6 +365,74 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     {},
   );
   const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+
+  // Parseia string MM:SS.CC em partes individuais
+  const parseSwimmingTimeParts = (value: string) => {
+    const m = value.match(/^(\d{0,2}):(\d{0,2})\.(\d{0,2})$/);
+    if (m) return { mm: m[1], ss: m[2], cc: m[3] };
+    return { mm: "", ss: "", cc: "" };
+  };
+
+  // Normaliza cada segmento para zero-padded (para ordenação correta)
+  const normalizeSwimmingTime = (value: string) => {
+    const { mm, ss, cc } = parseSwimmingTimeParts(value);
+    if (!mm && !ss && !cc) return "";
+    return `${mm.padStart(2, "0")}:${ss.padStart(2, "0")}.${cc.padStart(2, "0")}`;
+  };
+
+  // Verifica se o tempo tem algum dígito preenchido
+  const hasSwimmingTime = (value: string) => /\d/.test(value);
+
+  /**
+   * Sanitiza e valida MM:SS.CC:
+   * - Seconds > 59 são convertidos automaticamente em minutos (ex: 90s → +1min 30s)
+   * - Centesimos são limitados a 99
+   * - Todos os campos são zero-padded para 2 dígitos
+   */
+  const sanitizeSwimmingTime = (mm: string, ss: string, cc: string) => {
+    const rawMM = parseInt(mm || "0", 10);
+    const rawSS = parseInt(ss || "0", 10);
+    const rawCC = Math.min(parseInt(cc || "0", 10), 99);
+    // Carry-over: segundos > 59 viram minutos
+    const totalSeconds = rawMM * 60 + rawSS;
+    const finalMM = Math.min(Math.floor(totalSeconds / 60), 99);
+    const finalSS = totalSeconds % 60;
+    return {
+      mm: String(finalMM).padStart(2, "0"),
+      ss: String(finalSS).padStart(2, "0"),
+      cc: String(rawCC).padStart(2, "0"),
+    };
+  };
+
+  // Auto-Ranking automático baseado no tempo (recalcula sempre que algum tempo muda)
+  // swimmingEntries é derivado de selectedMatch.participants — não precisa estar no dep array
+  useEffect(() => {
+    if (!isSwimming || !isRankingModalOpen || !selectedMatch) return;
+
+    const participants = getStoredSwimmingParticipants();
+    const allIds = participants.map(p => p.id);
+
+    const idsWithTime = allIds.filter(id => hasSwimmingTime(swimmingTimes[id] || ""));
+    const idsWithoutTime = new Set(allIds.filter(id => !hasSwimmingTime(swimmingTimes[id] || "")));
+
+    // Ordena do menor (mais rápido) para o maior tempo usando valor normalizado
+    const sorted = [...idsWithTime].sort((idA, idB) => {
+      const tA = normalizeSwimmingTime(swimmingTimes[idA] || "") || "99:99.99";
+      const tB = normalizeSwimmingTime(swimmingTimes[idB] || "") || "99:99.99";
+      return tA.localeCompare(tB);
+    });
+
+    setSwimmingRankings(prev => {
+      const next = { ...prev };
+      // Remove posição de quem não tem tempo
+      idsWithoutTime.forEach(id => { delete next[id]; });
+      // Atribui posições sequenciais
+      sorted.forEach((id, index) => { next[id] = index + 1; });
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swimmingTimes, isSwimming, isRankingModalOpen]);
+
   const [osaekomiTeam, setOsaekomiTeam] = useState<"A" | "B" | null>(null);
   const [osaekomiSeconds, setOsaekomiSeconds] = useState(0);
   const [isGoldenScore, setIsGoldenScore] = useState(false);
@@ -6124,6 +6192,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           </div>
                           <select
                             value={swimmingRankings[entry.id] || ""}
+                            disabled={hasSwimmingTime(swimmingTimes[entry.id] || "")}
                             onChange={(e) => {
                               const value = e.target.value;
                               setSwimmingRankings((prev) => {
@@ -6142,6 +6211,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               padding: "5px",
                               fontSize: "12px",
                               fontWeight: 800,
+                              opacity: hasSwimmingTime(swimmingTimes[entry.id] || "") ? 0.6 : 1,
+                              cursor: hasSwimmingTime(swimmingTimes[entry.id] || "") ? "not-allowed" : "pointer"
                             }}
                           >
                             <option value="">Posição</option>
@@ -6189,25 +6260,148 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               );
                             })}
                         </select>
-                        <input
-                          placeholder="Tempo (ex: 00:58.32)"
-                          value={swimmingTimes[entry.id] || ""}
-                          onChange={(e) =>
-                            setSwimmingTimes((prev) => ({
-                              ...prev,
-                              [entry.id]: e.target.value,
-                            }))
-                          }
-                          style={{
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid #333",
-                            borderRadius: "6px",
-                            padding: "8px",
-                            color: "white",
-                            fontSize: "13px",
-                            width: "100%",
-                          }}
-                        />
+                         {/* 3 campos separados: MM : SS . CC — versão corrigida */}
+                        {(() => {
+                          const parts = parseSwimmingTimeParts(swimmingTimes[entry.id] || "");
+
+                          const inputBase: React.CSSProperties = {
+                            width: "38px",
+                            textAlign: "center",
+                            background: "#121212",
+                            border: "1.5px solid #333",
+                            borderRadius: "8px",
+                            padding: "9px 4px",
+                            color: "#ffffff",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                            fontFamily: "'Courier New', monospace",
+                            outline: "none",
+                            transition: "border-color 0.15s, box-shadow 0.15s",
+                            boxSizing: "border-box" as const,
+                          };
+                          const sep: React.CSSProperties = {
+                            color: "#555",
+                            fontSize: "20px",
+                            fontWeight: 700,
+                            userSelect: "none" as const,
+                            lineHeight: 1,
+                          };
+
+                          // Lê o estado mais recente via updater funcional (evita stale closure)
+                          const handleBlur = () => {
+                            setSwimmingTimes(prev => {
+                              const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                              if (!p.mm && !p.ss && !p.cc) return prev;
+                              // Valida overflow de segundos
+                              const ssNum = parseInt(p.ss || "0", 10);
+                              if (p.ss && ssNum > 59) {
+                                const s = sanitizeSwimmingTime(p.mm, p.ss, p.cc);
+                                return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
+                              }
+                              // Zero-pad apenas campos que já foram digitados (não preenche vazios)
+                              const mm = p.mm ? p.mm.padStart(2, "0") : "";
+                              const ss = p.ss ? p.ss.padStart(2, "0") : "";
+                              const cc = p.cc ? p.cc.padStart(2, "0") : "";
+                              const val = mm || ss || cc ? `${mm}:${ss}.${cc}` : "";
+                              return { ...prev, [entry.id]: val };
+                            });
+                          };
+
+                          // Reseta estilo ao perder foco (fix: onBlur resets border)
+                          const handleBlurStyle = (e: React.FocusEvent<HTMLInputElement>) => {
+                            e.target.style.borderColor = "#333";
+                            e.target.style.boxShadow = "none";
+                          };
+                          const handleFocusStyle = (e: React.FocusEvent<HTMLInputElement>) => {
+                            e.target.style.borderColor = "#3b82f6";
+                            e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.2)";
+                          };
+
+                          return (
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: "3px",
+                              background: "rgba(255,255,255,0.03)", borderRadius: "10px",
+                              padding: "6px 10px", border: "1px solid rgba(255,255,255,0.06)",
+                              width: "fit-content",
+                            }}>
+                              {/* Minutos */}
+                              <input
+                                id={`swim-mm-${entry.id}`}
+                                maxLength={2}
+                                inputMode="numeric"
+                                placeholder="MM"
+                                value={parts.mm}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                  // Lê parts.ss e parts.cc do estado atual (via closure do render)
+                                  setSwimmingTimes(prev => {
+                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                    const val = v || p.ss || p.cc ? `${v}:${p.ss}.${p.cc}` : "";
+                                    return { ...prev, [entry.id]: val };
+                                  });
+                                  if (v.length === 2) document.getElementById(`swim-ss-${entry.id}`)?.focus();
+                                }}
+                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                onFocus={handleFocusStyle}
+                                style={inputBase}
+                              />
+                              <span style={sep}>:</span>
+                              {/* Segundos */}
+                              <input
+                                id={`swim-ss-${entry.id}`}
+                                maxLength={2}
+                                inputMode="numeric"
+                                placeholder="SS"
+                                value={parts.ss}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Backspace" && parts.ss === "")
+                                    document.getElementById(`swim-mm-${entry.id}`)?.focus();
+                                }}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                  setSwimmingTimes(prev => {
+                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                    if (v.length === 2 && parseInt(v, 10) > 59) {
+                                      // Auto-conversão imediata: 90s → +1min 30s
+                                      const s = sanitizeSwimmingTime(p.mm, v, p.cc);
+                                      return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
+                                    }
+                                    const val = p.mm || v || p.cc ? `${p.mm}:${v}.${p.cc}` : "";
+                                    return { ...prev, [entry.id]: val };
+                                  });
+                                  if (v.length === 2) document.getElementById(`swim-cc-${entry.id}`)?.focus();
+                                }}
+                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                onFocus={handleFocusStyle}
+                                style={inputBase}
+                              />
+                              <span style={sep}>.</span>
+                              {/* Centésimos */}
+                              <input
+                                id={`swim-cc-${entry.id}`}
+                                maxLength={2}
+                                inputMode="numeric"
+                                placeholder="CC"
+                                value={parts.cc}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Backspace" && parts.cc === "")
+                                    document.getElementById(`swim-ss-${entry.id}`)?.focus();
+                                }}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                  setSwimmingTimes(prev => {
+                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                    const val = p.mm || p.ss || v ? `${p.mm}:${p.ss}.${v}` : "";
+                                    return { ...prev, [entry.id]: val };
+                                  });
+                                }}
+                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                onFocus={handleFocusStyle}
+                                style={inputBase}
+                              />
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

@@ -169,7 +169,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
             const sA = Number(pred.scoreA);
             const sB = Number(pred.scoreB);
             if (sA === 0 && sB === 0) {
-                showNotification(`No Judô, a luta não pode terminar em 0 a 0. Alguém deve pontuar!`, 'error');
+                showNotification(`No Judô, a luta não pode terminar em 0 a 0. É necessário haver um vencedor (Ippon ou Waza-ari)!`, 'error');
                 return;
             }
         } else if (!isValidPredictedScore) {
@@ -333,8 +333,24 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                 <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
                                     i
                                 </div>
-                                <div className="md5-tooltip-text">
+                                <div className="md5-tooltip-text" style={{ fontSize: '10px' }}>
                                     Na Modalidade Caratê o atleta vencedor é decidido caso algum atleta faça 8 pontos de vantagem ou tenha marcado mais pontos ao fim do tempo.
+                                </div>
+                            </div>
+                        )}
+                        {match.sport === 'Judô' && (
+                            <div className="md5-tooltip-container" style={{ margin: '0 auto 8px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 800, color: 'white' }}>REGRAS</span>
+                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
+                                    i
+                                </div>
+                                <div className="md5-tooltip-text" style={{ textAlign: 'left', width: '220px', fontSize: '9px' }}>
+                                    <div style={{ marginBottom: '8px' }}>
+                                        <span style={{ color: 'white', fontWeight: 'bold' }}>IPPON (2 pts):</span> Vitória direta. Encerra a luta.
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'white', fontWeight: 'bold' }}>WAZA-ARI (1 pt):</span> Ponto técnico. 2 = Ippon.
+                                    </div>
                                 </div>
                             </div>
                         )}
