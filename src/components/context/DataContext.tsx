@@ -204,9 +204,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               }
               return fullCourseString;
             });
+            const sortedCourses = fetchedCourses.sort((a, b) => a.localeCompare(b));
             setCustomEmblems(prev => ({ ...prev, ...nextEmblems }));
-            latestCoursesRef.current = fetchedCourses;
-            setCourses(fetchedCourses);
+            latestCoursesRef.current = sortedCourses;
+            setCourses(sortedCourses);
           } else {
             fetchedCourses = latestCoursesRef.current;
           }
@@ -325,7 +326,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     const [name, university] = course.split(" - ");
     isSavingCoursesRef.current = true;
     setCourses((prev) => {
-       const next = [course, ...prev];
+       const next = [...prev, course].sort((a, b) => a.localeCompare(b));
        latestCoursesRef.current = next;
        return next;
     });

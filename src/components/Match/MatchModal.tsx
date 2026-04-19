@@ -65,7 +65,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   ]);
 
   const getQuarterDuration = (match: Match): number => {
-    if (match.sport === "Caratê" || match.sport === "Judô") return 180;
+    if (match.sport === "Caratê") return 180;
+    if (match.sport === "Judô") return 240;
     if (match.sport === "Basquete 3x3") return 10 * 60; // único tempo de 10 min
     return match.category === "Feminino" ? 10 * 60 : 15 * 60;
   };

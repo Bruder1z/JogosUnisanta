@@ -153,6 +153,30 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
             return;
         }
         if (!hasPrediction || !pred) return;
+
+        // Validação de regra de encerramento (Target Score ou Max Difference)
+        const isKarate = match.sport === 'Caratê';
+        if (isKarate) {
+            const diff = Math.abs(Number(pred.scoreA) - Number(pred.scoreB));
+            if (diff > 8) {
+                showNotification(`No Caratê, a diferença de pontos não pode ser maior que 8.`, 'error');
+                return;
+            }
+        }
+        
+        const isJudo = match.sport === 'Judô';
+        if (isJudo) {
+            const sA = Number(pred.scoreA);
+            const sB = Number(pred.scoreB);
+            if (sA === 0 && sB === 0) {
+                showNotification(`No Judô, a luta não pode terminar em 0 a 0. Alguém deve pontuar!`, 'error');
+                return;
+            }
+        } else if (!isValidPredictedScore) {
+            showNotification(`No ${match.sport}, um dos times deve atingir exatamente ${maxScore} ${scoreUnit}.`, 'error');
+            return;
+        }
+
         const success = await saveUserPredictions({ [match.id]: pred });
         if (!success) { showNotification('Erro ao salvar o palpite.', 'error'); return; }
         setCardSaved(true);
@@ -181,6 +205,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
         'Vôlei de Praia': { label: 'pts',  classificacao: 21, final: 2 },
         'Futevôlei':      { label: 'pts',  classificacao: 18, final: 2 },
         'Beach Tennis':   { label: 'games',classificacao: 6,  final: 8 },
+        'Caratê':         { label: 'pts',  classificacao: 99, final: 99 },
+        'Judô':           { label: 'pts',  classificacao: 2,  final: 2 },
     };
 
     const getMaxScore = (sport: string, stage?: string): number => {
@@ -211,8 +237,14 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
         ? (match.stage === 'Fase Final' || isTamboreu)
         : isTenisMesa;
 
-    const maxAllowedA = (pred?.scoreB !== '' && Number(pred?.scoreB) === maxScore) ? maxScore - 1 : maxScore;
-    const maxAllowedB = (pred?.scoreA !== '' && Number(pred?.scoreA) === maxScore) ? maxScore - 1 : maxScore;
+    const isKarate = match.sport === 'Caratê';
+    const isFixedScoreSport = ['Vôlei', 'Vôlei de Praia', 'Futevôlei', 'Tamboréu', 'Tênis de Mesa'].includes(match.sport) || match.sport === 'Basquete 3x3';
+    const isValidPredictedScore = isKarate 
+        ? (pred && Math.abs(Number(pred.scoreA) - Number(pred.scoreB)) <= 8)
+        : (!isFixedScoreSport || (pred && (Number(pred.scoreA) === maxScore || Number(pred.scoreB) === maxScore)));
+
+    const maxAllowedA = (pred?.scoreB !== '' && Number(pred?.scoreB) === maxScore && isFixedScoreSport && !isKarate) ? maxScore - 1 : maxScore;
+    const maxAllowedB = (pred?.scoreA !== '' && Number(pred?.scoreA) === maxScore && isFixedScoreSport && !isKarate) ? maxScore - 1 : maxScore;
 
     return (
         <div className="sim-match-card" style={{
@@ -285,15 +317,24 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         {isTenisMesa && (
-                            <div style={{ position: 'absolute', bottom: '100%', paddingBottom: '4px', display: 'flex', justifyContent: 'center' }}>
-                                <div className="md5-tooltip-container" style={{ whiteSpace: 'nowrap' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: 800, color: 'white' }}>MD5</span>
-                                    <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
-                                        i
-                                    </div>
-                                    <div className="md5-tooltip-text">
-                                        Melhor de 5 (MD5) - Vence quem ganhar 3 partidas
-                                    </div>
+                            <div className="md5-tooltip-container" style={{ margin: '0 auto 8px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 800, color: 'white' }}>MD5</span>
+                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
+                                    i
+                                </div>
+                                <div className="md5-tooltip-text">
+                                    Melhor de 5 (MD5) - Vence quem ganhar 3 partidas
+                                </div>
+                            </div>
+                        )}
+                        {match.sport === 'Caratê' && (
+                            <div className="md5-tooltip-container" style={{ margin: '0 auto 8px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 800, color: 'white' }}>REGRAS</span>
+                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
+                                    i
+                                </div>
+                                <div className="md5-tooltip-text">
+                                    Na Modalidade Caratê o atleta vencedor é decidido caso algum atleta faça 8 pontos de vantagem ou tenha marcado mais pontos ao fim do tempo.
                                 </div>
                             </div>
                         )}
@@ -314,18 +355,18 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                             <div style={{ fontSize: '28px', fontWeight: 300, color: 'rgba(255,255,255,0.4)' }}>×</div>
-                            {maxScore < 99 && (
+                            {(maxScore < 99 || isKarate) && (
                                 <div style={{
                                     fontSize: '10px',
                                     fontWeight: 700,
-                                    color: isBestOf ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                                    color: (isKarate || isBestOf) ? '#f59e0b' : 'rgba(255,255,255,0.4)',
                                     textAlign: 'center',
                                     lineHeight: 1.3,
                                     whiteSpace: 'nowrap',
                                 }}>
-                                    {isBestOf
-                                        ? `MX ${maxScore} ${scoreUnit}`
-                                        : `MÁX ${maxScore} ${scoreUnit}`}
+                                    {isKarate 
+                                        ? `DIF. MÁX 8 pts` 
+                                        : (isBestOf ? `MX ${maxScore} ${scoreUnit}` : `MÁX ${maxScore} ${scoreUnit}`)}
                                 </div>
                             )}
                         </div>

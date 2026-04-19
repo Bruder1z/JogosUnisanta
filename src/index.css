@@ -45,27 +45,39 @@
 
 .md5-tooltip-text {
   position: absolute;
-
-  bottom: 100%;
+  bottom: 140%;
   left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 34px;
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(42, 42, 42, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: white;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  width: max-content;
-  white-space: nowrap;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  width: 220px;
+  white-space: normal;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 99;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 999;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1.4;
+}
+
+/* Tooltip Arrow */
+.md5-tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(42, 42, 42, 0.95) transparent transparent transparent;
 }
 
 .md5-tooltip-container:hover .md5-tooltip-text {

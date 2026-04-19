@@ -12,6 +12,7 @@ import {
   Trophy,
   MessageCircle,
   ChevronLeft,
+  Trash2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import LiveChat from "../Chat/LiveChat";
@@ -36,6 +37,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     addMatch,
     courses: coursesList,
     ensureMatchMvpCandidates,
+    deleteMatch,
   } = useData();
 
   const MVP_ELIGIBLE_SPORTS = new Set([
@@ -235,15 +237,37 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   // Locations oficiais
   const OFFICIAL_LOCATIONS = [
-    "Arena Unisanta",
-    "Bloco A",
-    "Centro de Treinamento",
+    "Arena Rebouças",
+    "Arena Unisanta (Praça das Bandeiras)",
+    "Bloco A - Quadra",
+    "Centro de Treinamento (CT)",
     "Clube dos Ingleses",
-    "Laerte Gonçalves (Bloco D)",
-    "Piscina Olimpica",
-    "Poliesportivo Unisanta (Bloco M)",
-    "Rebouças",
+    "Ginásio Laerte Gonçalves",
+    "Ginásio Poliesportivo",
+    "Piscina Olímpica",
   ];
+
+  const FIXED_LOCATIONS: Record<string, string> = {
+    Natação: "Piscina Olímpica",
+    "Basquete 3x3": "Ginásio Poliesportivo",
+    "Futebol Society": "Centro de Treinamento (CT)",
+    "Futebol X1": "Centro de Treinamento (CT)",
+    "Beach Tennis": "Arena Unisanta (Praça das Bandeiras)",
+    Futevôlei: "Arena Unisanta (Praça das Bandeiras)",
+    Tamboréu: "Arena Unisanta (Praça das Bandeiras)",
+    "Vôlei de Praia": "Arena Unisanta (Praça das Bandeiras)",
+    Caratê: "Bloco A - Quadra",
+    Judô: "Bloco A - Quadra",
+    Xadrez: "Bloco A - Quadra",
+    "Tênis de Mesa": "Clube dos Ingleses",
+  };
+
+  const FILTERED_LOCATIONS: Record<string, string[]> = {
+    Basquetebol: ["Ginásio Poliesportivo", "Arena Rebouças"],
+    Vôlei: ["Ginásio Laerte Gonçalves", "Arena Rebouças", "Ginásio Poliesportivo"],
+    Futsal: ["Ginásio Poliesportivo", "Ginásio Laerte Gonçalves"],
+    Handebol: ["Ginásio Laerte Gonçalves", "Ginásio Poliesportivo"],
+  };
 
   // Filter matches: Only scheduled or live
   const filteredMatches = matches.filter((m: Match) => {
@@ -647,7 +671,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       );
       const lastEvent =
         sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
-      const durationSeconds = (match.sport === "Caratê" || match.sport === "Judô") ? 180 : getBasketballQuarterDurationSeconds(match);
+      const durationSeconds = match.sport === "Caratê" ? 180 : (match.sport === "Judô" ? 240 : getBasketballQuarterDurationSeconds(match));
       setCurrentMinute(
         lastEvent && lastEvent.minute !== undefined
           ? lastEvent.minute
@@ -1525,7 +1549,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     if ((isBasketball || isKarate || isJudo) && currentMinute <= 0 && !isGoldenScore) {
-      setCurrentMinute((isKarate || isJudo) ? 180 : getBasketballQuarterDurationSeconds(selectedMatch));
+      const defaultTime = isKarate ? 180 : (isJudo ? 240 : getBasketballQuarterDurationSeconds(selectedMatch));
+      setCurrentMinute(defaultTime);
     }
 
     const hasStarted = selectedMatch.events?.some((e) => e.type === "start");
@@ -3407,7 +3432,32 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         </span>
                       )}
                     </div>
-                    <span style={styles.categoryBadge}>{match.category}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={styles.categoryBadge}>{match.category}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm("Certeza que deseja excluir esta partida?")) {
+                            deleteMatch(match.id);
+                            showNotification("Partida excluída com sucesso!", "success");
+                          }
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--danger-color, #ff4444)",
+                          cursor: "pointer",
+                          padding: "4px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "4px",
+                        }}
+                        title="Excluir partida"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
 
                   <div
@@ -3665,10 +3715,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     value={newMatchForm.sport}
                     onChange={(e) => {
                       const selectedSport = e.target.value;
+                      let nextLocation = newMatchForm.location;
+                      
+                      if (FIXED_LOCATIONS[selectedSport]) {
+                        nextLocation = FIXED_LOCATIONS[selectedSport];
+                      } else if (FILTERED_LOCATIONS[selectedSport] && !FILTERED_LOCATIONS[selectedSport].includes(nextLocation)) {
+                        nextLocation = "";
+                      }
+
                       setNewMatchForm({
                         ...newMatchForm,
                         sport: selectedSport,
-                        ...(selectedSport === "Natação" ? { location: "Piscina Olimpica" } : {})
+                        location: nextLocation,
                       });
                     }}
                     style={{
@@ -3996,6 +4054,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
                 <select
                   value={newMatchForm.location}
+                  disabled={!!FIXED_LOCATIONS[newMatchForm.sport]}
                   onChange={(e) =>
                     setNewMatchForm({
                       ...newMatchForm,
@@ -4006,14 +4065,23 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     width: "100%",
                     padding: "14px",
                     borderRadius: "8px",
-                    background: "#222",
+                    background: !!FIXED_LOCATIONS[newMatchForm.sport] ? "#1a1a1a" : "#222",
                     border: "1px solid #333",
-                    color: "white",
+                    color: !!FIXED_LOCATIONS[newMatchForm.sport] ? "#666" : "white",
                     fontSize: "14px",
+                    opacity: !!FIXED_LOCATIONS[newMatchForm.sport] ? 0.7 : 1,
+                    cursor: !!FIXED_LOCATIONS[newMatchForm.sport] ? "not-allowed" : "pointer",
                   }}
                 >
-                  <option value="">Selecione o Local</option>
-                  {OFFICIAL_LOCATIONS.map((l) => (
+                  <option value="">
+                    {FIXED_LOCATIONS[newMatchForm.sport] ? FIXED_LOCATIONS[newMatchForm.sport] : "Selecione o Local"}
+                  </option>
+                  {OFFICIAL_LOCATIONS.filter((l) => {
+                    if (FILTERED_LOCATIONS[newMatchForm.sport]) {
+                      return FILTERED_LOCATIONS[newMatchForm.sport].includes(l);
+                    }
+                    return true;
+                  }).map((l) => (
                     <option key={l} value={l}>
                       {l}
                     </option>
@@ -5413,10 +5481,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             {isKarate && (
               <div style={styles.eventSection}>
                 <h3
-                  style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}
+                  style={{ ...styles.sectionTitle, color: "var(--accent-color)", marginBottom: "8px" }}
                 >
                   🥋 Pontuação WKF
                 </h3>
+                <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "16px", textAlign: "center", fontStyle: "italic", lineHeight: "1.5", background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    Na Modalidade Caratê o atleta vencedor é decidido caso algum atleta faça 8 pontos de vantagem ou tenha marcado mais pontos ao fim do tempo.
+                </div>
 
                 <div
                   style={{
@@ -5619,9 +5690,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       <button
                         style={{
                           ...styles.eventBtn,
-                          background: "rgba(239, 68, 68, 0.15)",
-                          borderColor: "#ef4444",
-                          color: "#ef4444",
+                          background: "rgba(34, 197, 94, 0.15)",
+                          borderColor: "#22c55e",
+                          color: "#22c55e",
                         }}
                         onClick={() => handleJudoPoint(teamKey as "A" | "B", "ippon")}
                         disabled={selectedMatch.status === "finished"}
@@ -5631,16 +5702,16 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       <button
                         style={{
                           ...styles.eventBtn,
-                          background: osaekomiTeam === teamKey ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.15)",
-                          borderColor: "#22c55e",
-                          color: osaekomiTeam === teamKey ? "white" : "#22c55e",
+                          background: osaekomiTeam === teamKey ? "rgba(59, 130, 246, 0.8)" : "rgba(59, 130, 246, 0.15)",
+                          borderColor: "#3b82f6",
+                          color: osaekomiTeam === teamKey ? "white" : "#3b82f6",
                           marginTop: "8px",
                           opacity: (osaekomiTeam && osaekomiTeam !== teamKey) ? 0.5 : 1,
                         }}
                         onClick={() => osaekomiTeam === teamKey ? handleToketa() : handleOsaekomi(teamKey as "A" | "B")}
                         disabled={selectedMatch.status === "finished" || !!(osaekomiTeam && osaekomiTeam !== teamKey)}
                       >
-                        {osaekomiTeam === teamKey ? "Toketa (Sair)" : "Osaekomi (Solo)"}
+                        {osaekomiTeam === teamKey ? "Toketa (Sair)" : "Finalização"}
                       </button>
                     </div>
                   ))}
@@ -5657,7 +5728,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     animation: "pulse 2s infinite"
                   }}>
                     <div style={{ color: "#3b82f6", fontWeight: 800, fontSize: "14px", textTransform: "uppercase", marginBottom: "5px" }}>
-                      ⏲️ Imobilização em Curso ({osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]})
+                      ⏲️ Finalização em Curso ({osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]})
                     </div>
                     <div style={{ fontSize: "36px", fontWeight: 900, color: "#3b82f6" }}>
                       {osaekomiSeconds}s
