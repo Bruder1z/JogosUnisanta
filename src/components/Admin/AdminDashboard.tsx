@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
-import { Link } from 'react-router-dom';
 import {
     Users,
     PlusCircle,
@@ -25,6 +24,9 @@ const AdminDashboard: React.FC = () => {
 
     // Matches Filter
     const [filter, setFilter] = useState<'all' | 'male' | 'female'>('all');
+
+    // Course Search Filter
+    const [courseSearch, setCourseSearch] = useState('');
 
     // Modal & Feedback States
     const [selectedStat, setSelectedStat] = useState<any>(null);
@@ -552,36 +554,6 @@ const AdminDashboard: React.FC = () => {
                             {tab.label}
                         </button>
                     ))}
-
-                    <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-                        <div className="premium-card" style={{ padding: '20px', border: '1px solid var(--accent-color)', background: 'rgba(227, 6, 19, 0.05)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 800, fontSize: '14px', marginBottom: '15px' }}>
-                                <Trophy size={18} />
-                                CONTROLE DE PARTIDA
-                            </div>
-                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
-                                Gerencie placares e cronologia das partidas em tempo real.
-                            </p>
-                            <Link 
-                                to="/controle-partida" 
-                                className="hover-glow"
-                                style={{ 
-                                    display: 'block',
-                                    width: '100%',
-                                    padding: '10px',
-                                    textAlign: 'center',
-                                    background: 'var(--accent-color)',
-                                    color: 'white',
-                                    textDecoration: 'none',
-                                    borderRadius: '8px',
-                                    fontWeight: 700,
-                                    fontSize: '13px'
-                                }}
-                            >
-                                ABRIR CONTROLADOR
-                            </Link>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="admin-content-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -902,6 +874,31 @@ const AdminDashboard: React.FC = () => {
                                     <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Gerenciar Atletas</h2>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <select
+                                        value={courseSearch}
+                                        onChange={(e) => setCourseSearch(e.target.value)}
+                                        style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-hover)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '14px',
+                                            outline: 'none',
+                                            width: '200px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <option value="">Todos os cursos</option>
+                                        {coursesList.map((course, index) => {
+                                            const [name] = course.split(' - ');
+                                            return (
+                                                <option key={index} value={name}>
+                                                    {name}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
                                     <div
                                         style={{ position: 'relative' }}
                                         onMouseLeave={() => setShowImportInfo(false)}
@@ -1007,7 +1004,13 @@ const AdminDashboard: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
-                                        {[...athletesList].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)).map((athlete) => (
+                                        {[...athletesList]
+                                            .filter(athlete => 
+                                                courseSearch === '' || 
+                                                athlete.course === courseSearch
+                                            )
+                                            .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
+                                            .map((athlete) => (
                                             <div key={athlete.id} style={{
                                                 display: 'flex',
                                                 alignItems: 'center',

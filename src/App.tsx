@@ -93,3 +93,5 @@ function App() {
 
 
 export default App;
+
+//refatore esse código de forma mais simples, sem perder a funcionalidade, e usando o react-router-dom v6.4 ou superior, utilizando os loaders e actions para lidar com autenticação e redirecionamento.
