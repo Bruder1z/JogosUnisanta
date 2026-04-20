@@ -47,6 +47,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     "Futsal",
     "Futebol X1",
     "Handebol",
+    "Vôlei",
   ]);
 
   const seedMvpCandidatesOnFinish = async (finishedMatch: Match) => {
@@ -81,6 +82,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const isBasketball =
       finishedMatch.sport === "Basquetebol" ||
       finishedMatch.sport === "Basquete 3x3";
+    const isVolley = finishedMatch.sport === "Vôlei";
 
     const countableEvents = new Set<MatchEvent["type"]>([
       "goal",
@@ -89,6 +91,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     events.forEach((event) => {
       if (!countableEvents.has(event.type) || !event.player || !event.teamId) {
+        return;
+      }
+
+      // Para vôlei: conta todos os pontos marcados por jogador identificado
+      if (isVolley && !(event.type === "goal" && event.player)) {
         return;
       }
 
@@ -121,6 +128,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     // Valida consistência: remove candidatos cujo time não marcou nenhum gol.
     // Em partidas 0x0, mantém todos (sem gols registrados, qualquer destaque é válido).
+    // Para vôlei, mantém todos os candidatos com ACEs independente do placar de sets.
     const scoreA = finishedMatch.scoreA;
     const scoreB = finishedMatch.scoreB;
     const isScoreless = scoreA === 0 && scoreB === 0;
@@ -130,7 +138,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       [finishedMatch.teamB.id]: scoreB,
     };
 
-    const validCandidates = isScoreless
+    const validCandidates = isScoreless || isVolley
       ? Object.values(playerPoints)
       : Object.values(playerPoints).filter(c => (scoreByTeam[c.teamId] ?? 0) > 0);
 
@@ -682,13 +690,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           const next = prev + 1;
 
           if (next === 10) {
-            handleJudoPoint(osaekomiTeam, "waza_ari", isGoldenScore ? "Waza-ari no Golden Score" : "Waza-ari por Osaekomi (10s)");
+            handleJudoPoint(osaekomiTeam, "waza_ari", isGoldenScore ? "Waza-ari no Golden Score" : "Waza-ari por Finalização (10s)");
             if (isGoldenScore) {
               setOsaekomiTeam(null);
               return 0;
             }
           } else if (next === 20) {
-            handleJudoPoint(osaekomiTeam, "ippon", "Ippon por Osaekomi (20s)");
+            handleJudoPoint(osaekomiTeam, "ippon", "Ippon por Finalização (20s)");
             setOsaekomiTeam(null);
             return 0;
           }
@@ -961,108 +969,153 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     return updatedMatch;
   };
 
-  const handleBeachGameWin = (team: "A" | "B", pointEvent?: MatchEvent) => {
-    if (!selectedMatch || selectedMatch.status === "finished") return;
-
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({
-        type: "start",
-        minute: getCurrentEventMinute(),
-      });
-      if (started) {
-        selectedMatch.events = started.events;
-      }
-      setIsRunning(true);
-    }
-
-    const teamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const gameWinnerName =
-      team === "A" ? selectedMatch.teamA.name : selectedMatch.teamB.name;
-
-    const gameWinEvent: MatchEvent = {
-      id: `evt_${Date.now()}_setwin`,
-      type: "set_win",
-      minute: getCurrentEventMinute(),
-      teamId,
-      description: `Game para ${gameWinnerName}`,
-    };
-
-    const baseEvents = [
-      ...(selectedMatch.events || []),
-      ...(pointEvent ? [pointEvent] : []),
-      gameWinEvent,
-    ];
-
-    const updatedMatch: Match = {
-      ...selectedMatch,
-      status: "live",
-      events: baseEvents,
-    };
-    updateMatch(updatedMatch);
-  };
-
-  const handleBeachSetWin = (team: "A" | "B") => {
-    if (!selectedMatch || selectedMatch.status === "finished") return;
-
-    if (!selectedMatch.events?.some((e) => e.type === "start")) {
-      const started = pushMatchEvent({
-        type: "start",
-        minute: getCurrentEventMinute(),
-      });
-      if (started) {
-        selectedMatch.events = started.events;
-      }
-      setIsRunning(true);
-    }
-
-    const teamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const setWinnerName =
-      team === "A" ? selectedMatch.teamA.name : selectedMatch.teamB.name;
-    const setWinEvent: MatchEvent = {
-      id: `evt_${Date.now()}_set`,
-      type: "set_win",
-      minute: getCurrentEventMinute(),
-      teamId,
-      description: `Set para ${setWinnerName}`,
-    };
-
-    const updatedMatch: Match = {
-      ...selectedMatch,
-      scoreA: team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA,
-      scoreB: team === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB,
-      status: "live",
-      events: [...(selectedMatch.events || []), setWinEvent],
-    };
-
-    updateMatch(updatedMatch);
+  // ─── Beach Tennis — lógica automática ───────────────────────────────────────
+  // Retorna os pontos do game atual (desde o último "Game para" ou início)
+  const getBeachCurrentGamePoints = (match: Match): { ptsA: number; ptsB: number; isTiebreak: boolean } => {
+    const events = match.events || [];
+    const isTiebreak = [...events].some(
+      (e) => e.type === "halftime" && e.description?.startsWith("🎾 Início do Tie-break")
+    );
+    // Pega eventos de ponto desde o último "Game para"
+    const lastGameWinIdx = [...events].map((e, i) => ({ e, i })).reverse()
+      .find(({ e }) => e.type === "set_win" && e.description?.startsWith("Game para "))?.i ?? -1;
+    const relevantEvents = lastGameWinIdx === -1 ? events : events.slice(lastGameWinIdx + 1);
+    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === match.teamA.id).length;
+    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === match.teamB.id).length;
+    return { ptsA, ptsB, isTiebreak };
   };
 
   const handleBeachPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     if (!requireGameStarted()) return;
 
-    const teamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const pointWinnerName =
-      team === "A" ? selectedMatch.teamA.name : selectedMatch.teamB.name;
+    const isFinal = selectedMatch.stage === "Fase Final";
+    const targetGames = isFinal ? 8 : 6;
+    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const teamShort = team === "A"
+      ? selectedMatch.teamA.name.split(" - ")[0]
+      : selectedMatch.teamB.name.split(" - ")[0];
+
+    const { ptsA, ptsB, isTiebreak } = getBeachCurrentGamePoints(selectedMatch);
+    const newPtsA = team === "A" ? ptsA + 1 : ptsA;
+    const newPtsB = team === "B" ? ptsB + 1 : ptsB;
+
     const pointEvent: MatchEvent = {
       id: `evt_${Date.now()}_goal`,
       type: "goal",
       minute: getCurrentEventMinute(),
       teamId,
-      description: `Ponto para ${pointWinnerName}`,
+      description: `Ponto para ${teamShort}`,
     };
 
-    const updatedMatch: Match = {
+    let newGamesA = selectedMatch.scoreA;
+    let newGamesB = selectedMatch.scoreB;
+    const extraEvents: MatchEvent[] = [];
+
+    if (isTiebreak) {
+      // Tie-break: primeiro a 7 com 2 de diferença
+      const winTiebreak = (newPtsA >= 7 || newPtsB >= 7) && Math.abs(newPtsA - newPtsB) >= 2;
+      if (winTiebreak) {
+        const winner = newPtsA > newPtsB ? "A" : "B";
+        const winnerTeamId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        const winnerName = winner === "A"
+          ? selectedMatch.teamA.name.split(" - ")[0]
+          : selectedMatch.teamB.name.split(" - ")[0];
+        newGamesA = winner === "A" ? newGamesA + 1 : newGamesA;
+        newGamesB = winner === "B" ? newGamesB + 1 : newGamesB;
+        extraEvents.push({
+          id: `evt_${Date.now() + 1}_gamewin`,
+          type: "set_win",
+          minute: getCurrentEventMinute(),
+          teamId: winnerTeamId,
+          description: `Game para ${winnerName} (Tie-break ${newPtsA}x${newPtsB})`,
+        });
+        extraEvents.push({
+          id: `evt_${Date.now() + 2}_end`,
+          type: "end",
+          minute: getCurrentEventMinute(),
+          description: `Fim de Partida: ${winnerName} venceu por ${newGamesA}x${newGamesB} de Games`,
+        });
+        finishMatch({
+          ...selectedMatch,
+          scoreA: newGamesA,
+          scoreB: newGamesB,
+          status: "finished",
+          events: [...(selectedMatch.events || []), pointEvent, ...extraEvents],
+        });
+        return;
+      }
+    } else {
+      // Game normal No-Ad: 4 pontos = Game
+      const winGame = newPtsA >= 4 || newPtsB >= 4;
+      if (winGame) {
+        const winner = newPtsA >= 4 ? "A" : "B";
+        const winnerTeamId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+        const winnerName = winner === "A"
+          ? selectedMatch.teamA.name.split(" - ")[0]
+          : selectedMatch.teamB.name.split(" - ")[0];
+        newGamesA = winner === "A" ? newGamesA + 1 : newGamesA;
+        newGamesB = winner === "B" ? newGamesB + 1 : newGamesB;
+        extraEvents.push({
+          id: `evt_${Date.now() + 1}_gamewin`,
+          type: "set_win",
+          minute: getCurrentEventMinute(),
+          teamId: winnerTeamId,
+          description: `Game para ${winnerName}: ${newGamesA}x${newGamesB}`,
+        });
+
+        const tiebreakNeeded = newGamesA === targetGames && newGamesB === targetGames;
+        const setWon = !tiebreakNeeded &&
+          ((newGamesA >= targetGames && newGamesA - newGamesB >= 2) ||
+           (newGamesB >= targetGames && newGamesB - newGamesA >= 2));
+
+        if (tiebreakNeeded) {
+          extraEvents.push({
+            id: `evt_${Date.now() + 2}_tb`,
+            type: "halftime",
+            minute: getCurrentEventMinute(),
+            description: `🎾 Início do Tie-break decisivo (${newGamesA}x${newGamesB})`,
+          });
+        } else if (setWon) {
+          const setWinnerName = newGamesA > newGamesB
+            ? selectedMatch.teamA.name.split(" - ")[0]
+            : selectedMatch.teamB.name.split(" - ")[0];
+          extraEvents.push({
+            id: `evt_${Date.now() + 3}_end`,
+            type: "end",
+            minute: getCurrentEventMinute(),
+            description: `Fim de Partida: ${setWinnerName} venceu por ${newGamesA}x${newGamesB} de Games`,
+          });
+          finishMatch({
+            ...selectedMatch,
+            scoreA: newGamesA,
+            scoreB: newGamesB,
+            status: "finished",
+            events: [...(selectedMatch.events || []), pointEvent, ...extraEvents],
+          });
+          return;
+        }
+
+        updateMatch({
+          ...selectedMatch,
+          scoreA: newGamesA,
+          scoreB: newGamesB,
+          status: "live",
+          events: [...(selectedMatch.events || []), pointEvent, ...extraEvents],
+        });
+        return;
+      }
+    }
+
+    // Apenas registra o ponto
+    updateMatch({
       ...selectedMatch,
       events: [...(selectedMatch.events || []), pointEvent],
       status: "live",
-    };
-
-    updateMatch(updatedMatch);
+    });
   };
+
+
 
   const handleSetWin = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
@@ -1981,7 +2034,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           type: "osaekomi",
           minute: getCurrentEventMinute(),
           teamId: team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id,
-          description: `Osaekomi iniciado por ${teamName}`,
+          description: `Finalização iniciada por ${teamName}`,
         } as MatchEvent
       ]
     };
@@ -2004,7 +2057,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           id: `evt_${Date.now()}_toketa`,
           type: "toketa",
           minute: getCurrentEventMinute(),
-          description: `Toketa! Imobilização interrompida (${teamName})`,
+          description: `Toketa! Finalização interrompida (${teamName})`,
         } as MatchEvent
       ]
     };
@@ -2359,10 +2412,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       }
       setShowPlayerInput({ type, team });
     } else {
-      // Pênalti perdido não precisa de seleção de jogador
-      const teamId =
-        team === "A" ? selectedMatch?.teamA.id : selectedMatch?.teamB.id;
-      addEvent(type, teamId, "Pênalti perdido");
+      // Pênalti perdido: abre modal para selecionar o jogador
+      setShowPlayerInput({ type, team });
     }
   };
 
@@ -2537,6 +2588,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     if (showPlayerInput.type === "penalty_missed") {
+      const teamId =
+        showPlayerInput.team === "A"
+          ? selectedMatch.teamA.id
+          : selectedMatch.teamB.id;
+      addEvent(showPlayerInput.type, teamId, playerName.trim());
       setShowPlayerInput(null);
       return;
     }
@@ -2606,6 +2662,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     switch (type) {
       case "goal":
         if (isBasketball) return "🏀";
+        if (isBeachTennis) return "🎾";
         if (isVolleyball) return "🏐";
         if (isTamboreu) return "🎾";
         if (isKarate || isJudo) return "🥋";
@@ -2621,6 +2678,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "end":
         return "🏁";
       case "halftime":
+        if (isBeachTennis) return "🎾";
         return "⏸️";
       case "penalty_scored":
         return "⚽";
@@ -2631,7 +2689,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       case "shootout_missed":
         return "❌";
       case "set_win":
-        if (isBeachTennis) return "🎾☀️";
+        if (isBeachTennis) return "🎾";
         if (isVolleyball) return "🏐";
         return "🎾";
       case "tie_break_start":
@@ -2822,7 +2880,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         }
         label = `${isHandebol ? "TIRO DE 7 METROS" : "Gol de Pênalti"} - ${teamName}`;
         break;
-      case "penalty_missed":
+      case "penalty_missed": {
+        const playerInfo = event.player && event.player !== "Pênalti perdido"
+          ? ` - ${event.player}`
+          : "";
         if (isFutebolX1) {
           const currentScore = (event as TimelineEvent).timelineScore || "0x0";
           const athleteInfo = event.player
@@ -2831,8 +2892,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           label = `❌ Pênalti Perdido! Placar no momento: ${currentScore} - ${athleteInfo}`;
           break;
         }
-        label = `${isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido - ${teamName}`;
+        label = `${isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido - ${teamName}${playerInfo}`;
         break;
+      }
       case "shootout_scored":
         if (event.description) {
           label = event.description;
@@ -2884,14 +2946,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         label = event.description || `HANSOKU-MAKE! Vitória para ${teamName}`;
         break;
       case "start":
-        label = "Início da partida";
+        label = isJudo || isKarate ? "Início da luta" : "Início da partida";
         break;
       case "halftime":
         label = event.description || "Intervalo";
         break;
       case "end":
         label =
-          isSwimming && event.description ? event.description : "Fim de jogo";
+          isSwimming && event.description
+            ? event.description
+            : isJudo
+              ? "Fim de luta"
+              : "Fim de jogo";
         break;
       case "swimming_result":
         label = event.description || "Resultado da prova";
@@ -2940,8 +3006,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     let setScoreB = 0;
     let setPointsA = 0;
     let setPointsB = 0;
-    let beachSetsA = 0; // eslint-disable-line @typescript-eslint/no-unused-vars
-    let beachSetsB = 0; // eslint-disable-line @typescript-eslint/no-unused-vars
     let beachGamesA = 0;
     let beachGamesB = 0;
     let beachPointsA = 0;
@@ -2977,21 +3041,23 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             beachPointsB = 0;
           }
 
-          if (
-            event.type === "set_win" &&
-            event.description?.startsWith("Set para ")
-          ) {
-            if (event.teamId === selectedMatch.teamA.id) beachSetsA += 1;
-            if (event.teamId === selectedMatch.teamB.id) beachSetsB += 1;
-            beachGamesA = 0;
-            beachGamesB = 0;
+          // Tie-break: reseta pontos ao iniciar
+          if (event.type === "halftime" && event.description?.startsWith("🎾 Início do Tie-break")) {
             beachPointsA = 0;
             beachPointsB = 0;
           }
 
+          // Detecta se estamos em tie-break (algum evento halftime de tie-break já ocorreu)
+          const inTiebreak = events
+            .slice(0, events.indexOf(event) + 1)
+            .some((e) => e.type === "halftime" && e.description?.startsWith("🎾 Início do Tie-break"));
+
+          const ptLabelA = inTiebreak ? String(beachPointsA) : (BEACH_POINT_LABELS[Math.min(beachPointsA, 3)] ?? "0");
+          const ptLabelB = inTiebreak ? String(beachPointsB) : (BEACH_POINT_LABELS[Math.min(beachPointsB, 3)] ?? "0");
+
           return {
             ...event,
-            timelineScore: `Game ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
+            timelineScore: `Games ${beachGamesA}x${beachGamesB} | ${inTiebreak ? "Tie-break" : "Pontos"} ${ptLabelA}-${ptLabelB}`,
             timelineQuarter,
           };
         }
@@ -4916,29 +4982,51 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 {(() => {
                   const isFinal = selectedMatch.stage === "Fase Final";
                   const targetGames = isFinal ? 8 : 6;
-                  const currentGamesA = selectedMatch.scoreA;
-                  const currentGamesB = selectedMatch.scoreB;
+                  const { ptsA, ptsB, isTiebreak } = getBeachCurrentGamePoints(selectedMatch);
+                  const PT_LABELS = ["0", "15", "30", "40"];
+                  const labelA = isTiebreak ? String(ptsA) : (PT_LABELS[Math.min(ptsA, 3)] ?? "0");
+                  const labelB = isTiebreak ? String(ptsB) : (PT_LABELS[Math.min(ptsB, 3)] ?? "0");
+                  const phaseColor = isFinal ? "#f59e0b" : "var(--accent-color)";
+                  const phaseBg = isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)";
+                  const phaseBorder = isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)";
                   return (
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "8px 12px", marginBottom: "10px",
-                      background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
-                      borderRadius: "8px",
-                      border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
-                    }}>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
-                        {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
-                      </span>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
-                        Games: {currentGamesA} x {currentGamesB} · Alvo: {targetGames} (vant. 2)
-                      </span>
-                    </div>
+                    <>
+                      {/* Fase + alvo */}
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 12px", marginBottom: "10px",
+                        background: phaseBg, borderRadius: "8px", border: `1px solid ${phaseBorder}`,
+                      }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: phaseColor, textTransform: "uppercase" }}>
+                          {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
+                        </span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                          Games: {selectedMatch.scoreA} x {selectedMatch.scoreB} · Alvo: {targetGames} (vant. 2)
+                        </span>
+                      </div>
+
+                      {/* Placar do game atual */}
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        gap: "16px", padding: "10px", marginBottom: "12px",
+                        background: "rgba(255,255,255,0.04)", borderRadius: "8px",
+                        border: isTiebreak ? "1px solid rgba(234,179,8,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                      }}>
+                        {isTiebreak && (
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "#eab308", textTransform: "uppercase", marginRight: "4px" }}>
+                            🎾 Tie-break
+                          </span>
+                        )}
+                        <span style={{ fontSize: "22px", fontWeight: 900, color: "var(--text-primary)" }}>{labelA}</span>
+                        <span style={{ fontSize: "16px", color: "rgba(255,255,255,0.4)" }}>–</span>
+                        <span style={{ fontSize: "22px", fontWeight: 900, color: "var(--text-primary)" }}>{labelB}</span>
+                      </div>
+                    </>
                   );
                 })()}
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
+
+                {/* Único botão por time — sistema decide o resto */}
+                <div style={styles.eventButtons} className="match-timeline-event-grid">
                   <button
                     style={{ ...styles.eventBtn, ...styles.teamABtn }}
                     onClick={() => handleBeachPoint("A")}
@@ -4952,70 +5040,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   >
                     <Plus size={20} />
                     Ponto {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
-              </div>
-
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>🏆 Games</h3>
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleBeachGameWin("A")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Game {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleBeachGameWin("B")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Game {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
-              </div>
-
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>🏅 Sets</h3>
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "rgba(16, 185, 129, 0.15)",
-                      borderColor: "var(--success-color)",
-                      color: "var(--success-color)",
-                    }}
-                    onClick={() => handleBeachSetWin("A")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "rgba(16, 185, 129, 0.15)",
-                      borderColor: "var(--success-color)",
-                      color: "var(--success-color)",
-                    }}
-                    onClick={() => handleBeachSetWin("B")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set {selectedMatch.teamB.name.split(" - ")[0]}
                   </button>
                 </div>
               </div>
@@ -5717,6 +5741,27 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 >
                   🥋 Pontuação Judô {isGoldenScore && " (GOLDEN SCORE)"}
                 </h3>
+
+                {/* Painel de regras */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "8px",
+                  marginBottom: "14px",
+                  padding: "10px 12px",
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#22c55e", whiteSpace: "nowrap" }}>IPPON (2 pts)</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Vitória direta. Encerra a luta.</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#eab308", whiteSpace: "nowrap" }}>WAZA-ARI (1 pt)</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Ponto técnico. 2 = Ippon.</span>
+                  </div>
+                </div>
 
                 <div
                   style={{

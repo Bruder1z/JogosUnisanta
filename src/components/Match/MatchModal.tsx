@@ -320,8 +320,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     "Futsal",
     "Futebol X1",
     "Handebol",
+    "Vôlei",
   ].includes(currentMatch.sport);
-  const isGoalBasedMvpSport = ["Futsal", "Futebol Society", "Futebol X1", "Futebol"].includes(
+  const isVolleyMvpSport = currentMatch.sport === "Vôlei";
+  const isGoalBasedMvpSport = ["Futsal", "Futebol Society", "Futebol X1", "Futebol", "Handebol"].includes(
     currentMatch.sport,
   );
   const getMvpPerformanceLabel = (value: number) => {
@@ -332,6 +334,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const isKarate = currentMatch.sport === "Caratê";
   const isJudo = currentMatch.sport === "Judô";
   const isXadrez = currentMatch.sport === "Xadrez";
+  const isHandebol = currentMatch.sport === "Handebol";
   const hideTimelineMinute = [
     "Vôlei",
     "Vôlei de Praia",
@@ -584,6 +587,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "swimming_result":
         return <div style={{ fontSize: "16px" }}>🏊</div>;
       case "set_win":
+        if (isBeachTennis) return <div style={{ fontSize: "16px" }}>🎾</div>;
         return <Trophy size={16} color="#ffd700" />;
       case "yellow_card":
         return (
@@ -618,6 +622,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "start":
         return <Play size={16} color="var(--accent-color)" />;
       case "halftime":
+        if (isBeachTennis) return <div style={{ fontSize: "16px" }}>🎾</div>;
         return <Pause size={16} color="#f59e0b" />;
       case "end":
         return <CheckCircle size={16} color="#44ff44" />;
@@ -643,19 +648,19 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "red_card":
         return "Cartão Vermelho";
       case "penalty_scored":
-        return "Pênalti Marcado";
+        return isHandebol ? "Tiro de 7 Metros Convertido!" : "Pênalti Marcado";
       case "penalty_missed":
-        return "Pênalti Perdido";
+        return isHandebol ? "Tiro de 7 Metros Perdido" : "Pênalti Perdido";
       case "shootout_scored":
         return "GOL de Shoot-out";
       case "shootout_missed":
         return "❌ Shoot-out Perdido";
       case "start":
-        return "Início da Partida";
+        return isJudo || isKarate ? "Início da luta" : "Início da Partida";
       case "halftime":
         return "Intervalo";
       case "end":
-        return "Fim da Partida";
+        return isJudo || isKarate ? "Fim da luta" : "Fim da Partida";
       case "draw":
         return "Empate (Tabuada)";
       case "chess_result":
@@ -706,7 +711,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           : "Jogo";
 
     if (event.type === "goal") {
-      if (isBeachTennis || isVolleyballFamilySport || isKarate || isJudo || isTamboreu) {
+      if (isBeachTennis || isKarate || isJudo || isTamboreu) {
+        return `Ponto para ${teamName}`;
+      }
+      if (isVolleyballFamilySport) {
+        if (event.player && event.player.trim()) {
+          return `🏐 ${event.player} (${teamName})`;
+        }
         return `Ponto para ${teamName}`;
       }
       if (isBasketball) {
@@ -730,9 +741,15 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     }
 
     if (event.type === "penalty_scored") {
-      return event.player
-        ? `Pênalti convertido! ${event.player}`
-        : "Pênalti convertido!";
+      const label = isHandebol ? "Tiro de 7 Metros convertido!" : "Pênalti convertido!";
+      return event.player ? `${label} ${event.player}` : label;
+    }
+
+    if (event.type === "penalty_missed") {
+      const label = isHandebol ? "Tiro de 7 Metros Perdido" : "Pênalti Perdido";
+      return event.player && event.player !== "Pênalti perdido"
+        ? `${label} - ${event.player}`
+        : label;
     }
 
     if (event.type === "yellow_card") {
@@ -845,12 +862,16 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       };
     };
 
-    const isCountableEvent = (eventType: MatchEvent["type"]) =>
-      eventType === "goal" ||
-      eventType === "penalty_scored";
+    const isCountableEvent = (event: MatchEvent): boolean => {
+      if (isVolleyMvpSport) {
+        // Para vôlei: conta todos os pontos marcados por jogador identificado
+        return event.type === "goal" && !!event.player;
+      }
+      return event.type === "goal" || event.type === "penalty_scored";
+    };
 
     events.forEach((event) => {
-      if (isCountableEvent(event.type) && event.player && event.teamId) {
+      if (isCountableEvent(event) && event.player && event.teamId) {
         const teamMeta = getTeamMeta(event.teamId);
         if (!teamMeta) return; // teamId inválido — ignora
 
@@ -1035,8 +1056,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     let setScoreB = 0;
     let setPointsA = 0;
     let setPointsB = 0;
-    let beachSetsA = 0;
-    let beachSetsB = 0;
     let beachGamesA = 0;
     let beachGamesB = 0;
     let beachPointsA = 0;
@@ -1070,21 +1089,22 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           beachPointsB = 0;
         }
 
-        if (
-          event.type === "set_win" &&
-          event.description?.startsWith("Set para ")
-        ) {
-          if (event.teamId === currentMatch.teamA.id) beachSetsA += 1;
-          if (event.teamId === currentMatch.teamB.id) beachSetsB += 1;
-          beachGamesA = 0;
-          beachGamesB = 0;
+        // Tie-break: reseta pontos ao iniciar
+        if (event.type === "halftime" && event.description?.startsWith("🎾 Início do Tie-break")) {
           beachPointsA = 0;
           beachPointsB = 0;
         }
 
+        const inTiebreak = events
+          .slice(0, events.indexOf(event) + 1)
+          .some((e) => e.type === "halftime" && e.description?.startsWith("🎾 Início do Tie-break"));
+
+        const ptLabelA = inTiebreak ? String(beachPointsA) : (BEACH_POINT_LABELS[Math.min(beachPointsA, 3)] ?? "0");
+        const ptLabelB = inTiebreak ? String(beachPointsB) : (BEACH_POINT_LABELS[Math.min(beachPointsB, 3)] ?? "0");
+
         return {
           ...event,
-          timelineScore: `Game ${beachGamesA}x${beachGamesB} | Pontos ${BEACH_POINT_LABELS[Math.min(beachPointsA, 3)]}-${BEACH_POINT_LABELS[Math.min(beachPointsB, 3)]}`,
+          timelineScore: `Games ${beachGamesA}x${beachGamesB} | ${inTiebreak ? "Tie-break" : "Pontos"} ${ptLabelA}-${ptLabelB}`,
           timelineQuarter,
         };
       }
@@ -1098,8 +1118,15 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         if (event.type === "set_win") {
           if (event.teamId === currentMatch.teamA.id) setScoreA += 1;
           if (event.teamId === currentMatch.teamB.id) setScoreB += 1;
+          const finalPtsA = setPointsA;
+          const finalPtsB = setPointsB;
           setPointsA = 0;
           setPointsB = 0;
+          return {
+            ...event,
+            timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${finalPtsA}-${finalPtsB}`,
+            timelineQuarter,
+          };
         }
 
         return {
