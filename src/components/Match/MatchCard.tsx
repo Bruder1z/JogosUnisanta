@@ -251,17 +251,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
             if (bestKey) return `/emblemas/${COURSE_EMBLEMS[bestKey]}`;
         }
 
-        // FASE 3: MATCH PARCIAL GENÉRICO (Último recurso)
-        for (const pk of possibleKeys) {
-            const normalizedPk = String(pk).trim().toLowerCase();
-            if (!normalizedPk) continue;
-
-            const partialKey = emblemKeys.find(k => {
-                const normalizedK = k.toLowerCase();
-                return normalizedK.includes(normalizedPk) || normalizedPk.includes(normalizedK);
-            });
-            if (partialKey) return `/emblemas/${COURSE_EMBLEMS[partialKey]}`;
-        }
+        // FASE 3 REMOVIDA: Para evitar que cursos genéricos ("Direito") recebam emblemas de outras instituições.
         
         return null;
     };

@@ -260,17 +260,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       if (bestKey) return `/emblemas/${COURSE_EMBLEMS[bestKey]}`;
     }
 
-    // FASE 3: MATCH PARCIAL GENÉRICO (Último recurso)
-    for (const pk of possibleKeys) {
-      const normalizedPk = String(pk).trim().toLowerCase();
-      if (!normalizedPk) continue;
-
-      const partialKey = emblemKeys.find(k => {
-        const normalizedK = k.toLowerCase();
-        return normalizedK.includes(normalizedPk) || normalizedPk.includes(normalizedK);
-      });
-      if (partialKey) return `/emblemas/${COURSE_EMBLEMS[partialKey]}`;
-    }
+    // FASE 3 REMOVIDA: Para evitar que cursos genéricos ("Direito") recebam emblemas de outras instituições.
     
     return null;
   };
@@ -3804,9 +3794,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           }}
                         >
                           {(() => {
-                            const emblem = getTeamEmblem(
-                              match.teamA.course || match.teamA.name,
-                            );
+                            const emblem = getTeamEmblem(match.teamA);
                             return emblem ? (
                               <img
                                 src={emblem}
@@ -3843,6 +3831,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           >
                             {match.teamA.name.split(" - ")[0]}
                           </span>
+                          {match.teamA.name.split(" - ")[1] && (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--text-secondary)",
+                                textAlign: "right",
+                                marginTop: "-4px"
+                              }}
+                            >
+                              {match.teamA.name.split(" - ")[1]}
+                            </span>
+                          )}
                         </div>
 
                         <div
@@ -3877,9 +3877,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           }}
                         >
                           {(() => {
-                            const emblem = getTeamEmblem(
-                              match.teamB.course || match.teamB.name,
-                            );
+                            const emblem = getTeamEmblem(match.teamB);
                             return emblem ? (
                               <img
                                 src={emblem}
@@ -3916,6 +3914,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                           >
                             {match.teamB.name.split(" - ")[0]}
                           </span>
+                          {match.teamB.name.split(" - ")[1] && (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--text-secondary)",
+                                textAlign: "left",
+                                marginTop: "-4px"
+                              }}
+                            >
+                              {match.teamB.name.split(" - ")[1]}
+                            </span>
+                          )}
                         </div>
                       </>
                     )}

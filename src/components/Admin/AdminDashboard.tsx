@@ -82,11 +82,26 @@ const NORMALIZE_INST_MAP: Record<string, string> = {
   "FPG": "FPG",
   "UNILUS": "Unilus",
   "UNOESTE": "Unoeste",
+  // São Judas — variantes
   "SÃO JUDAS": "São Judas",
+  "SAO JUDAS": "São Judas",
+  "S. JUDAS": "São Judas",
   "S.JUDAS": "São Judas",
+  "USJT": "São Judas",
+  // Federal de Cubatão — variantes
   "FED. CUBATÃO": "Federal de Cubatão",
   "FED CUBATÃO": "Federal de Cubatão",
-  "STRONG": "Strong"
+  "FED. CUBATAO": "Federal de Cubatão",
+  "FED CUBATAO": "Federal de Cubatão",
+  "FEDERAL CUBATÃO": "Federal de Cubatão",
+  "FEDERAL DE CUBATÃO": "Federal de Cubatão",
+  "FEDERAL CUBATAO": "Federal de Cubatão",
+  "FED DE CUBATÃO": "Federal de Cubatão",
+  "FED DE CUBATAO": "Federal de Cubatão",
+  // Outras variantes
+  "STRONG": "Strong",
+  "UNESP": "Unesp",
+  "UNISAL": "Unisal",
 };
 
 // Mapeamento de abreviações da planilha para modalidade e categoria
@@ -149,7 +164,8 @@ const normalizeTeamName = (rawName: string) => {
     }
 
     // Clean up typical delimiters
-    name = name.replace(/^[-–—\s]+/, "").replace(/[-–—\s]+$/, "").trim();
+    // Limpar delimitadores comuns usados na planilha entre curso e instituição
+    name = name.replace(/^[-–—\/\(\)\s]+/, "").replace(/[-–—\/\(\)\s]+$/, "").trim();
 
     let foundCourse = name;
     const sortedCourseKeys = Object.keys(NORMALIZE_COURSE_MAP).sort((a,b) => b.length - a.length);
@@ -570,45 +586,53 @@ const AdminDashboard: React.FC = () => {
             return;
         }
 
-        // Criar helper para matching
+        // Helper para matching de equipe: SEMPRE exige curso + instituição juntos.
+        // Sem fallback cego — se não encontrar match exato, retorna null (erro registrado).
         const findTeam = (normalizedName: string) => {
             if (!normalizedName) return null;
             const upName = normalizedName.toUpperCase().trim();
-            const parts = upName.split(' - ');
-            const coursePart = parts[0].trim();
-            const instPart = parts.length > 1 ? parts[1].trim() : '';
-            
-            // 1. Caso tenhamos Instituição: Match exato Curso + Instituição
+            const dashIdx = upName.indexOf(' - ');
+            const coursePart = (dashIdx !== -1 ? upName.slice(0, dashIdx) : upName).trim();
+            const instPart  = (dashIdx !== -1 ? upName.slice(dashIdx + 3) : '').trim();
+
+            // --- Caso 1: temos Curso E Instituição → match obrigatório em AMBOS ---
             if (instPart) {
-                // Tentativa exata (Course - University)
-                let found = dbCourses.find(c => {
-                    const full = `${c.name} - ${c.university}`.toUpperCase();
-                    return full === upName;
-                });
+                // 1a. Match exato de nome completo: "Curso - Universidade"
+                let found = dbCourses.find(c =>
+                    `${c.name} - ${c.university}`.toUpperCase() === upName
+                );
                 if (found) return found;
 
-                // Tentativa flexível: O curso é o mesmo e a instituição bate (parcial)
+                // 1b. Curso exato + instituição parcial (contains bidirecional)
                 found = dbCourses.find(c => {
                     const cName = c.name.toUpperCase();
                     const cInst = c.university.toUpperCase();
                     return cName === coursePart && (cInst.includes(instPart) || instPart.includes(cInst));
                 });
                 if (found) return found;
-            }
 
-            // 2. Fallback: Se não especificou instituição ou as tentativas acima falharam 
-            // Tentamos bater apenas o curso, mas apenas se NÃO tivermos uma instituição conflitante 
-            // Se instPart existe e chegamos aqui, significa que não achamos nada com essa inst.
-            // Para evitar erro de Direto Unisantos pegando Direito Esamc, se instPart existe, não faremos fallback cego.
-            
-            if (!instPart) {
-                const found = dbCourses.find(c => c.name.toUpperCase() === coursePart);
+                // 1c. Curso parcial + instituição parcial (contains bidirecional em ambos)
+                found = dbCourses.find(c => {
+                    const cName = c.name.toUpperCase();
+                    const cInst = c.university.toUpperCase();
+                    const courseMatch = cName.includes(coursePart) || coursePart.includes(cName);
+                    const instMatch   = cInst.includes(instPart)   || instPart.includes(cInst);
+                    return courseMatch && instMatch;
+                });
                 if (found) return found;
 
-                // Match parcial no nome do curso
-                return dbCourses.find(c => coursePart.includes(c.name.toUpperCase()) || c.name.toUpperCase().includes(coursePart));
+                // Instituição especificada mas não encontrou nada → ERRO, sem fallback
+                return null;
             }
 
+            // --- Caso 2: só o nome do curso, sem instituição ---
+            // Aceita SOMENTE se houver exatamente 1 equipe com esse nome no banco.
+            // Se houver 2+ (ex: "Direito" existe em Esamc, Unisanta, Unimes),
+            // retorna null para forçar registro como erro — nunca adivinhar.
+            const matchesByCourse = dbCourses.filter(c => c.name.toUpperCase() === coursePart);
+            if (matchesByCourse.length === 1) return matchesByCourse[0];
+
+            // Ambíguo (múltiplas instituições) ou não encontrado → ERRO
             return null;
         };
 
