@@ -110,8 +110,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
             <div className="premium-card" style={{
                 width: '100%',
                 maxWidth: '450px',
-                padding: '40px',
-                maxHeight: '90vh',
+                padding: '24px',
+                maxHeight: '95vh',
                 overflowY: 'auto'
             }}>
                 {showForgotPassword ? (
@@ -249,10 +249,10 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                     </>
                 ) : (
                     <>
-                        <h2 style={{ marginBottom: '10px', textAlign: 'center' }}>
+                        <h2 style={{ marginBottom: '2px', textAlign: 'center', fontSize: '18px' }}>
                             {isRegister ? 'Criar sua conta' : 'Bem-vindo de volta'}
                         </h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'center', marginBottom: '30px' }}>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'center', marginBottom: '12px' }}>
                             {isRegister ? 'Cadastre-se para participar dos Jogos Unisanta' : 'Acesse para interagir nos Jogos Unisanta'}
                         </p>
 
@@ -270,11 +270,11 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {isRegister && (
                                 <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Nome</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Nome</label>
                                         <input
                                             name="name"
                                             value={formData.name}
@@ -284,8 +284,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                             required
                                         />
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Sobrenome</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Sobrenome</label>
                                         <input
                                             name="surname"
                                             value={formData.surname}
@@ -298,8 +298,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </>
                             )}
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>E-mail</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>E-mail</label>
                                 <input
                                     type="email"
                                     name="email"
@@ -313,8 +313,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
 
                             {isRegister && (
                                 <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Curso</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Curso</label>
                                         <select
                                             name="preferredCourse"
                                             value={formData.preferredCourse}
@@ -328,8 +328,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Esporte de interesse</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Esporte de interesse</label>
                                         <select
                                             name="preferredSport"
                                             value={formData.preferredSport}
@@ -346,8 +346,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </>
                             )}
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Senha</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Senha</label>
                                 <input
                                     type="password"
                                     name="password"
@@ -360,8 +360,8 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                             </div>
 
                             {isRegister && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Confirmar Senha</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Confirmar Senha</label>
                                     <input
                                         type="password"
                                         name="confirmPassword"
@@ -377,11 +377,11 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                             <button type="submit" style={{
                                 background: 'var(--accent-color)',
                                 color: 'white',
-                                padding: '14px',
+                                padding: '10px',
                                 borderRadius: 'var(--border-radius)',
                                 fontWeight: 'bold',
-                                marginTop: '10px',
-                                fontSize: '15px'
+                                marginTop: '4px',
+                                fontSize: '14px'
                             }}>
                                 {isRegister ? 'Finalizar Cadastro' : 'Entrar'}
                             </button>
@@ -421,7 +421,7 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
 const inputStyle = {
     background: 'var(--bg-hover)',
     border: '1px solid var(--border-color)',
-    padding: '12px',
+    padding: '8px 12px',
     borderRadius: 'var(--border-radius)',
     color: 'var(--text-primary)',
     outline: 'none',

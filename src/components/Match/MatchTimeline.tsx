@@ -352,15 +352,32 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     Handebol: ["Ginásio Laerte Gonçalves", "Ginásio Poliesportivo"],
   };
 
+  const activeMatches = matches.filter((m: Match) => m.status !== "finished");
+  
+  const dynamicSports = Array.from(new Set(activeMatches.map((m: Match) => m.sport).filter(Boolean))).sort();
+  const sportsOptions = dynamicSports.length > 0 ? dynamicSports : AVAILABLE_SPORTS;
+  
+  const dynamicLocations = Array.from(new Set(activeMatches.map((m: Match) => m.location).filter(Boolean))).sort();
+  const locationOptions = dynamicLocations.length > 0 ? dynamicLocations : OFFICIAL_LOCATIONS;
+
+  const dynamicCategories = Array.from(new Set(activeMatches.map((m: Match) => m.category).filter(Boolean))).sort();
+  const categoryOptions = dynamicCategories.length > 0 ? dynamicCategories : ["Masculino", "Feminino"];
+
   // Filter matches: Only scheduled or live
   const filteredMatches = matches
     .filter((m: Match) => {
       const matchesStatus = m.status !== "finished";
-      const matchesSport = filterSport === "Todos" || m.sport === filterSport;
-      const matchesLocation =
-        filterLocation === "Todos" || m.location === filterLocation;
-      const matchesCategory =
-        filterCategory === "Todos" || m.category === filterCategory;
+      
+      const normalize = (str?: string) => (str || "").trim().toLowerCase();
+      
+      const matchesSport = filterSport === "Todos" || normalize(m.sport) === normalize(filterSport);
+      
+      const locMatch = normalize(m.location) === normalize(filterLocation) || 
+                       (normalize(m.location) && normalize(filterLocation) && 
+                       (normalize(m.location).includes(normalize(filterLocation)) || normalize(filterLocation).includes(normalize(m.location))));
+      const matchesLocation = filterLocation === "Todos" || locMatch;
+      
+      const matchesCategory = filterCategory === "Todos" || normalize(m.category) === normalize(filterCategory);
 
       return matchesStatus && matchesSport && matchesLocation && matchesCategory;
     })
@@ -3580,7 +3597,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 }}
               >
                 <option value="Todos">Todas as Modalidades</option>
-                {AVAILABLE_SPORTS.map((s) => (
+                {sportsOptions.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -3612,7 +3629,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 }}
               >
                 <option value="Todos">Todos os Locais</option>
-                {OFFICIAL_LOCATIONS.map((l) => (
+                {locationOptions.map((l) => (
                   <option key={l} value={l}>
                     {l}
                   </option>
@@ -3644,8 +3661,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 }}
               >
                 <option value="Todos">Todos</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Feminino">Feminino</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
