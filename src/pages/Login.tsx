@@ -1,4 +1,4 @@
-import { useState, type FC, type FormEvent } from 'react';
+import React, { useState, type FC } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_COURSES, AVAILABLE_SPORTS } from '../data/mockData';
 import ForgotPassword from './components/ForgotPassword';
@@ -6,6 +6,11 @@ import ForgotPassword from './components/ForgotPassword';
 const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [showConfirmation, setShowConfirmation] = useState(false);
+    const [confirmEmailAddr, setConfirmEmailAddr] = useState('');
+    const [confirmCode, setConfirmCode] = useState('');
+    const [confirmLoading, setConfirmLoading] = useState(false);
+    const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -16,9 +21,9 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
         preferredSport: ''
     });
     const [error, setError] = useState('');
-    const { login, register } = useAuth();
+    const { login, register, confirmEmail, resendConfirmation } = useAuth();
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleSubmit = async (e: { preventDefault(): void }) => {
         e.preventDefault();
         setError('');
 
@@ -39,16 +44,49 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                 favoriteTeam: '',
                 password: formData.password
             };
-            const success = await register(registerData);
-            if (success) onClose();
-        } else {
-            const success = await login(formData.email, formData.password);
-            if (success) {
-                onClose();
+            const result = await register(registerData);
+            if (result.success && result.pendingEmail) {
+                setConfirmEmailAddr(result.pendingEmail);
+                setShowConfirmation(true);
             } else {
-                setError('Credenciais inválidas.');
+                setError('Erro ao criar conta. E-mail já cadastrado ou dados inválidos.');
+            }
+        } else {
+            const result = await login(formData.email, formData.password);
+            if (result === 'ok') {
+                onClose();
+            } else if (result === 'unconfirmed') {
+                setConfirmEmailAddr(formData.email);
+                setShowConfirmation(true);
+            } else {
+                setError('E-mail ou senha inválidos.');
             }
         }
+    };
+
+    const handleConfirm = async (e: { preventDefault(): void }) => {
+        e.preventDefault();
+        setError('');
+        if (!confirmCode || confirmCode.length !== 5) {
+            setError('Digite o código de 5 dígitos enviado para seu e-mail.');
+            return;
+        }
+        setConfirmLoading(true);
+        const success = await confirmEmail(confirmEmailAddr, confirmCode);
+        setConfirmLoading(false);
+        if (success) {
+            onClose();
+        } else {
+            setError('Código inválido ou expirado. Verifique seu e-mail e tente novamente.');
+        }
+    };
+
+    const handleResend = async () => {
+        setResendStatus('sending');
+        const success = await resendConfirmation(confirmEmailAddr);
+        setResendStatus(success ? 'sent' : 'error');
+        setConfirmCode('');
+        setError('');
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -85,6 +123,129 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                 Voltar para login
                             </button>
                         </div>
+                    </>
+                ) : showConfirmation ? (
+                    <>
+                        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                            <div style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: '50%',
+                                background: 'rgba(var(--accent-rgb, 227,6,19), 0.1)',
+                                border: '2px solid var(--accent-color)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px',
+                                fontSize: 24
+                            }}>
+                                ✉️
+                            </div>
+                            <h2 style={{ marginBottom: 8 }}>Confirme seu e-mail</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
+                                Enviamos um código de 5 dígitos para<br />
+                                <strong style={{ color: 'var(--text-primary)' }}>{confirmEmailAddr}</strong>
+                            </p>
+                        </div>
+
+                        {error && (
+                            <div style={{
+                                background: 'rgba(227, 6, 19, 0.1)',
+                                color: 'var(--accent-color)',
+                                padding: '12px',
+                                borderRadius: 'var(--border-radius)',
+                                fontSize: '13px',
+                                marginBottom: '20px',
+                                border: '1px solid var(--accent-color)'
+                            }}>
+                                {error}
+                            </div>
+                        )}
+
+                        {resendStatus === 'sent' && (
+                            <div style={{
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                color: '#22c55e',
+                                padding: '12px',
+                                borderRadius: 'var(--border-radius)',
+                                fontSize: '13px',
+                                marginBottom: '20px',
+                                border: '1px solid #22c55e'
+                            }}>
+                                Novo código enviado! Verifique seu e-mail.
+                            </div>
+                        )}
+
+                        <form onSubmit={handleConfirm} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                    Código de confirmação
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={5}
+                                    value={confirmCode}
+                                    onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="00000"
+                                    style={{
+                                        ...inputStyle,
+                                        textAlign: 'center',
+                                        fontSize: '28px',
+                                        letterSpacing: '12px',
+                                        fontWeight: 700,
+                                        padding: '16px',
+                                    }}
+                                    autoFocus
+                                    required
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={confirmLoading}
+                                style={{
+                                    background: 'var(--accent-color)',
+                                    color: 'white',
+                                    padding: '14px',
+                                    borderRadius: 'var(--border-radius)',
+                                    fontWeight: 'bold',
+                                    fontSize: '15px',
+                                    opacity: confirmLoading ? 0.7 : 1,
+                                    cursor: confirmLoading ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                {confirmLoading ? 'Verificando...' : 'Confirmar conta'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleResend}
+                                disabled={resendStatus === 'sending'}
+                                style={{
+                                    color: 'var(--accent-color)',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    opacity: resendStatus === 'sending' ? 0.7 : 1,
+                                    cursor: resendStatus === 'sending' ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                {resendStatus === 'sending' ? 'Reenviando...' : 'Não recebeu o código? Reenviar'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowConfirmation(false);
+                                    setConfirmCode('');
+                                    setError('');
+                                    setResendStatus('idle');
+                                }}
+                                style={{ color: 'var(--text-secondary)', fontSize: '13px' }}
+                            >
+                                Voltar
+                            </button>
+                        </form>
                     </>
                 ) : (
                     <>
@@ -225,14 +386,13 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                 {isRegister ? 'Finalizar Cadastro' : 'Entrar'}
                             </button>
 
-                            {/* Esqueceu sua senha? */}
                             {!isRegister && (
                                 <button
                                     type="button"
                                     style={{ background: 'none', border: 'none', marginTop: 8 }}
                                     onClick={() => setShowForgotPassword(true)}
                                 >
-                                    Esqueceu sua senha? <span style={{color: 'var(--accent-color)', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline'}}>Clique aqui</span>
+                                    Esqueceu sua senha? <span style={{ color: 'var(--accent-color)', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline' }}>Clique aqui</span>
                                 </button>
                             )}
 
@@ -251,8 +411,6 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                                 Voltar para o site
                             </button>
                         </form>
-
-
                     </>
                 )}
             </div>
