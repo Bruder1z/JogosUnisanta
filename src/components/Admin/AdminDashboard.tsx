@@ -19,6 +19,122 @@ import {
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
 
+const NORMALIZE_COURSE_MAP: Record<string, string> = {
+  "ODONTO": "Odontologia",
+  "ED. FIS.": "Educação Física",
+  "ED. FÍSICA": "Educação Física",
+  "SIST. INF.": "Sistemas de Informação",
+  "SIST INF": "Sistemas de Informação",
+  "SIST INFO": "Sistemas de Informação",
+  "FISIO.": "Fisioterapia",
+  "FÍSIO": "Fisioterapia",
+  "FISIO": "Fisioterapia",
+  "MED. VET": "Medicina Veterinária",
+  "MED VET": "Medicina Veterinária",
+  "MED.": "Medicina",
+  "MED": "Medicina",
+  "ARQUIT.": "Arquitetura",
+  "ARQUIT": "Arquitetura",
+  "NUTRIÇÃO": "Nutrição",
+  "DIREITO": "Direito",
+  "ADM.": "Administração",
+  "ADM": "Administração",
+  "ENG.": "Engenharia",
+  "ENG": "Engenharia",
+  "COMUNIC.": "Comunicação",
+  "COMUNIC": "Comunicação",
+  "PSICO.": "Psicologia",
+  "PSICO": "Psicologia",
+  "ENFERM.": "Enfermagem",
+  "BIOMED": "Biomedicina",
+  "BIOLOG": "Biologia",
+  "CIEN. EDUC.": "Ciên. Educ.",
+  "CIEN EDUC": "Ciên. Educ.",
+  "CIEN. EDU.": "Ciên. Educ.",
+  "CIEN. ED.": "Ciên. Educ.",
+  "TEC. INF.": "Tec. Inf.",
+  "TEC INF": "Tec. Inf.",
+  "ANAL. SIST.": "Análise de Sistemas",
+  "FARMÁCIA": "Farmácia",
+  "FARMACIA": "Farmácia",
+  "FAAC": "FAAC",
+  "FACECS": "FACECS",
+  "FEFESP": "FEFESP",
+  "FEFIS": "FEFIS",
+  "REL.INT.": "Rel. Internacionais",
+  "REL. INT.": "Rel. Internacionais",
+  "NEG.": "Negócios",
+  "NEGÓCIOS": "Negócios",
+  "NEGOCIOS": "Negócios",
+  "SAUDE": "Saúde",
+  "SAÚDE": "Saúde",
+  "BIOLOGIA": "Biologia"
+};
+
+const NORMALIZE_INST_MAP: Record<string, string> = {
+  "UNISANTA": "Unisanta",
+  "UNISANTOS": "Unisantos",
+  "UNIFESP": "Unifesp",
+  "UNAERP": "Unaerp",
+  "UNIMES": "Unimes",
+  "UNIP": "Unip",
+  "ESAMC": "Esamc",
+  "FPG": "FPG",
+  "UNILUS": "Unilus",
+  "UNOESTE": "Unoeste",
+  "SÃO JUDAS": "São Judas",
+  "S.JUDAS": "São Judas",
+  "FED. CUBATÃO": "Federal de Cubatão",
+  "FED CUBATÃO": "Federal de Cubatão",
+  "STRONG": "Strong"
+};
+
+const normalizeTeamName = (rawName: string) => {
+    if (!rawName) return "";
+    let name = rawName.toUpperCase().trim();
+    let foundInst = "";
+
+    // Sort keys by length descending to match longest possible pattern first
+    const sortedInstKeys = Object.keys(NORMALIZE_INST_MAP).sort((a,b) => b.length - a.length);
+    for (const key of sortedInstKeys) {
+        if (name.includes(key)) {
+            foundInst = NORMALIZE_INST_MAP[key];
+            name = name.replace(key, "").trim();
+            break;
+        }
+    }
+
+    // Clean up typical delimiters
+    name = name.replace(/^[-–—\s]+/, "").replace(/[-–—\s]+$/, "").trim();
+
+    let foundCourse = name;
+    const sortedCourseKeys = Object.keys(NORMALIZE_COURSE_MAP).sort((a,b) => b.length - a.length);
+    
+    // 1. Try exact match
+    let matched = false;
+    for (const key of sortedCourseKeys) {
+        if (name === key) {
+            foundCourse = NORMALIZE_COURSE_MAP[key];
+            matched = true;
+            break;
+        }
+    }
+    
+    // 2. Try partial match if not matched exactly
+    if (!matched) {
+        for (const key of sortedCourseKeys) {
+             if (name.includes(key)) {
+                 foundCourse = name.replace(key, NORMALIZE_COURSE_MAP[key]).trim();
+                 matched = true;
+                 break;
+             }
+        }
+    }
+    
+    if (!foundInst) return foundCourse;
+    return `${foundCourse} - ${foundInst}`;
+};
+
 const AdminDashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState('overview');
 
@@ -31,12 +147,25 @@ const AdminDashboard: React.FC = () => {
     // Modal & Feedback States
     const [selectedStat, setSelectedStat] = useState<any>(null);
     const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
+    const [isImportMatchesOpen, setIsImportMatchesOpen] = useState(false);
     const [isScoreOpen, setIsScoreOpen] = useState(false);
     const [isNewCourseOpen, setIsNewCourseOpen] = useState(false);
     const [isNewAthleteOpen, setIsNewAthleteOpen] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     const [importStatus, setImportStatus] = useState<{current: number, total: number, message: string, errors: string[]} | null>(null);
     const [showImportInfo, setShowImportInfo] = useState(false);
+    const [previewMatches, setPreviewMatches] = useState<any[]>([]);
+    const removePreviewMatch = (id: string) => {
+        setPreviewMatches(prev => prev.filter(m => m.id !== id));
+    };
+    const [matchImportStatus, setMatchImportStatus] = useState<{
+        current: number, 
+        total: number, 
+        successCount: number, 
+        errorCount: number,
+        skippedCount: number,
+        errors: string[]
+    } | null>(null);
     // DataContext
     const { 
         courses: coursesList, 
@@ -285,6 +414,223 @@ const AdminDashboard: React.FC = () => {
         };
         reader.readAsText(file);
         event.target.value = '';
+    };
+
+    const handleMatchFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const XLSX = await import('xlsx');
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            const sheetName = workbook.SheetNames.includes('Cronograma') ? 'Cronograma' : workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            const parsedMatches: any[] = [];
+            const headers = jsonData[0] as string[] || [];
+            
+            for (let i = 1; i < jsonData.length; i++) {
+                const row: any = jsonData[i];
+                if (!row || row.length === 0) continue; 
+                
+                const getCol = (colName: string) => {
+                    const idx = headers.findIndex(h => h && h.toString().trim().toLowerCase() === colName.toLowerCase());
+                    return idx !== -1 ? row[idx] : undefined;
+                };
+
+                const dataVal = getCol('Data') !== undefined ? getCol('Data') : row[0];
+                const horaVal = getCol('Hora') !== undefined ? getCol('Hora') : row[1];
+                const modalidadeVal = getCol('Modalidade') !== undefined ? getCol('Modalidade') : row[2];
+                const equipeAVal = getCol('Equipe A') !== undefined ? getCol('Equipe A') : row[3];
+                const equipeBVal = getCol('Equipe B') !== undefined ? getCol('Equipe B') : row[4];
+                const localVal = getCol('Local') !== undefined ? getCol('Local') : row[5];
+                const faseVal = getCol('Fase') !== undefined ? getCol('Fase') : row[6];
+
+                if (!equipeAVal && !equipeBVal && !modalidadeVal) continue;
+
+                let processedTime: string | null = null;
+                if (horaVal !== undefined && horaVal !== null) {
+                    if (typeof horaVal === 'number') {
+                        // Safe conversion avoiding 19:60 issues
+                        const totalMinutes = Math.round(horaVal * 24 * 60);
+                        const horas = Math.floor(totalMinutes / 60);
+                        const minutos = totalMinutes % 60;
+                        processedTime = `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+                    } else if (typeof horaVal === 'string') {
+                        const lowHora = horaVal.toLowerCase();
+                        if (lowHora.includes('seguir') || lowHora.includes('a definir')) {
+                            processedTime = null;
+                        } else {
+                            processedTime = horaVal.trim();
+                        }
+                    }
+                }
+
+                let processedDate = String(dataVal || '');
+                if (typeof dataVal === 'number') {
+                    const parsedDateObj = XLSX.SSF.parse_date_code(dataVal);
+                    processedDate = `${String(parsedDateObj.d).padStart(2, '0')}/${String(parsedDateObj.m).padStart(2, '0')}/${String(parsedDateObj.y).padStart(4, '0')}`;
+                }
+
+                const teamAAliased = normalizeTeamName(String(equipeAVal || ''));
+                const teamBAliased = normalizeTeamName(String(equipeBVal || ''));
+
+                parsedMatches.push({
+                    id: crypto.randomUUID(),
+                    date: processedDate,
+                    time: processedTime,
+                    sport: String(modalidadeVal || ''),
+                    teamA: { id: crypto.randomUUID(), name: teamAAliased, course: teamAAliased, faculty: '' },
+                    teamB: { id: crypto.randomUUID(), name: teamBAliased, course: teamBAliased, faculty: '' },
+                    location: String(localVal || ''),
+                    stage: String(faseVal || ''),
+                    status: 'scheduled',
+                    scoreA: 0,
+                    scoreB: 0,
+                    category: 'Masculino'
+                });
+            }
+            
+            setPreviewMatches(parsedMatches);
+        };
+        
+        reader.readAsArrayBuffer(file);
+        event.target.value = '';
+    };
+
+    const handleConfirmImport = async () => {
+        if (previewMatches.length === 0) return;
+        
+        setMatchImportStatus({
+            current: 0,
+            total: previewMatches.length,
+            successCount: 0,
+            errorCount: 0,
+            skippedCount: 0,
+            errors: []
+        });
+
+        const { data: dbCourses, error: coursesError } = await supabase.from('courses').select('id, name, university');
+        
+        if (coursesError || !dbCourses) {
+            showNotification('Erro ao buscar lista de equipes no banco.');
+            setMatchImportStatus(null);
+            return;
+        }
+
+        // Criar helper para matching
+        const findTeam = (normalizedName: string) => {
+            if (!normalizedName) return null;
+            const upName = normalizedName.toUpperCase().trim();
+            const parts = upName.split(' - ');
+            const coursePart = parts[0].trim();
+            const instPart = parts.length > 1 ? parts[1].trim() : '';
+            
+            // 1. Caso tenhamos Instituição: Match exato Curso + Instituição
+            if (instPart) {
+                // Tentativa exata (Course - University)
+                let found = dbCourses.find(c => {
+                    const full = `${c.name} - ${c.university}`.toUpperCase();
+                    return full === upName;
+                });
+                if (found) return found;
+
+                // Tentativa flexível: O curso é o mesmo e a instituição bate (parcial)
+                found = dbCourses.find(c => {
+                    const cName = c.name.toUpperCase();
+                    const cInst = c.university.toUpperCase();
+                    return cName === coursePart && (cInst.includes(instPart) || instPart.includes(cInst));
+                });
+                if (found) return found;
+            }
+
+            // 2. Fallback: Se não especificou instituição ou as tentativas acima falharam 
+            // Tentamos bater apenas o curso, mas apenas se NÃO tivermos uma instituição conflitante 
+            // Se instPart existe e chegamos aqui, significa que não achamos nada com essa inst.
+            // Para evitar erro de Direto Unisantos pegando Direito Esamc, se instPart existe, não faremos fallback cego.
+            
+            if (!instPart) {
+                const found = dbCourses.find(c => c.name.toUpperCase() === coursePart);
+                if (found) return found;
+
+                // Match parcial no nome do curso
+                return dbCourses.find(c => coursePart.includes(c.name.toUpperCase()) || c.name.toUpperCase().includes(coursePart));
+            }
+
+            return null;
+        };
+
+        for (const matchPreview of previewMatches) {
+            const teamAData = findTeam(matchPreview.teamA.name);
+            const teamBData = findTeam(matchPreview.teamB.name);
+
+            if (!teamAData || !teamBData) {
+                const missing: string[] = [];
+                if (!teamAData) missing.push(matchPreview.teamA.name);
+                if (!teamBData) missing.push(matchPreview.teamB.name);
+                
+                setMatchImportStatus(prev => prev ? {
+                    ...prev,
+                    current: prev.current + 1,
+                    errorCount: prev.errorCount + 1,
+                    errors: [...new Set([...prev.errors, ...missing])]
+                } : null);
+                continue;
+            }
+
+            const finalMatch: any = {
+                ...matchPreview,
+                teamA: { 
+                    id: teamAData.id, 
+                    name: `${teamAData.name} - ${teamAData.university}`, 
+                    course: teamAData.name, 
+                    faculty: teamAData.university,
+                    logo: customEmblems[`${teamAData.name} - ${teamAData.university}`] || null
+                },
+                teamB: { 
+                    id: teamBData.id, 
+                    name: `${teamBData.name} - ${teamBData.university}`, 
+                    course: teamBData.name, 
+                    faculty: teamBData.university,
+                    logo: customEmblems[`${teamBData.name} - ${teamBData.university}`] || null
+                }
+            };
+
+            // Verificar se já existe partida idêntica (duplicada)
+            const isDuplicate = matches.some(m => 
+                m.sport === finalMatch.sport &&
+                m.category === finalMatch.category &&
+                m.date === finalMatch.date &&
+                m.time === finalMatch.time &&
+                (
+                    (m.teamA.id === finalMatch.teamA.id && m.teamB.id === finalMatch.teamB.id) ||
+                    (m.teamA.id === finalMatch.teamB.id && m.teamB.id === finalMatch.teamA.id)
+                )
+            );
+
+            if (isDuplicate) {
+                setMatchImportStatus(prev => prev ? {
+                    ...prev,
+                    current: prev.current + 1,
+                    skippedCount: prev.skippedCount + 1
+                } : null);
+                continue;
+            }
+
+            await addMatch(finalMatch);
+            
+            setMatchImportStatus(prev => prev ? {
+                ...prev,
+                current: prev.current + 1,
+                successCount: prev.successCount + 1
+            } : null);
+        }
     };
 
     const filteredMatches = matches.filter(match => {
@@ -647,33 +993,58 @@ const AdminDashboard: React.FC = () => {
                         <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
                             <div className="admin-section-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Últimas Atividades</h2>
-                                <button
-                                    className="admin-primary-action"
-                                    onClick={() => {
-                                        setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', stage: 'Fase de Classificação', date: '', time: '', location: '' });
-                                        setIsNewMatchOpen(true);
-                                    }}
-                                    style={{
-                                        background: 'var(--accent-color)',
-                                        color: 'white',
-                                        padding: '8px 16px',
-                                        borderRadius: '6px',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        border: 'none',
-                                        transition: 'background 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.background = '#c10510'}
-                                    onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
-                                >
-                                    <PlusCircle size={16} />
-                                    Nova Partida
-                                </button>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        style={{
+                                            background: 'transparent',
+                                            color: 'var(--text-secondary)',
+                                            padding: '8px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            border: '1px solid var(--border-color)',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onClick={() => setIsImportMatchesOpen(true)}
+                                        onMouseOver={e => { e.currentTarget.style.color = 'var(--accent-color)'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                                    >
+                                        <Upload size={16} />
+                                        Importar Partidas
+                                    </button>
+                                    <button
+                                        className="admin-primary-action"
+                                        onClick={() => {
+                                            setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', stage: 'Fase de Classificação', date: '', time: '', location: '' });
+                                            setIsNewMatchOpen(true);
+                                        }}
+                                        style={{
+                                            background: 'var(--accent-color)',
+                                            color: 'white',
+                                            padding: '8px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            border: 'none',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = '#c10510'}
+                                        onMouseOut={e => e.currentTarget.style.background = 'var(--accent-color)'}
+                                    >
+                                        <PlusCircle size={16} />
+                                        Nova Partida
+                                    </button>
+                                </div>
                             </div>
+
 
                             <div className="admin-filter-row" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
                                 <button
@@ -1718,6 +2089,273 @@ const AdminDashboard: React.FC = () => {
                             <button onClick={handleSaveNewMatch} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>Salvar Partida</button>
                             <button onClick={() => setIsNewMatchOpen(false)} style={modalButtonStyle}>Cancelar</button>
                         </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {isImportMatchesOpen && (
+                <ModalOverlay onClose={() => { 
+                    setIsImportMatchesOpen(false); 
+                    setPreviewMatches([]); 
+                    setMatchImportStatus(null);
+                }}>
+                    <h2 style={{ marginBottom: '16px' }}>Importar Partidas via Excel</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {matchImportStatus ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                                {/* Progress View */}
+                                {matchImportStatus.current < matchImportStatus.total ? (
+                                    <>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                                                Importando Partidas...
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                                Processando {matchImportStatus.current} de {matchImportStatus.total}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Progress Bar Container */}
+                                        <div style={{ 
+                                            width: '100%', 
+                                            height: '10px', 
+                                            background: 'rgba(255,255,255,0.05)', 
+                                            borderRadius: '5px', 
+                                            overflow: 'hidden',
+                                            border: '1px solid var(--border-color)'
+                                        }}>
+                                            <div style={{ 
+                                                width: `${(matchImportStatus.current / (matchImportStatus.total || 1)) * 100}%`, 
+                                                height: '100%', 
+                                                background: 'var(--accent-color)',
+                                                transition: 'width 0.3s ease'
+                                            }} />
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                            Por favor, não feche esta janela...
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Summary View */}
+                                        <div style={{ textAlign: 'center', background: 'rgba(34, 197, 94, 0.1)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                            <div style={{ 
+                                                width: '40px', height: '40px', borderRadius: '50%', background: '#22c55e', 
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' 
+                                            }}>
+                                                <Check size={24} color="white" />
+                                            </div>
+                                            <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>Importação Concluída!</div>
+                                            <div style={{ fontSize: '15px', color: '#22c55e', fontWeight: 600, marginTop: '4px' }}>
+                                                {matchImportStatus.successCount} partidas criadas com sucesso
+                                            </div>
+                                            {matchImportStatus.errorCount > 0 && (
+                                                <div style={{ fontSize: '14px', color: '#ef4444', fontWeight: 600, marginTop: '4px' }}>
+                                                    {matchImportStatus.errorCount} partidas ignoradas (equipes não encontradas)
+                                                </div>
+                                            )}
+                                            {matchImportStatus.skippedCount > 0 && (
+                                                <div style={{ fontSize: '14px', color: '#3b82f6', fontWeight: 600, marginTop: '4px' }}>
+                                                    {matchImportStatus.skippedCount} partidas já existiam e foram puladas
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {matchImportStatus.errors.length > 0 && (
+                                            <div style={{ maxHeight: '160px', overflowY: 'auto', background: 'rgba(239, 68, 68, 0.05)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Info size={14} /> Equipes não localizadas no banco:
+                                                </div>
+                                                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    {matchImportStatus.errors.map((err, i) => (
+                                                        <li key={i}>{err}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <div className="admin-modal-actions">
+                                            <button 
+                                                onClick={() => {
+                                                    setIsImportMatchesOpen(false);
+                                                    setPreviewMatches([]);
+                                                    setMatchImportStatus(null);
+                                                }} 
+                                                style={{ ...modalButtonStyle, width: '100%', background: 'var(--accent-color)' }}
+                                            >
+                                                Concluir e Fechar
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : previewMatches.length === 0 ? (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <Info size={24} color="var(--accent-color)" style={{ minWidth: '24px' }} />
+                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>Como importar a planilha?</div>
+                                        Envie um arquivo <strong>.xlsx</strong> contendo as partidas. Certifique-se de que a planilha segue o formato oficial.
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <a
+                                        href="/tabela_exemplo.xlsx"
+                                        download="tabela_exemplo.xlsx"
+                                        style={{
+                                            background: 'transparent', color: 'var(--text-secondary)', padding: '12px 16px', borderRadius: '6px', cursor: 'pointer',
+                                            fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid var(--border-color)',
+                                            transition: 'all 0.2s', textDecoration: 'none'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.borderColor = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        <Download size={16} /> Baixar planilha exemplo
+                                    </a>
+
+                                    <label style={{
+                                        background: 'transparent', color: 'var(--text-secondary)', padding: '12px 16px', borderRadius: '6px', cursor: 'pointer',
+                                        fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid var(--border-color)',
+                                        transition: 'all 0.2s'
+                                    }} 
+                                    onMouseOver={e => { e.currentTarget.style.color = 'var(--accent-color)'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }} 
+                                    onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                                    >
+                                        <Upload size={16} /> Importar arquivo .xlsx
+                                        <input type="file" accept=".xlsx" onChange={handleMatchFileUpload} style={{ display: 'none' }} />
+                                    </label>
+                                </div>
+
+                                <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                    <button onClick={() => setIsImportMatchesOpen(false)} style={{ ...modalButtonStyle, width: '100%' }}>Cancelar</button>
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '60vh' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {previewMatches.length} partidas encontradas:
+                                </div>
+                                <div style={{ 
+                                    overflowY: 'auto', 
+                                    background: 'rgba(255,255,255,0.02)', 
+                                    borderRadius: '12px', 
+                                    border: '1px solid var(--border-color)', 
+                                    padding: '15px', 
+                                    maxHeight: '50vh' 
+                                }}>
+                                    <div style={{ 
+                                        display: 'grid', 
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                                        gap: '15px' 
+                                    }}>
+                                        {previewMatches.map((m, idx) => {
+                                            const emblemA = customEmblems[m.teamA.name] || (m.teamA.name in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[m.teamA.name]}` : null);
+                                            const emblemB = customEmblems[m.teamB.name] || (m.teamB.name in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[m.teamB.name]}` : null);
+                                            
+                                            return (
+                                                <div key={m.id || idx} className="premium-card" style={{ 
+                                                    padding: '15px', 
+                                                    position: 'relative',
+                                                    background: 'var(--bg-card)',
+                                                    border: '1px solid var(--border-color)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '12px'
+                                                }}>
+                                                    {/* Header: Sport Name centered and Trash Icon */}
+                                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                                                        <div style={{ 
+                                                            fontSize: '12px', 
+                                                            fontWeight: 800, 
+                                                            color: 'var(--accent-color)',
+                                                            textTransform: 'uppercase',
+                                                            letterSpacing: '1px',
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            {m.sport}
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => removePreviewMatch(m.id)}
+                                                            style={{ 
+                                                                position: 'absolute',
+                                                                right: '-5px',
+                                                                top: '-5px',
+                                                                background: 'transparent',
+                                                                border: 'none',
+                                                                color: 'var(--text-secondary)',
+                                                                cursor: 'pointer',
+                                                                padding: '5px',
+                                                                transition: 'color 0.2s'
+                                                            }}
+                                                            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                                                            onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Teams and VS */}
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', padding: '5px 0' }}>
+                                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
+                                                            {emblemA ? (
+                                                                <img src={emblemA} alt="" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
+                                                            ) : (
+                                                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>?</div>
+                                                            )}
+                                                            <div style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1.2 }}>{m.teamA.name.split(' - ')[0]}</div>
+                                                        </div>
+
+                                                        <div style={{ 
+                                                            fontSize: '12px', 
+                                                            fontWeight: 900, 
+                                                            color: 'var(--text-secondary)',
+                                                            background: 'rgba(255,255,255,0.05)',
+                                                            padding: '4px 8px',
+                                                            borderRadius: '6px',
+                                                            border: '1px solid var(--border-color)'
+                                                        }}>VS</div>
+
+                                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
+                                                            {emblemB ? (
+                                                                <img src={emblemB} alt="" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
+                                                            ) : (
+                                                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>?</div>
+                                                            )}
+                                                            <div style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1.2 }}>{m.teamB.name.split(' - ')[0]}</div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Footer info */}
+                                                    <div style={{ 
+                                                        marginTop: 'auto', 
+                                                        paddingTop: '10px', 
+                                                        borderTop: '1px solid var(--border-color)',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        fontSize: '10px',
+                                                        color: 'var(--text-secondary)',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        <span>{m.date}</span>
+                                                        <span style={{ color: 'var(--accent-color)' }}>{m.time ? m.time : 'A definir'}</span>
+                                                        <span>{m.stage.split(' ').map((w: string) => w[0]).join('').toUpperCase()}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <button onClick={handleConfirmImport} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>
+                                        Confirmar e Criar Partidas
+                                    </button>
+                                    <button onClick={() => setPreviewMatches([])} style={modalButtonStyle}>
+                                        Voltar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </ModalOverlay>
             )}

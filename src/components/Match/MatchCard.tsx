@@ -182,15 +182,87 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
     };
 
     const getTeamEmblem = (team: any) => {
-        if (team.logo) return team.logo;
-        if (team.course && team.course in COURSE_EMBLEMS) {
-            return `/emblemas/${COURSE_EMBLEMS[team.course]}`;
+        if (!team) return null;
+        if (typeof team === 'object' && team.logo) return team.logo;
+        
+        const possibleKeys: string[] = [];
+        let identifiedCourse = '';
+        let identifiedFaculty = '';
+        
+        if (typeof team === 'string') {
+            possibleKeys.push(team);
+            if (team.includes(' - ')) {
+                [identifiedCourse, identifiedFaculty] = team.split(' - ');
+            } else {
+                identifiedCourse = team;
+            }
+        } else {
+            // 1. Chave exata (Nome Completo)
+            if (team.name) {
+                possibleKeys.push(team.name);
+                if (team.name.includes(' - ') && (!team.course || !team.faculty)) {
+                    const [c, f] = team.name.split(' - ');
+                    identifiedCourse = c;
+                    identifiedFaculty = f;
+                }
+            }
+            
+            // 2. Chave composta (Curso - Faculdade)
+            if (team.course && team.faculty) {
+                possibleKeys.push(`${team.course} - ${team.faculty}`);
+                identifiedCourse = identifiedCourse || team.course;
+                identifiedFaculty = identifiedFaculty || team.faculty;
+            }
+            
+            // 3. Apenas o curso
+            if (team.course) {
+                possibleKeys.push(team.course);
+                identifiedCourse = identifiedCourse || team.course;
+            }
+            
+            // 4. Nome splitado (primeira parte)
+            if (team.name && team.name.includes(' - ')) {
+                const firstPart = team.name.split(' - ')[0];
+                possibleKeys.push(firstPart);
+                identifiedCourse = identifiedCourse || firstPart;
+            }
         }
         
-        const strictName = team.name.split(' - ')[0];
-        if (strictName in COURSE_EMBLEMS) {
-            return `/emblemas/${COURSE_EMBLEMS[strictName]}`;
+        const emblemKeys = Object.keys(COURSE_EMBLEMS);
+        
+        // FASE 1: TENTATIVA DE MATCH EXATO (Prioritária)
+        for (const pk of possibleKeys) {
+            const normalizedPk = String(pk).trim().toLowerCase();
+            if (!normalizedPk) continue;
+            
+            const exactKey = emblemKeys.find(k => k.toLowerCase() === normalizedPk);
+            if (exactKey) return `/emblemas/${COURSE_EMBLEMS[exactKey]}`;
         }
+        
+        // FASE 2: TENTATIVA DE MATCH PARCIAL (Apenas se falhar o exato)
+        // Se temos faculdade identificada, tentamos um match que contenha AMBOS
+        if (identifiedCourse && identifiedFaculty) {
+            const courseLow = identifiedCourse.toLowerCase();
+            const facultyLow = identifiedFaculty.toLowerCase();
+            const bestKey = emblemKeys.find(k => {
+                const kLow = k.toLowerCase();
+                return kLow.includes(courseLow) && kLow.includes(facultyLow);
+            });
+            if (bestKey) return `/emblemas/${COURSE_EMBLEMS[bestKey]}`;
+        }
+
+        // FASE 3: MATCH PARCIAL GENÉRICO (Último recurso)
+        for (const pk of possibleKeys) {
+            const normalizedPk = String(pk).trim().toLowerCase();
+            if (!normalizedPk) continue;
+
+            const partialKey = emblemKeys.find(k => {
+                const normalizedK = k.toLowerCase();
+                return normalizedK.includes(normalizedPk) || normalizedPk.includes(normalizedK);
+            });
+            if (partialKey) return `/emblemas/${COURSE_EMBLEMS[partialKey]}`;
+        }
+        
         return null;
     };
 
