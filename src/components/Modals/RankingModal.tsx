@@ -9,9 +9,20 @@ interface RankingModalProps {
 }
 
 const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking }) => {
-    const { ranking: liveRanking } = useData();
+    const { ranking: liveRanking, customEmblems } = useData();
     const ranking = useOfficialRanking ? mockRanking : liveRanking;
     const getTeamEmblem = (teamName: string) => {
+        // 1. Priorizar emblema customizado
+        if (customEmblems[teamName]) {
+            return customEmblems[teamName];
+        }
+        
+        // 2. Tentar emblema padrão
+        if (teamName in COURSE_EMBLEMS) {
+            return `/emblemas/${COURSE_EMBLEMS[teamName]}`;
+        }
+        
+        // 3. Buscar por match parcial
         const foundCourse = Object.keys(COURSE_EMBLEMS).find(courseKey =>
             courseKey.toLowerCase().includes(teamName.toLowerCase())
         );
@@ -162,9 +173,7 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                                                     padding: '4px'
                                                 }}>
                                                 {(() => {
-                                                        const emblemUrl = item.course in COURSE_EMBLEMS
-                                                            ? `/emblemas/${COURSE_EMBLEMS[item.course]}`
-                                                            : getTeamEmblem(item.course);
+                                                        const emblemUrl = getTeamEmblem(item.course);
                                                         if (emblemUrl) {
                                                             return (
                                                                 <>

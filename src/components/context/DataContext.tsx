@@ -79,6 +79,7 @@ interface DataContextType {
   addMatch: (match: Match) => void;
   updateMatch: (match: Match) => void;
   deleteMatch: (id: string) => void;
+  deleteScheduledMatches: () => Promise<void>;
   ranking: RankingEntry[];
   updateRankingPoints: (course: string, newPoints: number) => void;
   featuredAthletes: FeaturedAthlete[];
@@ -688,6 +689,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     await supabase.from("matches").delete().match({ id });
   };
 
+  const deleteScheduledMatches = async () => {
+    setMatches((prev) => prev.filter((m) => m.status !== "scheduled"));
+    await supabase.from("matches").delete().eq("status", "scheduled");
+  };
+
   const updateRankingPoints = useCallback(
     async (course: string, newPoints: number) => {
       const updated = ranking.map((entry) =>
@@ -779,6 +785,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         addMatch,
         updateMatch,
         deleteMatch,
+        deleteScheduledMatches,
         ranking,
         updateRankingPoints,
         resetRankingPoints,

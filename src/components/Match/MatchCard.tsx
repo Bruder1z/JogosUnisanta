@@ -325,7 +325,7 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                 return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span>{match.sport.toUpperCase()} - {match.category.toUpperCase()}</span>
+                            <span>{match.sport} {match.category}</span>
                             {showPhase && (
                                 <span style={{
                                     fontSize: '11px',

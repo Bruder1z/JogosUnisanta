@@ -38,6 +38,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     courses: coursesList,
     ensureMatchMvpCandidates,
     deleteMatch,
+    deleteScheduledMatches,
   } = useData();
 
   const MVP_ELIGIBLE_SPORTS = new Set([
@@ -352,16 +353,53 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   };
 
   // Filter matches: Only scheduled or live
-  const filteredMatches = matches.filter((m: Match) => {
-    const matchesStatus = m.status !== "finished";
-    const matchesSport = filterSport === "Todos" || m.sport === filterSport;
-    const matchesLocation =
-      filterLocation === "Todos" || m.location === filterLocation;
-    const matchesCategory =
-      filterCategory === "Todos" || m.category === filterCategory;
+  const filteredMatches = matches
+    .filter((m: Match) => {
+      const matchesStatus = m.status !== "finished";
+      const matchesSport = filterSport === "Todos" || m.sport === filterSport;
+      const matchesLocation =
+        filterLocation === "Todos" || m.location === filterLocation;
+      const matchesCategory =
+        filterCategory === "Todos" || m.category === filterCategory;
 
-    return matchesStatus && matchesSport && matchesLocation && matchesCategory;
-  });
+      return matchesStatus && matchesSport && matchesLocation && matchesCategory;
+    })
+    .sort((a: Match, b: Match) => {
+      // Partidas ao vivo sempre no topo
+      if (a.status === "live" && b.status !== "live") return -1;
+      if (b.status === "live" && a.status !== "live") return 1;
+      
+      // Para partidas agendadas, ordenar por data e hora
+      if (a.status === "scheduled" && b.status === "scheduled") {
+        // Converter data de DD/MM/YYYY ou YYYY-MM-DD para timestamp
+        const parseDate = (dateStr: string, timeStr: string) => {
+          let date: Date;
+          if (dateStr.includes('/')) {
+            // Formato DD/MM/YYYY
+            const [day, month, year] = dateStr.split('/');
+            date = new Date(`${year}-${month}-${day}`);
+          } else {
+            // Formato YYYY-MM-DD
+            date = new Date(dateStr);
+          }
+          
+          // Adicionar hora se disponível
+          if (timeStr) {
+            const [hours, minutes] = timeStr.split(':');
+            date.setHours(parseInt(hours), parseInt(minutes));
+          }
+          
+          return date.getTime();
+        };
+        
+        const timeA = parseDate(a.date, a.time);
+        const timeB = parseDate(b.date, b.time);
+        
+        return timeA - timeB; // Mais próximas primeiro
+      }
+      
+      return 0;
+    });
 
   const selectedMatch = matches.find((m) => m.id === activeMatchId) || null;
   const isBeachTennis = selectedMatch?.sport === "Beach Tennis";
@@ -3418,8 +3456,39 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             }}
           >
             <h1 style={styles.title}>⚽ Controle de Partida</h1>
-            <button
-              onClick={() => {
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <button
+                onClick={async () => {
+                  const scheduled = matches.filter(m => m.status === "scheduled");
+                  if (scheduled.length === 0) {
+                    showNotification("Nenhuma partida agendada para excluir.", "error");
+                    return;
+                  }
+                  if (window.confirm(`Excluir todas as ${scheduled.length} partidas agendadas? Esta ação não pode ser desfeita.`)) {
+                    await deleteScheduledMatches();
+                    showNotification("Todas as partidas agendadas foram excluídas.", "success");
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  color: "#ef4444",
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid #ef444460",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "13px",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <Trash2 size={16} /> Excluir Agendadas
+              </button>
+              <button
+                onClick={() => {
                 setIsNewMatchOpen(true);
                 // Limpar cache de emblemas ao abrir formulário
                 setEmblemA(null);
@@ -3452,6 +3521,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             >
               <PlusCircle size={18} /> Nova Partida
             </button>
+            </div>
           </div>
         </div>
 
@@ -3626,7 +3696,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         alignItems: "center",
                       }}
                     >
-                      <span style={styles.sportBadge}>{match.sport}</span>
+                      <span style={styles.sportBadge}>{match.sport} {match.category}</span>
                       {match.status === "live" && (
                         <span
                           style={{
@@ -3641,7 +3711,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={styles.categoryBadge}>{match.category}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -4495,11 +4564,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       fontSize: "11px",
                       fontWeight: 700,
                       color: "var(--text-secondary)",
-                      textTransform: "uppercase",
                       letterSpacing: "1.5px",
                       marginBottom: "2px",
                     }}>
-                      {selectedMatch.sport} · {selectedMatch.category}
+                      {selectedMatch.sport} {selectedMatch.category}
                     </span>
                     <Clock size={24} />
                     <span style={styles.minute}>
@@ -4554,11 +4622,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       fontSize: "11px",
                       fontWeight: 700,
                       color: "var(--text-secondary)",
-                      textTransform: "uppercase",
                       letterSpacing: "1.5px",
                       marginBottom: "2px",
                     }}>
-                      {selectedMatch.sport} · {selectedMatch.category}
+                      {selectedMatch.sport} {selectedMatch.category}
                     </span>
                     {selectedMatch.status === "live" && (
                       <span style={styles.liveBadge} className="pulse-animation">

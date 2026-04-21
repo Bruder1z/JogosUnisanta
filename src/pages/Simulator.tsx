@@ -354,8 +354,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                 </div>
                             </div>
                         )}
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', textAlign: 'center' }}>
-                            {match.sport} • {match.category}
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
+                            {match.sport} {match.category}
                         </div>
                         {['Vôlei', 'Vôlei de Praia', 'Futevôlei', 'Beach Tennis'].includes(match.sport) && match.stage && (
                             <div style={{ fontSize: '11px', fontWeight: 700, textAlign: 'center', marginTop: '2px', color: match.stage === 'Fase Final' ? '#f59e0b' : 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>

@@ -89,6 +89,50 @@ const NORMALIZE_INST_MAP: Record<string, string> = {
   "STRONG": "Strong"
 };
 
+// Mapeamento de abreviações da planilha para modalidade e categoria
+const MODALIDADE_MAP: Record<string, { sport: string; category: 'Masculino' | 'Feminino' }> = {
+  'FSM':          { sport: 'Futsal',           category: 'Masculino' },
+  'FSF':          { sport: 'Futsal',           category: 'Feminino'  },
+  'FM':           { sport: 'Futebol Society',  category: 'Masculino' },
+  'FF':           { sport: 'Futebol Society',  category: 'Feminino'  },
+  'FM 1X1':       { sport: 'Futebol X1',       category: 'Masculino' },
+  'FF 1X1':       { sport: 'Futebol X1',       category: 'Feminino'  },
+  'VM':           { sport: 'Vôlei',            category: 'Masculino' },
+  'VF':           { sport: 'Vôlei',            category: 'Feminino'  },
+  'VPM':          { sport: 'Vôlei de Praia',   category: 'Masculino' },
+  'VPF':          { sport: 'Vôlei de Praia',   category: 'Feminino'  },
+  'BM':           { sport: 'Basquetebol',      category: 'Masculino' },
+  'BF':           { sport: 'Basquetebol',      category: 'Feminino'  },
+  'BM 3X3':       { sport: 'Basquete 3x3',     category: 'Masculino' },
+  'BF 3X3':       { sport: 'Basquete 3x3',     category: 'Feminino'  },
+  'HM':           { sport: 'Handebol',         category: 'Masculino' },
+  'HF':           { sport: 'Handebol',         category: 'Feminino'  },
+  'TMM':          { sport: 'Tênis de Mesa',    category: 'Masculino' },
+  'TMF':          { sport: 'Tênis de Mesa',    category: 'Feminino'  },
+  'B TENNIS M':   { sport: 'Beach Tennis',     category: 'Masculino' },
+  'B TENNIS F':   { sport: 'Beach Tennis',     category: 'Feminino'  },
+  'TAMB. M':      { sport: 'Tamboréu',         category: 'Masculino' },
+  'TAMB. F':      { sport: 'Tamboréu',         category: 'Feminino'  },
+  'FUTEVÔLEI M':  { sport: 'Futevôlei',        category: 'Masculino' },
+  'FUTEVÔLEI F':  { sport: 'Futevôlei',        category: 'Feminino'  },
+  'FUTEVOLEI M':  { sport: 'Futevôlei',        category: 'Masculino' },
+  'FUTEVOLEI F':  { sport: 'Futevôlei',        category: 'Feminino'  },
+  'XADREZ':       { sport: 'Xadrez',           category: 'Masculino' },
+  'NATAÇÃO':      { sport: 'Natação',          category: 'Masculino' },
+  'NATACAO':      { sport: 'Natação',          category: 'Masculino' },
+  'CARATÊ':       { sport: 'Caratê',           category: 'Masculino' },
+  'KARATE':       { sport: 'Caratê',           category: 'Masculino' },
+  'JUDÔ':         { sport: 'Judô',             category: 'Masculino' },
+  'JUDO':         { sport: 'Judô',             category: 'Masculino' },
+};
+
+const parseModalidade = (raw: string): { sport: string; category: 'Masculino' | 'Feminino' } => {
+  const key = raw.trim().toUpperCase();
+  if (MODALIDADE_MAP[key]) return MODALIDADE_MAP[key];
+  // fallback: retorna o valor bruto como sport e Masculino como categoria
+  return { sport: raw.trim(), category: 'Masculino' };
+};
+
 const normalizeTeamName = (rawName: string) => {
     if (!rawName) return "";
     let name = rawName.toUpperCase().trim();
@@ -481,11 +525,13 @@ const AdminDashboard: React.FC = () => {
                 const teamAAliased = normalizeTeamName(String(equipeAVal || ''));
                 const teamBAliased = normalizeTeamName(String(equipeBVal || ''));
 
+                const { sport: parsedSport, category: parsedCategory } = parseModalidade(String(modalidadeVal || ''));
+
                 parsedMatches.push({
                     id: crypto.randomUUID(),
                     date: processedDate,
                     time: processedTime,
-                    sport: String(modalidadeVal || ''),
+                    sport: parsedSport,
                     teamA: { id: crypto.randomUUID(), name: teamAAliased, course: teamAAliased, faculty: '' },
                     teamB: { id: crypto.randomUUID(), name: teamBAliased, course: teamBAliased, faculty: '' },
                     location: String(localVal || ''),
@@ -493,7 +539,7 @@ const AdminDashboard: React.FC = () => {
                     status: 'scheduled',
                     scoreA: 0,
                     scoreB: 0,
-                    category: 'Masculino'
+                    category: parsedCategory
                 });
             }
             
@@ -2273,7 +2319,7 @@ const AdminDashboard: React.FC = () => {
                                                             letterSpacing: '1px',
                                                             textAlign: 'center'
                                                         }}>
-                                                            {m.sport}
+                                                            {m.sport} {m.category}
                                                         </div>
                                                         <button 
                                                             onClick={() => removePreviewMatch(m.id)}
@@ -2339,7 +2385,7 @@ const AdminDashboard: React.FC = () => {
                                                     }}>
                                                         <span>{m.date}</span>
                                                         <span style={{ color: 'var(--accent-color)' }}>{m.time ? m.time : 'A definir'}</span>
-                                                        <span>{m.stage.split(' ').map((w: string) => w[0]).join('').toUpperCase()}</span>
+                                                        <span>{m.location || '—'}</span>
                                                     </div>
                                                 </div>
                                             );

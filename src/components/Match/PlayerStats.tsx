@@ -123,7 +123,7 @@ const PlayerStats: FC<PlayerStatsProps> = ({ match, onClose }) => {
                 color: "var(--text-secondary)",
               }}
             >
-              {match.sport} • {match.category}
+              {match.sport} {match.category}
             </p>
           </div>
           <button
