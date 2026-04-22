@@ -9,12 +9,12 @@ import LigaCard from '../components/Cards/LigaCard';
 import { COURSE_EMBLEMS, type Match } from '../data/mockData';
 import { useAuth, type Prediction } from '../context/AuthContext';
 import { useData } from '../components/context/DataContext';
-import { 
+import {
     Users,
     CheckCircle, RotateCcw, Calendar, Zap
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import LeagueDetailsModal from '../components/Modals/LeagueDetailsModal.tsx';
+import LeagueDetailsModal from '../components/Modals/LeagueDetailsModal';
 import LeagueFormModal from '../components/Modals/LeagueFormModal';
 import JoinLeagueModal from '../components/Modals/JoinLeagueModal';
 
@@ -177,10 +177,10 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
 
     // Tabela de regras por modalidade e fase
     const SCORE_RULES: Record<string, { label: string; classificacao: number; final: number }> = {
-        'Vôlei':          { label: 'sets', classificacao: 25, final: 2 },
-        'Vôlei de Praia': { label: 'pts',  classificacao: 21, final: 2 },
-        'Futevôlei':      { label: 'pts',  classificacao: 18, final: 2 },
-        'Beach Tennis':   { label: 'games',classificacao: 6,  final: 8 },
+        'Vôlei': { label: 'sets', classificacao: 25, final: 2 },
+        'Vôlei de Praia': { label: 'pts', classificacao: 21, final: 2 },
+        'Futevôlei': { label: 'pts', classificacao: 18, final: 2 },
+        'Beach Tennis': { label: 'games', classificacao: 6, final: 8 },
     };
 
     const getMaxScore = (sport: string, stage?: string): number => {
@@ -262,11 +262,11 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                 <input
                                     type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
                                     disabled={isCardDisabled} value={localA}
-                                    onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
-                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalA(raw); if (raw === '') { updatePrediction(match.id,'scoreA',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedA)); if (c !== raw) setLocalA(c); updatePrediction(match.id,'scoreA',c); }}
+                                    onKeyDown={(e) => { const ok = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); setLocalA(raw); if (raw === '') { updatePrediction(match.id, 'scoreA', ''); return; } const n = parseInt(raw, 10); const c = String(Math.min(n, maxAllowedA)); if (c !== raw) setLocalA(c); updatePrediction(match.id, 'scoreA', c); }}
                                     onFocus={(e) => { focusedField.current = 'A'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
-                                    style={{ width:'48px', height:'48px', border:`2px solid ${localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius:'6px', fontSize:'24px', fontWeight:900, color: localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box', transition:'border-color 0.2s, color 0.2s' }}
+                                    style={{ width: '48px', height: '48px', border: `2px solid ${localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius: '6px', fontSize: '24px', fontWeight: 900, color: localA !== '' && Number(localA) === maxAllowedA && maxScore < 99 ? '#ef4444' : 'white', background: 'transparent', textAlign: 'center', outline: 'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing: 'border-box', transition: 'border-color 0.2s, color 0.2s' }}
                                 />
                             )}
                             {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
@@ -357,11 +357,11 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                                 <input
                                     type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
                                     disabled={isCardDisabled} value={localB}
-                                    onKeyDown={(e) => { const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
-                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g,''); setLocalB(raw); if (raw === '') { updatePrediction(match.id,'scoreB',''); return; } const n = parseInt(raw,10); const c = String(Math.min(n, maxAllowedB)); if (c !== raw) setLocalB(c); updatePrediction(match.id,'scoreB',c); }}
+                                    onKeyDown={(e) => { const ok = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab']; if (!ok.includes(e.key) && !/^[0-9]$/.test(e.key)) e.preventDefault(); }}
+                                    onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); setLocalB(raw); if (raw === '') { updatePrediction(match.id, 'scoreB', ''); return; } const n = parseInt(raw, 10); const c = String(Math.min(n, maxAllowedB)); if (c !== raw) setLocalB(c); updatePrediction(match.id, 'scoreB', c); }}
                                     onFocus={(e) => { focusedField.current = 'B'; e.target.select(); }}
                                     onBlur={() => { focusedField.current = null; }}
-                                    style={{ width:'48px', height:'48px', border:`2px solid ${localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius:'6px', fontSize:'24px', fontWeight:900, color: localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white', background:'transparent', textAlign:'center', outline:'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing:'border-box', transition:'border-color 0.2s, color 0.2s' }}
+                                    style={{ width: '48px', height: '48px', border: `2px solid ${localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white'}`, borderRadius: '6px', fontSize: '24px', fontWeight: 900, color: localB !== '' && Number(localB) === maxAllowedB && maxScore < 99 ? '#ef4444' : 'white', background: 'transparent', textAlign: 'center', outline: 'none', cursor: isCardDisabled ? 'not-allowed' : 'text', boxSizing: 'border-box', transition: 'border-color 0.2s, color 0.2s' }}
                                 />
                             )}
                             {match.status === 'finished' && <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>PALPITE</div>}
@@ -387,8 +387,8 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                 const [dot, label, col] = isExact
                     ? ['#4ade80', 'PLACAR EXATO (+3)', '#4ade80']
                     : isWin
-                    ? ['#eab308', 'ACERTOU VENCEDOR (+1)', '#eab308']
-                    : ['#ef4444', 'ERROU (0)', '#ef4444'];
+                        ? ['#eab308', 'ACERTOU VENCEDOR (+1)', '#eab308']
+                        : ['#ef4444', 'ERROU (0)', '#ef4444'];
                 return (
                     <div style={{ padding: '12px 18px', background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: dot }} />
@@ -527,8 +527,8 @@ const Simulator: FC = () => {
         } else if (data) {
             setAllLeagues(data);
             const userEmail = user.email.toLowerCase();
-            const userLeagues = data.filter(l => 
-                (l.owner_email && l.owner_email.toLowerCase() === userEmail) || 
+            const userLeagues = data.filter(l =>
+                (l.owner_email && l.owner_email.toLowerCase() === userEmail) ||
                 (l.participants && Array.isArray(l.participants) && l.participants.some((p: string) => p.toLowerCase() === userEmail)) ||
                 (l.participants && typeof l.participants === 'string' && l.participants.toLowerCase().includes(userEmail))
             );
@@ -544,7 +544,7 @@ const Simulator: FC = () => {
                 .from('league_requests')
                 .select('*')
                 .eq('user_email', user.email);
-            
+
             if (requestsData) {
                 setUserRequests(requestsData);
             }
@@ -1065,8 +1065,8 @@ const Simulator: FC = () => {
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
-                                                background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' : 
-                                                           (totalLeaguesCount >= 5 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
+                                                background: userRequests.some(r => r.league_id === league.id) ? 'rgba(255,255,255,0.05)' :
+                                                    (totalLeaguesCount >= 5 ? 'rgba(255,255,255,0.02)' : 'var(--accent-color)'),
                                                 color: (userRequests.some(r => r.league_id === league.id) || totalLeaguesCount >= 5) ? 'var(--text-secondary)' : 'white',
                                                 border: (userRequests.some(r => r.league_id === league.id) || totalLeaguesCount >= 5) ? '1px solid var(--border-color)' : 'none',
                                                 borderRadius: '8px',
@@ -1076,8 +1076,8 @@ const Simulator: FC = () => {
                                                 opacity: (totalLeaguesCount >= 5 && !userRequests.some(r => r.league_id === league.id)) ? 0.5 : 1
                                             }}
                                         >
-                                            {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' : 
-                                             (totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
+                                            {userRequests.some(r => r.league_id === league.id) ? 'AGUARDE (PEDIDO FEITO)' :
+                                                (totalLeaguesCount >= 5 ? 'LIMITE ATINGIDO' : 'PEDIR PARA ENTRAR')}
                                         </button>
                                     </div>
                                 ))}

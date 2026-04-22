@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect, useMemo, useRef } from "react";
+﻿import { type FC, useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Clock,
@@ -14,11 +14,12 @@ import {
   type Match,
   type MatchEvent,
   COURSE_EMBLEMS,
-} from "../../data/mockData";
-import { type MatchMvpCandidateInput, useData } from "../context/DataContext";
-import { useAuth } from "../../context/AuthContext";
-import PlayerStats from "./PlayerStats";
-import LiveChat from "../Chat/LiveChat";
+} from "../../../data/mockData";
+import { type MatchMvpCandidateInput, useData } from "../../context/DataContext";
+import { useAuth } from "../../../context/AuthContext";
+import PlayerStats from "../PlayerStats";
+import LiveChat from "../../Chat/LiveChat";
+import './styles.css';
 
 interface MatchModalProps {
   match: Match;
@@ -53,7 +54,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
   // MVP Voting Timer: baseado no timestamp real da partida finalizada
   useEffect(() => {
-    // Se partida não terminou ou não tem timestamp, retorna
+    // Se partida n├úo terminou ou n├úo tem timestamp, retorna
     if (currentMatch.status !== "finished" || !currentMatch.mvpVotingStartedAt) {
       setIsMvpVotingActive(false);
       return;
@@ -72,7 +73,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         return;
       }
 
-      // Se tempo ainda está rolando, ativa a votação
+      // Se tempo ainda est├í rolando, ativa a vota├º├úo
       setIsMvpVotingActive(true);
     }, 500);
 
@@ -183,17 +184,17 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const isBeachTennis = currentMatch.sport === "Beach Tennis";
   const isFutsal = currentMatch.sport === "Futsal";
   const isFutebolSociety = currentMatch.sport === "Futebol Society";
-  const isTamboreu = currentMatch.sport === "Tamboréu";
+  const isTamboreu = currentMatch.sport === "Tambor├®u";
   const isSetSport = [
-    "Vôlei",
-    "Vôlei de Praia",
-    "Tênis de Mesa",
-    "Futevôlei",
+    "V├┤lei",
+    "V├┤lei de Praia",
+    "T├¬nis de Mesa",
+    "Futev├┤lei",
   ].includes(currentMatch.sport);
   const isVolleyballFamilySport = [
-    "Vôlei",
-    "Vôlei de Praia",
-    "Futevôlei",
+    "V├┤lei",
+    "V├┤lei de Praia",
+    "Futev├┤lei",
   ].includes(currentMatch.sport);
   const isBasketball =
     currentMatch.sport === "Basquetebol" ||
@@ -213,19 +214,19 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     if (isGoalBasedMvpSport) return value === 1 ? "gol" : "gols";
     return value === 1 ? "ponto" : "pontos";
   };
-  const isSwimming = currentMatch.sport === "Natação";
-  const isKarate = currentMatch.sport === "Caratê";
-  const isJudo = currentMatch.sport === "Judô";
+  const isSwimming = currentMatch.sport === "Nata├º├úo";
+  const isKarate = currentMatch.sport === "Carat├¬";
+  const isJudo = currentMatch.sport === "Jud├┤";
   const isXadrez = currentMatch.sport === "Xadrez";
   const hideTimelineMinute = [
-    "Vôlei",
-    "Vôlei de Praia",
-    "Tênis de Mesa",
-    "Futevôlei",
+    "V├┤lei",
+    "V├┤lei de Praia",
+    "T├¬nis de Mesa",
+    "Futev├┤lei",
     "Beach Tennis",
-    "Natação",
-    "Caratê",
-    "Judô",
+    "Nata├º├úo",
+    "Carat├¬",
+    "Jud├┤",
     "Xadrez",
   ].includes(currentMatch.sport);
   const isResultBreakdownSport = isSetSport || isBeachTennis;
@@ -444,12 +445,12 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     );
   };
 
-  // O bloco de MVP foi removido conforme solicitação, a Cronologia preencherá o espaço.
+  // O bloco de MVP foi removido conforme solicita├º├úo, a Cronologia preencher├í o espa├ºo.
   const getEventIcon = (type: MatchEvent["type"]) => {
     const isVolleyball =
-      currentMatch.sport === "Vôlei" ||
-      currentMatch.sport === "Vôlei de Praia" ||
-      currentMatch.sport === "Futevôlei";
+      currentMatch.sport === "V├┤lei" ||
+      currentMatch.sport === "V├┤lei de Praia" ||
+      currentMatch.sport === "Futev├┤lei";
     const isBasketball =
       currentMatch.sport === "Basquetebol" ||
       currentMatch.sport === "Basquete 3x3";
@@ -459,15 +460,15 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     switch (type) {
       case "goal":
-        if (isBasketball) return <div style={{ fontSize: "16px" }}>🏀</div>;
-        if (isBeachTennis) return <div style={{ fontSize: "16px" }}>🎾</div>;
-        if (isTamboreu) return <div style={{ fontSize: "16px" }}>🎾</div>;
-        if (isKarate || isJudo) return <div style={{ fontSize: "16px" }}>🥋</div>;
-        if (isSoccerSport) return <div style={{ fontSize: "16px" }}>⚽</div>;
-        if (isVolleyball) return <div style={{ fontSize: "16px" }}>🏐</div>;
-        return <div style={{ fontSize: "16px" }}>⚽</div>;
+        if (isBasketball) return <div style={{ fontSize: "16px" }}>­ƒÅÇ</div>;
+        if (isBeachTennis) return <div style={{ fontSize: "16px" }}>­ƒÄ¥</div>;
+        if (isTamboreu) return <div style={{ fontSize: "16px" }}>­ƒÄ¥</div>;
+        if (isKarate || isJudo) return <div style={{ fontSize: "16px" }}>­ƒÑï</div>;
+        if (isSoccerSport) return <div style={{ fontSize: "16px" }}>ÔÜ¢</div>;
+        if (isVolleyball) return <div style={{ fontSize: "16px" }}>­ƒÅÉ</div>;
+        return <div style={{ fontSize: "16px" }}>ÔÜ¢</div>;
       case "swimming_result":
-        return <div style={{ fontSize: "16px" }}>🏊</div>;
+        return <div style={{ fontSize: "16px" }}>­ƒÅè</div>;
       case "set_win":
         return <Trophy size={16} color="#ffd700" />;
       case "yellow_card":
@@ -493,13 +494,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           />
         );
       case "penalty_scored":
-        return <div style={{ fontSize: "16px" }}>⚽</div>;
+        return <div style={{ fontSize: "16px" }}>ÔÜ¢</div>;
       case "penalty_missed":
-        return <div style={{ fontSize: "16px" }}>❌</div>;
+        return <div style={{ fontSize: "16px" }}>ÔØî</div>;
       case "shootout_scored":
-        return <div style={{ fontSize: "16px" }}>⚽</div>;
+        return <div style={{ fontSize: "16px" }}>ÔÜ¢</div>;
       case "shootout_missed":
-        return <div style={{ fontSize: "16px" }}>❌</div>;
+        return <div style={{ fontSize: "16px" }}>ÔØî</div>;
       case "start":
         return <Play size={16} color="var(--accent-color)" />;
       case "halftime":
@@ -507,7 +508,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "end":
         return <CheckCircle size={16} color="#44ff44" />;
       case "draw":
-        return <div style={{ fontSize: "16px" }}>½</div>;
+        return <div style={{ fontSize: "16px" }}>┬¢</div>;
       case "chess_result":
         return <Trophy size={16} color="#ffd700" />;
       default:
@@ -524,19 +525,19 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       case "set_win":
         return "Fim do Set";
       case "yellow_card":
-        return "Cartão Amarelo";
+        return "Cart├úo Amarelo";
       case "red_card":
-        return "Cartão Vermelho";
+        return "Cart├úo Vermelho";
       case "penalty_scored":
-        return "Pênalti Marcado";
+        return "P├¬nalti Marcado";
       case "penalty_missed":
-        return "Pênalti Perdido";
+        return "P├¬nalti Perdido";
       case "shootout_scored":
         return "GOL de Shoot-out";
       case "shootout_missed":
-        return "❌ Shoot-out Perdido";
+        return "ÔØî Shoot-out Perdido";
       case "start":
-        return "Início da Partida";
+        return "In├¡cio da Partida";
       case "halftime":
         return "Intervalo";
       case "end":
@@ -597,9 +598,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       if (isBasketball) {
         const pts = event.description?.match(/\+(\d+)\s*Ponto/)?.[1];
         if (event.player) {
-          return pts ? `🏀 ${event.player} +${pts}pts` : `🏀 ${event.player}`;
+          return pts ? `­ƒÅÇ ${event.player} +${pts}pts` : `­ƒÅÇ ${event.player}`;
         }
-        return pts ? `🏀 +${pts}pts — ${teamName}` : `🏀 ${teamName}`;
+        return pts ? `­ƒÅÇ +${pts}pts ÔÇö ${teamName}` : `­ƒÅÇ ${teamName}`;
       }
       if (event.player) {
         return `GOL! ${event.player}`;
@@ -616,20 +617,20 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
     if (event.type === "penalty_scored") {
       return event.player
-        ? `Pênalti convertido! ${event.player}`
-        : "Pênalti convertido!";
+        ? `P├¬nalti convertido! ${event.player}`
+        : "P├¬nalti convertido!";
     }
 
     if (event.type === "yellow_card") {
       return event.player
-        ? `Cartão Amarelo - ${event.player}`
-        : "Cartão Amarelo";
+        ? `Cart├úo Amarelo - ${event.player}`
+        : "Cart├úo Amarelo";
     }
 
     if (event.type === "red_card") {
       return event.player
-        ? `Cartão Vermelho - ${event.player}`
-        : "Cartão Vermelho";
+        ? `Cart├úo Vermelho - ${event.player}`
+        : "Cart├úo Vermelho";
     }
 
     if (event.type === "draw") {
@@ -637,7 +638,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     }
 
     if (event.type === "chess_result") {
-      return event.description || "Vitória";
+      return event.description || "Vit├│ria";
     }
 
     return stripLeadingEmoji(getSafeEventDescription(event));
@@ -656,7 +657,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           : "Faculdade";
 
     const pontuacaoLabel = event.player
-      ? `🏀 ${event.player} +${pointValue}pts — ${teamName}`
+      ? `­ƒÅÇ ${event.player} +${pointValue}pts ÔÇö ${teamName}`
       : `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`;
 
     return {
@@ -719,11 +720,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
       const matchTeam =
         teamId === currentMatch.teamA.id ? currentMatch.teamA : currentMatch.teamB;
       const nameParts = matchTeam.name.split(" - ");
-      const institution = matchTeam.faculty || nameParts[1] || "Não informado";
+      const institution = matchTeam.faculty || nameParts[1] || "N├úo informado";
       return {
         teamName: nameParts[0] || matchTeam.name,
         institution,
-        course: matchTeam.course || nameParts[0] || "Não informado",
+        course: matchTeam.course || nameParts[0] || "N├úo informado",
       };
     };
 
@@ -990,7 +991,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
         return {
           ...event,
-          timelineScore: event.type === "goal" ? `🎾 ${setPointsA} x ${setPointsB}` : "",
+          timelineScore: event.type === "goal" ? `­ƒÄ¥ ${setPointsA} x ${setPointsB}` : "",
           timelineQuarter,
         };
       }
@@ -1051,7 +1052,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
 
   // Codigo mantido em comentario conforme solicitado pelo usuario.
   // const simulateMatch = () => {
-  //     const isVolleyball = currentMatch.sport === 'Vôlei' || currentMatch.sport.includes('Vôlei');
+  //     const isVolleyball = currentMatch.sport === 'V├┤lei' || currentMatch.sport.includes('V├┤lei');
   //     const scoreA = isVolleyball ? 2 : Math.floor(Math.random() * 5);
   //     const scoreB = isVolleyball ? (Math.random() > 0.5 ? 1 : 0) : Math.floor(Math.random() * 5);
   //
@@ -1276,10 +1277,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         </div>
                       )}
                       {[
-                        "Vôlei",
-                        "Vôlei de Praia",
-                        "Tênis de Mesa",
-                        "Futevôlei",
+                        "V├┤lei",
+                        "V├┤lei de Praia",
+                        "T├¬nis de Mesa",
+                        "Futev├┤lei",
                       ].includes(currentMatch.sport) &&
                         currentMatch.status === "live" && (
                           <div
@@ -1318,10 +1319,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         )}
                       {currentMatch.status === "live" &&
                         ![
-                          "Vôlei",
-                          "Vôlei de Praia",
-                          "Tênis de Mesa",
-                          "Futevôlei",
+                          "V├┤lei",
+                          "V├┤lei de Praia",
+                          "T├¬nis de Mesa",
+                          "Futev├┤lei",
                         ].includes(currentMatch.sport) && (
                           <div
                             style={{
@@ -1357,7 +1358,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <Clock size={14} />
-                  {currentMatch.date.split("-").reverse().join("-")} às{" "}
+                  {currentMatch.date.split("-").reverse().join("-")} ├ás{" "}
                   {currentMatch.time}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1367,7 +1368,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
               </div>
 
             </div>
-            {/* Botões de ação no topo */}
+            {/* Bot├Áes de a├º├úo no topo */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
                 onClick={onClose}
@@ -1388,37 +1389,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 <X size={20} />
               </button>
 
-              {/* Player Stats Button - Only for Basketball */}
-              {isBasketball && (
-                <button
-                  onClick={() => setShowPlayerStats(true)}
-                  style={{
-                    background: "var(--bg-hover)",
-                    border: "none",
-                    color: "var(--text-secondary)",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "background 0.2s, color 0.2s",
-                  }}
-                  title="Ver estatísticas dos jogadores"
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "var(--accent-color)";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                >
-                  <Users size={18} />
-                </button>
-              )}
-
               <button
                 onClick={() => setShowChat((v) => !v)}
                 style={{
@@ -1438,6 +1408,38 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
               >
                 <span role="img" aria-label="Chat">💬</span>
               </button>
+
+              {/* Player Stats Button - Only for Basketball */}
+              {isBasketball && (
+                <button
+                  onClick={() => setShowPlayerStats(true)}
+                  style={{
+                    background: "var(--bg-hover)",
+                    border: "none",
+                    color: "var(--text-secondary)",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "background 0.2s, color 0.2s",
+                  }}
+                  title="Ver estat├¡sticas dos jogadores"
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = "var(--accent-color)";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                >
+                  <Users size={18} />
+                </button>
+              )}
+
             </div>
           </div>
 
@@ -1548,7 +1550,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                     }}
                   >
                     <Trophy size={16} color="#ffd700" />
-                    Votação para MVP em andamento
+                    Vota├º├úo para MVP em andamento
                   </div>
                   <div
                     style={{
@@ -1600,7 +1602,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                           {candidate.playerName}
                         </div>
                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                          {candidate.teamName} • {candidate.points} {getMvpPerformanceLabel(candidate.points)}
+                          {candidate.teamName} ÔÇó {candidate.points} {getMvpPerformanceLabel(candidate.points)}
                         </div>
                       </div>
 
@@ -1627,8 +1629,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         {userAlreadyVotedThisMatch
                           ? `Votado (${candidate.votes})`
                           : isVotingCandidateId === candidate.id
-                          ? "Votando..."
-                          : `Votar (${candidate.votes})`}
+                            ? "Votando..."
+                            : `Votar (${candidate.votes})`}
                       </button>
                     </div>
                   ))
@@ -2196,7 +2198,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Vitórias
+                      Vit├│rias
                     </div>
                     <div
                       style={{
@@ -2274,7 +2276,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Vitórias
+                      Vit├│rias
                     </div>
                     <div
                       style={{
@@ -2316,7 +2318,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         fontWeight: 600,
                       }}
                     >
-                      Últimos 5 jogos
+                      ├Ültimos 5 jogos
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
                       {teamAForm.length > 0 ? (
@@ -2362,7 +2364,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                             color: "var(--text-secondary)",
                           }}
                         >
-                          Sem histórico
+                          Sem hist├│rico
                         </div>
                       )}
                     </div>
@@ -2394,7 +2396,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         fontWeight: 600,
                       }}
                     >
-                      Últimos 5 jogos
+                      ├Ültimos 5 jogos
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
                       {teamBForm.length > 0 ? (
@@ -2440,7 +2442,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                             color: "var(--text-secondary)",
                           }}
                         >
-                          Sem histórico
+                          Sem hist├│rico
                         </div>
                       )}
                     </div>

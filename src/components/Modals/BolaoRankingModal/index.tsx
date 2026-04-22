@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { X, Medal, Crown, Eye } from 'lucide-react';
-import { useData } from '../context/DataContext';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../services/supabaseClient';
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../../context/AuthContext';
+import type { Match } from '../../../data/mockData';
+import { supabase } from '../../../services/supabaseClient';
+import './styles.css';
 
 interface BolaoRankingModalProps {
     onClose: () => void;
@@ -61,7 +63,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                 const validPreds = predsData || [];
 
                 // 3. Compute points
-                const finishedMatches = matches.filter(m => m.status === 'finished');
+                const finishedMatches = matches.filter((m: Match) => m.status === 'finished');
                 const userScores: Record<string, BolaoUserRanking> = {};
 
                 validUsers.forEach(u => {
@@ -92,7 +94,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                 });
 
                 validPreds.forEach(pred => {
-                    const match = finishedMatches.find(m => m.id === pred.match_id);
+                    const match = finishedMatches.find((m: Match) => m.id === pred.match_id);
                     if (match && userScores[pred.user_email] && pred.score_a !== null && pred.score_b !== null) {
                         const predA = Number(pred.score_a);
                         const predB = Number(pred.score_b);
@@ -127,77 +129,29 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
     }, []); // No context dependency for polling
 
     return (
-        <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(10px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-            padding: '20px'
-        }}>
-            <div className="premium-card animate-in" style={{
-                width: '100%',
-                maxWidth: '600px',
-                maxHeight: '85vh',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                overflow: 'hidden',
-                border: '1px solid var(--border-color)',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                background: 'var(--bg-card)'
-            }}>
+        <div className="bolao-ranking-overlay">
+            <div className="bolao-ranking-card bolao-ranking-animate-in">
                 {/* Header */}
-                <div style={{
-                    padding: '25px',
-                    borderBottom: '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: 'rgba(255,255,255,0.02)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{
-                            width: '45px',
-                            height: '45px',
-                            borderRadius: '12px',
-                            background: '#dc2626',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)'
-                        }}>
+                <div className="bolao-ranking-header">
+                    <div className="bolao-ranking-header-left">
+                        <div className="bolao-ranking-icon-wrapper">
                             <Crown size={24} color="white" />
                         </div>
                         <div>
-                            <h2 style={{ fontSize: '20px', fontWeight: 900, margin: 0 }}>Ranking Geral</h2>
-                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Classificação geral dos usuários</p>
+                            <h2 className="bolao-ranking-title">Ranking Geral</h2>
+                            <p className="bolao-ranking-subtitle">Classificação geral dos usuários</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        style={{
-                            background: 'var(--bg-hover)',
-                            border: 'none',
-                            color: 'white',
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '50%',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
+                        className="bolao-ranking-btn-close"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div style={{
+                <div className="bolao-ranking-content" style={{
                     overflowY: 'auto',
                     padding: '0',
                     flex: 1,
@@ -341,7 +295,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                                                 </thead>
                                                                 <tbody>
                                                                     {userPredictions.map(pred => {
-                                                                        const match = matches.find(m => m.id === pred.match_id);
+                                                                        const match = matches.find((m: Match) => m.id === pred.match_id);
                                                                         if (!match) return null;
                                                                         const isFinished = match.status === 'finished';
                                                                         const isExact = isFinished && Number(pred.score_a) === match.scoreA && Number(pred.score_b) === match.scoreB;

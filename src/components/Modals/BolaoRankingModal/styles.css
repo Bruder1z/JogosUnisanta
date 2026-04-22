@@ -1,0 +1,274 @@
+.bolao-ranking-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+.bolao-ranking-card {
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    background: var(--bg-card);
+    border-radius: 12px; /* Assuming card has rounded corners */
+}
+
+.bolao-ranking-header {
+    padding: 25px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.02);
+}
+
+.bolao-ranking-header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.bolao-ranking-icon-wrapper {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    background: #dc2626;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+}
+
+.bolao-ranking-title {
+    font-size: 20px;
+    font-weight: 900;
+    margin: 0;
+}
+
+.bolao-ranking-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 4px 0 0 0;
+}
+
+.bolao-ranking-btn-close {
+    background: var(--bg-hover);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bolao-ranking-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.bolao-ranking-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-secondary);
+}
+
+.bolao-ranking-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.bolao-ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bolao-ranking-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--bg-hover);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s;
+}
+
+.bolao-ranking-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-color);
+}
+
+.bolao-ranking-item-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.bolao-ranking-position {
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--text-secondary);
+    width: 30px;
+    text-align: center;
+}
+
+.bolao-ranking-position.gold {
+    color: #E2B13C; /* Typical gold color */
+}
+
+.bolao-ranking-position.silver {
+    color: #C0C0C0;
+}
+
+.bolao-ranking-position.bronze {
+    color: #CD7F32;
+}
+
+.bolao-ranking-user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.bolao-ranking-user-name {
+    font-weight: 700;
+    font-size: 15px;
+    color: white;
+}
+
+.bolao-ranking-user-course {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.bolao-ranking-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.bolao-ranking-points {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.bolao-ranking-points-value {
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--accent-color);
+}
+
+.bolao-ranking-points-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+}
+
+.bolao-ranking-btn-view {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.bolao-ranking-btn-view:hover {
+    background: var(--bg-hover);
+    color: white;
+}
+
+.bolao-user-preds-modal {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-card);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+}
+
+.bolao-user-preds-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.bolao-user-preds-title {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.bolao-user-preds-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.bolao-user-preds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bolao-user-pred-item {
+    background: var(--bg-hover);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.bolao-user-pred-match {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.bolao-user-pred-score {
+    font-weight: 800;
+    color: white;
+    font-size: 16px;
+}
+
+.bolao-ranking-animate-in {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

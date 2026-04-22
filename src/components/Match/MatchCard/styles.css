@@ -1,0 +1,337 @@
+.match-card-wrapper {
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.match-card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.match-card-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.match-card-stage {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.match-card-stage.final {
+    color: #f59e0b;
+}
+
+.match-card-stage.classification {
+    color: var(--accent-color);
+}
+
+.match-card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.match-card-live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--live-color);
+    box-shadow: 0 0 8px var(--live-color);
+}
+
+.match-card-status-live {
+    color: var(--live-color);
+}
+
+.match-card-status-other {
+    color: var(--text-secondary);
+}
+
+.match-card-teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.match-card-team {
+    flex: 1;
+    text-align: center;
+}
+
+.match-card-team-logo-wrap {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.match-card-team-logo {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.match-card-team-logo-fallback {
+    font-size: 32px;
+}
+
+.match-team-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.match-card-team-institution {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.match-card-team-faculty {
+    font-size: 11px;
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.match-card-score-wrap {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.match-score {
+    font-size: 32px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.match-score-separator {
+    font-size: 18px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.match-card-beach-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: -5px;
+}
+
+.match-card-beach-games {
+    font-size: 12px;
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.match-card-beach-points {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.match-card-beach-sets {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.match-card-beach-points-label {
+    margin-top: 6px;
+    text-align: center;
+}
+
+.match-card-penalty {
+    margin-top: 6px;
+    text-align: center;
+}
+
+.match-card-penalty-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f59e0b;
+    letter-spacing: 0.5px;
+}
+
+.match-card-penalty-score {
+    font-size: 16px;
+    font-weight: 900;
+    color: white;
+}
+
+.match-card-penalty-winner {
+    font-size: 11px;
+    color: #22c55e;
+    font-weight: 700;
+}
+
+.match-card-swimming-wrapper {
+    margin-bottom: 20px;
+}
+
+.match-card-swimming-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.match-card-swimming-grid {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-card-swimming-podium {
+    min-width: 140px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255,255,255,0.04);
+    text-align: center;
+}
+
+.match-card-swimming-podium-emblem {
+    height: 46px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.match-card-swimming-podium-emblem img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.match-card-swimming-position {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.match-card-swimming-position.gold {
+    color: #f59e0b;
+}
+
+.match-card-swimming-position.silver {
+    color: #9ca3af;
+}
+
+.match-card-swimming-position.bronze {
+    color: #cd7f32;
+}
+
+.match-card-swimming-athlete {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.match-card-swimming-course {
+    font-size: 13px;
+    color: white;
+    margin-top: 4px;
+    font-weight: 700;
+}
+
+.match-card-swimming-faculty {
+    font-size: 13px;
+    color: white;
+    margin-top: 4px;
+}
+
+.match-card-swimming-empty {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.match-card-participants-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.match-card-participants-grid {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-card-participant {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.match-card-participant-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.match-card-participant-name {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255,255,255,0.04);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.match-card-participant-empty {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.match-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.match-card-footer-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.match-card-stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.match-card-inline-top-spacing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: -5px;
+}

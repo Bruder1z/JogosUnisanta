@@ -152,6 +152,19 @@ button {
     display: flex !important;
     align-items: center;
     justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0 !important;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .mobile-menu-btn svg {
+    width: 22px;
+    height: 22px;
+    display: block;
   }
 
   .header-desktop-nav {

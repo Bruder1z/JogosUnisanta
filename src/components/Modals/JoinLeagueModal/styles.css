@@ -1,0 +1,137 @@
+.join-league-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4000;
+    padding: 20px;
+}
+
+.join-league-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 32px;
+    text-align: center;
+}
+
+.join-league-error-icon-wrapper {
+    color: #ef4444;
+    margin-bottom: 16px;
+}
+
+.join-league-error-icon {
+    margin: 0 auto;
+}
+
+.join-league-error-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 24px;
+}
+
+.join-league-btn-back {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.join-league-success-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(220, 38, 38, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    border: 2px solid var(--accent-color);
+}
+
+.join-league-success-icon {
+    color: var(--accent-color);
+}
+
+.join-league-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: white;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.join-league-desc {
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.join-league-name-highlight {
+    color: white;
+    font-size: 18px;
+}
+
+.join-league-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.join-league-btn-accept {
+    width: 100%;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.join-league-btn-accept:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.join-league-btn-reject {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

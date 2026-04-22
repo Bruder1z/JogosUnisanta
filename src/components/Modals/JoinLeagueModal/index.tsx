@@ -1,8 +1,9 @@
-import { useNotification } from '../NotificationContext';
+import { useNotification } from '../../NotificationContext';
 import React, { useEffect, useState } from 'react';
 import { X, Trophy, Check } from 'lucide-react';
-import { supabase } from '../../services/supabaseClient';
-import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../../services/supabaseClient';
+import { useAuth } from '../../../context/AuthContext';
+import './styles.css';
 
 interface JoinLeagueModalProps {
     leagueId: string;
@@ -80,7 +81,7 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
             // ── Proceed with join ──
             console.log("League object before join:", league);
             let currentParticipants: string[] = [];
-            
+
             if (Array.isArray(league.participants)) {
                 currentParticipants = league.participants;
             } else if (typeof league.participants === 'string' && league.participants) {
@@ -101,9 +102,9 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
             }
 
             const updatedParticipants = Array.from(new Set([...currentParticipants, userEmail]));
-            
+
             console.log("Attempting to update participants to:", updatedParticipants);
-            
+
             const { data, error, status } = await supabase
                 .from('leagues')
                 .update({ participants: updatedParticipants })
@@ -133,64 +134,40 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
     if (loading) return null;
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', zIndex: 4000, padding: '20px'
-        }}>
-            <div className="premium-card fade-in" style={{
-                width: '100%', maxWidth: '400px', background: 'var(--bg-card)',
-                border: '1px solid var(--border-color)', borderRadius: '20px',
-                padding: '32px', textAlign: 'center'
-            }}>
+        <div className="join-league-overlay">
+            <div className="join-league-card fade-in">
                 {error ? (
                     <>
-                        <div style={{ color: '#ef4444', marginBottom: '16px' }}>
-                             <X size={48} style={{ margin: '0 auto' }} />
+                        <div className="join-league-error-icon-wrapper">
+                            <X size={48} className="join-league-error-icon" />
                         </div>
-                        <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '24px' }}>{error}</h2>
-                        <button onClick={onClose} style={{
-                            width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--accent-color)',
-                            color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer'
-                        }}>VOLTAR</button>
+                        <h2 className="join-league-error-title">{error}</h2>
+                        <button onClick={onClose} className="join-league-btn-back">VOLTAR</button>
                     </>
                 ) : (
                     <>
-                        <div style={{ 
-                            width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(220, 38, 38, 0.1)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                            border: '2px solid var(--accent-color)'
-                        }}>
-                            <Trophy size={32} style={{ color: 'var(--accent-color)' }} />
+                        <div className="join-league-success-icon-wrapper">
+                            <Trophy size={32} className="join-league-success-icon" />
                         </div>
-                        <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'white', marginBottom: '8px', textTransform: 'uppercase' }}>
+                        <h2 className="join-league-title">
                             CONVITE RECEBIDO!
                         </h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '15px', lineHeight: 1.5 }}>
-                            Você foi convidado para participar da liga:<br/>
-                            <strong style={{ color: 'white', fontSize: '18px' }}>{league.name}</strong>
+                        <p className="join-league-desc">
+                            Você foi convidado para participar da liga:<br />
+                            <strong className="join-league-name-highlight">{league.name}</strong>
                         </p>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <button 
+                        <div className="join-league-btn-group">
+                            <button
                                 onClick={handleJoin}
                                 disabled={isJoining}
-                                style={{
-                                    width: '100%', padding: '16px', borderRadius: '12px', background: 'var(--accent-color)',
-                                    color: 'white', border: 'none', fontWeight: 800, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                    transition: 'all 0.2s'
-                                }}
+                                className="join-league-btn-accept"
                             >
                                 <Check size={18} /> {isJoining ? 'ENTRANDO...' : 'ACEITAR CONVITE'}
                             </button>
-                            <button 
+                            <button
                                 onClick={onClose}
-                                style={{
-                                    width: '100%', padding: '14px', borderRadius: '12px', background: 'none',
-                                    border: '1px solid var(--border-color)', color: 'var(--text-secondary)',
-                                    fontWeight: 700, cursor: 'pointer'
-                                }}
+                                className="join-league-btn-reject"
                             >
                                 RECUSAR
                             </button>
@@ -198,10 +175,6 @@ const JoinLeagueModal: React.FC<JoinLeagueModalProps> = ({ leagueId, onClose, on
                     </>
                 )}
             </div>
-            <style>{`
-                .fade-in { animation: fadeIn 0.4s ease-out; }
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            `}</style>
         </div>
     );
 };

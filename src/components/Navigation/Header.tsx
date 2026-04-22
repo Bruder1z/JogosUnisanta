@@ -63,11 +63,7 @@ const Header: FC = () => {
                         onClick={toggle}
                         style={{
                             color: 'var(--text-primary)',
-                            background: 'none',
-                            border: 'none',
                             cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '6px',
                         }}
                     >
                         <Menu size={24} />

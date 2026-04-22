@@ -1,7 +1,7 @@
 import { type FC } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar.tsx';
-import MatchTimeline from '../components/Match/MatchTimeline';
+import MatchTimeline from '../components/Match/MatchTimeline/index';
 
 const MatchControl: FC = () => {
     return (
