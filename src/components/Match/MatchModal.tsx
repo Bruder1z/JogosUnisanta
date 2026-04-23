@@ -18,7 +18,6 @@ import {
 import { type MatchMvpCandidateInput, useData } from "../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import PlayerStats from "./PlayerStats";
-import LiveChat from "../Chat/LiveChat";
 
 interface MatchModalProps {
   match: Match;
@@ -35,7 +34,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   } = useData();
   const { user, openLoginModal } = useAuth();
   const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
-  const [showChat, setShowChat] = useState(false);
   const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [isSavingMvpCandidates, setIsSavingMvpCandidates] = useState(false);
   const [mvpCandidatesLoadError, setMvpCandidatesLoadError] = useState<string | null>(null);
@@ -1331,7 +1329,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           alignItems: "stretch",
           justifyContent: "center",
           width: "100%",
-          maxWidth: showChat ? "960px" : "600px",
+          maxWidth: "600px",
           height: "fit-content",
           maxHeight: "80vh",
           gap: "16px",
@@ -1677,26 +1675,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   <Users size={18} />
                 </button>
               )}
-
-              <button
-                onClick={() => setShowChat((v) => !v)}
-                style={{
-                  background: showChat ? "var(--accent-color)" : "var(--bg-hover)",
-                  border: "none",
-                  color: showChat ? "#fff" : "var(--text-secondary)",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "background 0.2s, color 0.2s",
-                }}
-                title={showChat ? "Fechar chat" : "Abrir chat da partida"}
-              >
-                <span role="img" aria-label="Chat">💬</span>
-              </button>
             </div>
           </div>
 
@@ -2710,25 +2688,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           </div>
         </div>
 
-        {/* Chat lateral */}
-        {showChat && (
-          <div
-            style={{
-              width: "340px",
-              minWidth: "340px",
-              background: "var(--bg-card)",
-              borderRadius: "12px",
-              boxShadow: "0 2px 16px rgba(0,0,0,0.15)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              animation: "modalSlideUp 0.3s ease-out",
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <LiveChat matchId={currentMatch.id} />
-          </div>
-        )}
       </div>
 
       {/* Player Stats Modal */}

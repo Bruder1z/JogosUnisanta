@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 import Header from '../components/Navigation/Header';
-import Sidebar from '../components/Layout/Sidebar.tsx';
+import Sidebar from '../components/Layout/Sidebar';
 import MatchTimeline from '../components/Match/MatchTimeline';
 
 const MatchControl: FC = () => {

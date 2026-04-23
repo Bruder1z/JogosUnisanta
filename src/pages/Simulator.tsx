@@ -671,7 +671,7 @@ const Simulator: FC = () => {
         if (success) {
             showToast({
                 message: 'Todos os palpites foram salvos no banco!',
-                teamA: 'BOLÃO',
+                teamA: 'PALPITÔMETRO',
                 scoreA: filledCount,
                 teamB: 'SALVO',
                 scoreB: 1,
@@ -717,7 +717,7 @@ const Simulator: FC = () => {
                                 color: 'white',
                                 textTransform: 'uppercase',
                                 lineHeight: 1,
-                            }}>BOLÃO</h1>
+                            }}>PALPITÔMETRO</h1>
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button
                                     onClick={() => setShowBolaoRanking(true)}
@@ -739,7 +739,7 @@ const Simulator: FC = () => {
                                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#dc2626'; e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'; e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; e.currentTarget.style.color = '#ff6b6b'; }}
                                 >
-                                    RANKING BOLÃO
+                                    RANKING PALPITÔMETRO
                                 </button>
                                 <button
                                     onClick={() => setAberto(true)}
@@ -1026,7 +1026,7 @@ const Simulator: FC = () => {
                                 {/* Automatic Leagues - LIGA GERAL visível para todos, mas só superadmin pode gerenciar */}
                                 <LigaCard
                                     name="LIGA GERAL"
-                                    description="Todos os participantes do Bolão Unisanta"
+                                    description="Todos os participantes do Palpitômetro Unisanta"
                                     type="global"
                                     onClick={() => setSelectedLeague({ name: 'LIGA GERAL', type: 'global' })}
                                 />

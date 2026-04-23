@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Navigation/Header';
-import Sidebar from '../components/Layout/Sidebar.tsx';
+import Sidebar from '../components/Layout/Sidebar';
 import MatchCard from '../components/Match/MatchCard';
 import MatchModal from '../components/Match/MatchModal';
 import ModalitiesModal from '../components/Modals/ModalitiesModal';

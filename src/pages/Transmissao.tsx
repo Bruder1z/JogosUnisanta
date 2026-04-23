@@ -2,7 +2,6 @@ import { type FC, useState } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
-import LiveChat from '../components/Chat/LiveChat';
 
 const Transmissao: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
@@ -48,10 +47,6 @@ const Transmissao: FC = () => {
                                 </div>
                             </div>
 
-                            {/* Chat */}
-                            <div style={{ height: '500px' }}>
-                                <LiveChat matchId="transmissao-geral" />
-                            </div>
                         </div>
                     </div>
                 </div>

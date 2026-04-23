@@ -10,7 +10,6 @@ import Estatisticas from './pages/Estatisticas';
 import Simulator from './pages/Simulator';
 import MatchControl from './pages/MatchControl';
 import Calendario from './pages/Calendario';
-import Torcida from './pages/Torcida';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './components/context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
@@ -45,8 +44,8 @@ const AppContent = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const joinId = params.get('join');
-    if (joinId && location.pathname !== '/bolao') {
-      navigate(`/bolao?join=${joinId}`, { replace: true });
+    if (joinId && location.pathname !== '/palpitometro') {
+      navigate(`/palpitometro?join=${joinId}`, { replace: true });
     }
   }, [location, navigate]);
 
@@ -60,14 +59,13 @@ const AppContent = () => {
         <Route path="/estatisticas" element={<Estatisticas />} />
         <Route path="/historia" element={<History />} />
         <Route path="/transmissao" element={<Transmissao />} />
-        <Route path="/bolao" element={<Simulator />} />
+        <Route path="/palpitometro" element={<Simulator />} />
         <Route path='/controle-partida' element={
           <ProtectedRoute requiredRole="superadmin">
             <MatchControl />
           </ProtectedRoute>
         } />
         <Route path="/calendario" element={<Calendario />} />
-        <Route path="/torcida" element={<Torcida />} />
       </Routes>
       {isLoginModalOpen && <Login onClose={closeLoginModal} />}
     </>

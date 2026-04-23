@@ -1,13 +1,14 @@
 import { type FC, useState, useMemo } from 'react';
 import { User as UserIcon, Trophy, LayoutDashboard, Menu } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useSidebar } from '../../context/SidebarContext';
-import ProfileModal from '../Modals/ProfileModal';
-import { useData } from '../context/DataContext';
-import TorcidaNotificationBell from '../TorcidaNotificationBell';
+import { useAuth } from '../../../context/AuthContext';
+import { useSidebar } from '../../../context/SidebarContext';
+import ProfileModal from '../../Modals/ProfileModal';
+import { useData } from '../../context/DataContext';
+import './Header.css';
+import { type HeaderProps } from './Header.types';
 
-const Header: FC = () => {
+const Header: FC<HeaderProps> = () => {
     const { user, openLoginModal, userPredictions } = useAuth();
     const { toggle } = useSidebar();
     const { matches } = useData();
@@ -93,16 +94,11 @@ const Header: FC = () => {
                             textDecoration: 'none',
                             transition: 'color 0.2s'
                         }}>Notícias</Link>
-                        <Link to="/bolao" style={{
-                            color: isActive('/bolao') ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        <Link to="/palpitometro" style={{
+                            color: isActive('/palpitometro') ? 'var(--text-primary)' : 'var(--text-secondary)',
                             textDecoration: 'none',
                             transition: 'color 0.2s'
-                        }}>Bolão</Link>
-                        <Link to="/torcida" style={{
-                            color: isActive('/torcida') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            textDecoration: 'none',
-                            transition: 'color 0.2s'
-                        }}>Comunidade</Link>
+                        }}>Palpitômetro</Link>
                         {user?.role === 'superadmin' && (
                             <Link to="/controle-partida" style={{
                                 color: isActive('/controle-partida') ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -121,8 +117,6 @@ const Header: FC = () => {
                                 <div className="header-user-pts" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ffd700', fontSize: '13px', fontWeight: 700, marginRight: '10px' }}>
                                     <Trophy size={14} /> {totalPoints} {totalPoints === 1 ? 'pt' : 'pts'}
                                 </div>
-
-                                <TorcidaNotificationBell />
 
                                 {showAdminShortcut && (
                                     <button

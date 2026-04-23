@@ -7,14 +7,10 @@ import {
     LayoutGrid,
     Calendar
 } from 'lucide-react';
-import { useSidebar } from '../../context/SidebarContext';
-import { useAuth } from '../../context/AuthContext';
-
-interface SidebarProps {
-    onShowModalities?: () => void;
-    onSelectSport?: (sport: string) => void;
-    onShowRanking?: () => void;
-}
+import { useSidebar } from '../../../context/SidebarContext';
+import { useAuth } from '../../../context/AuthContext';
+import { type SidebarProps } from './Sidebar.types';
+import './Sidebar.css';
 
 const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRanking }) => {
     const { user } = useAuth();
@@ -83,13 +79,9 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                             <span style={{ fontSize: '16px' }}>📰</span>
                             <span className="sidebar-mobile-nav-label">Notícias</span>
                         </Link>
-                        <Link to="/bolao" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                        <Link to="/palpitometro" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
                             <span style={{ fontSize: '16px' }}>⚡</span>
-                            <span className="sidebar-mobile-nav-label">Bolão</span>
-                        </Link>
-                        <Link to="/torcida" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                            <span style={{ fontSize: '16px' }}>📢</span>
-                            <span className="sidebar-mobile-nav-label">Comunidade</span>
+                            <span className="sidebar-mobile-nav-label">Palpitômetro</span>
                         </Link>
                         {user?.role === 'superadmin' && (
                             <Link to="/controle-partida" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--accent-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s', fontWeight: 700 }}>
@@ -226,13 +218,6 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     </Link>
 
                 </div>
-
-                <style>{`
-                    .sidebar-link:hover {
-                        background: var(--bg-hover);
-                        color: var(--text-primary) !important;
-                    }
-                `}</style>
             </aside>
         </>
     );

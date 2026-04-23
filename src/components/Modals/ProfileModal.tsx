@@ -290,7 +290,7 @@ const ProfileModal: FC<ProfileModalProps> = ({ onClose }) => {
                                 {simulatorStats.totalPoints} <span style={{ fontSize: '16px', color: '#888', fontWeight: 600 }}>PTS</span>
                             </h3>
                             <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 30px' }}>
-                                Pontuação Total no Bolão
+                                Pontuação Total no Palpitômetro
                             </p>
 
                             <div style={{

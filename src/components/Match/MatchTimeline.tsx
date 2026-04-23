@@ -15,7 +15,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import LiveChat from "../Chat/LiveChat";
 import {
   type Match,
   type MatchEvent,
@@ -7352,26 +7351,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         </div>
       </div>
 
-      {
-        showChat && activeMatchId && (
-          <div
-            style={{
-              width: "360px",
-              minWidth: "360px",
-              background: "var(--bg-card)",
-              borderLeft: "1px solid var(--border-color)",
-              display: "flex",
-              flexDirection: "column",
-              height: "100vh",
-              position: "sticky",
-              top: 0,
-              overflow: "hidden"
-            }}
-          >
-            <LiveChat matchId={activeMatchId} />
-          </div>
-        )
-      }
 
       {/* Modal seletor de jogador para ponto no Vôlei de Praia */}
       {beachPointPicker && selectedMatch && (() => {

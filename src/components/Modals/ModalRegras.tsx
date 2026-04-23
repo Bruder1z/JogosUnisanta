@@ -66,7 +66,7 @@ const ModalRegras: FC<ModalRegrasProps> = ({ aberto, setAberto }) => {
                         paddingRight: '32px',
                     }}
                 >
-                    Regras do Bolão
+                    Regras do Palpitômetro
                 </h2>
 
                 {/* Texto principal */}
@@ -91,7 +91,7 @@ const ModalRegras: FC<ModalRegrasProps> = ({ aberto, setAberto }) => {
                             lineHeight: '1.6',
                         }}
                     >
-                        Os critérios de desempate utilizados no bolão são:
+                        Os critérios de desempate utilizados no palpitômetro são:
                     </p>
                     <ul
                         style={{
