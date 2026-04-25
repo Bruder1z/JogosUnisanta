@@ -1,0 +1,247 @@
+.match-card-wrapper {
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.match-card-main-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.match-card-team {
+    flex: 1;
+    text-align: center;
+}
+
+.match-card-team-emblem {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.match-card-team-emblem-image {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.match-card-team-logo {
+    font-size: 32px;
+}
+
+.match-card-team-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.match-card-team-faculty {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.match-card-team-course {
+    font-size: 11px;
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.match-card-score-panel {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.match-card-score-main {
+    font-size: 32px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.match-card-score-separator {
+    font-size: 18px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.match-card-score-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: -5px;
+}
+
+.match-card-score-details-beach {
+    gap: 2px;
+}
+
+.match-card-score-games {
+    font-size: 12px;
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.match-card-score-points {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.match-card-score-sets {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.match-card-score-live-points {
+    font-size: 12px;
+    color: var(--accent-color);
+    font-weight: 700;
+    margin-top: -5px;
+}
+
+.match-card-score-penalty {
+    margin-top: 6px;
+    text-align: center;
+}
+
+.match-card-score-penalty-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f59e0b;
+    letter-spacing: 0.5px;
+}
+
+.match-card-score-penalty-result {
+    font-size: 16px;
+    font-weight: 900;
+    color: white;
+}
+
+.match-card-score-penalty-winner {
+    font-size: 11px;
+    color: #22c55e;
+    font-weight: 700;
+}
+
+.match-card-swimming-summary {
+    margin-bottom: 20px;
+}
+
+.match-card-swimming-podium-list {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-card-swimming-podium-item {
+    min-width: 140px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.04);
+    text-align: center;
+}
+
+.match-card-swimming-podium-emblem {
+    height: 46px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.match-card-swimming-podium-emblem-image {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.match-card-swimming-podium-rank {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.match-card-swimming-podium-rank-1 {
+    color: #f59e0b;
+}
+
+.match-card-swimming-podium-rank-2 {
+    color: #9ca3af;
+}
+
+.match-card-swimming-podium-rank-3 {
+    color: #cd7f32;
+}
+
+.match-card-swimming-podium-athlete {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.match-card-swimming-podium-course {
+    font-size: 13px;
+    color: white;
+    margin-top: 4px;
+    font-weight: 700;
+}
+
+.match-card-swimming-podium-faculty {
+    font-size: 13px;
+    color: white;
+    margin-top: 4px;
+}
+
+.match-card-swimming-empty {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.match-card-swimming-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.match-card-swimming-participants {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-card-swimming-participant {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.match-card-swimming-participant-emblem {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.match-card-swimming-participant-label {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 12px;
+    font-weight: 700;
+}

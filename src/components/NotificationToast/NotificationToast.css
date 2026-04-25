@@ -1,0 +1,32 @@
+.notificationToast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(20, 20, 20, 0.85);
+    backdrop-filter: blur(10px);
+    color: var(--notification-toast-color);
+    border: 1px solid var(--notification-toast-border);
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-weight: 500;
+    font-size: 13.5px;
+    min-width: 260px;
+    max-width: 340px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 9999;
+    transition: all 0.25s ease;
+}
+
+.notificationToastMessage {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.notificationToastIconWrap {
+    display: flex;
+    align-items: center;
+    margin-right: 16px;
+}

@@ -1,0 +1,210 @@
+.modalDetalhesOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  animation: modalDetalhesFadeIn 0.2s ease-out;
+}
+
+.modalDetalhesBackdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.modalDetalhesCard {
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background-color: #121212;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  animation: modalDetalhesSlideUp 0.3s ease-out;
+}
+
+.modalDetalhesGradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(227, 6, 19, 0.1), transparent);
+  pointer-events: none;
+}
+
+.modalDetalhesCloseButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalDetalhesCloseButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.modalDetalhesContent {
+  padding: 40px;
+}
+
+.modalDetalhesTopSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.modalDetalhesEmblemWrap {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.modalDetalhesEmblemImage {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
+.modalDetalhesEmblemFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 40px;
+}
+
+.modalDetalhesTitle {
+  margin: 0 0 8px 0;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.modalDetalhesBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background-color: rgba(227, 6, 19, 0.15);
+  color: var(--accent-color);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.modalDetalhesDivider {
+  height: 1px;
+  margin: 35px 0;
+  background-color: var(--border-color);
+}
+
+.modalDetalhesStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.modalDetalhesStatColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modalDetalhesStatLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.modalDetalhesStatValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modalDetalhesStatValueLarge {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.modalDetalhesStatValueAccent {
+  color: var(--accent-color);
+}
+
+.modalDetalhesSubtext {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.modalDetalhesStatNote {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+@keyframes modalDetalhesFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalDetalhesSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .modalDetalhesContent {
+    padding: 28px 20px 24px;
+  }
+
+  .modalDetalhesTitle {
+    font-size: 26px;
+  }
+
+  .modalDetalhesStatsGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

@@ -1,0 +1,31 @@
+.modalShellOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modalShellBackdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.modalShellCard {
+  position: relative;
+  width: 100%;
+}
+
+.modalShellCloseButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

@@ -1,0 +1,124 @@
+.joinLeagueOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000;
+  padding: 20px;
+}
+
+.joinLeagueModal {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+}
+
+.joinLeagueFadeIn {
+  animation: joinLeagueFadeIn 0.4s ease-out;
+}
+
+@keyframes joinLeagueFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.joinLeagueErrorIcon {
+  color: #ef4444;
+  margin-bottom: 16px;
+}
+
+.joinLeagueTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.joinLeaguePrimaryButton,
+.joinLeagueSecondaryButton {
+  width: 100%;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.joinLeaguePrimaryButton {
+  padding: 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.joinLeaguePrimaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.joinLeaguePrimaryButton:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.joinLeagueSecondaryButton {
+  padding: 14px;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.joinLeagueIconWrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  border: 2px solid var(--accent-color);
+}
+
+.joinLeagueHeading {
+  font-size: 20px;
+  font-weight: 900;
+  color: white;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.joinLeagueDescription {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.joinLeagueLeagueName {
+  color: white;
+  font-size: 18px;
+}
+
+.joinLeagueButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

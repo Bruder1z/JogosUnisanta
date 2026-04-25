@@ -1,0 +1,233 @@
+.leagueFormOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.leagueFormModal {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 32px;
+  border-radius: 20px;
+  position: relative;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+}
+
+.leagueFormCloseButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.leagueFormCloseButton:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.leagueFormFadeIn {
+  animation: leagueFormFadeIn 0.4s ease-out;
+}
+
+@keyframes leagueFormFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.leagueFormCreatedWrap {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.leagueFormCreatedIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  border: 2px solid #22c55e;
+}
+
+.leagueFormCreatedTitle {
+  font-size: 24px;
+  font-weight: 900;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.leagueFormCreatedText {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 15px;
+}
+
+.leagueFormLinkBox {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.leagueFormLinkInput {
+  flex: 1;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 13px;
+}
+
+.leagueFormCopyButton,
+.leagueFormPrimaryButton,
+.leagueFormSecondaryButton {
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.leagueFormCopyButton {
+  background: var(--accent-color);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.leagueFormDoneButton,
+.leagueFormPrimaryButton,
+.leagueFormSecondaryButton {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.leagueFormDoneButton,
+.leagueFormSecondaryButton {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: white;
+}
+
+.leagueFormHeadingWrap {
+  margin-bottom: 24px;
+}
+
+.leagueFormHeading {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: -0.5px;
+}
+
+.leagueFormDescription {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.leagueForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.leagueFormField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leagueFormLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.leagueFormInput,
+.leagueFormTextarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: white;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.leagueFormInput:focus,
+.leagueFormTextarea:focus {
+  border-color: var(--accent-color);
+}
+
+.leagueFormTextarea {
+  resize: none;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.leagueFormSubmitButton {
+  margin-top: 12px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 8px 20px rgba(227, 6, 19, 0.3);
+}
+
+.leagueFormSubmitButton:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(227, 6, 19, 0.4);
+}
+
+.leagueFormSubmitButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}

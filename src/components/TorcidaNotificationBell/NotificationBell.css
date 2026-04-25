@@ -1,0 +1,140 @@
+.torcidaNotificationBellRoot {
+    position: relative;
+}
+
+.torcidaNotificationBellButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: color 0.2s;
+}
+
+.torcidaNotificationBellBadge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: var(--accent-color);
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.torcidaNotificationBellDropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 320px;
+    background: #1a1a1a;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    overflow: hidden;
+}
+
+.torcidaNotificationBellHeader {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.torcidaNotificationBellTitle {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.torcidaNotificationBellClear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.torcidaNotificationBellList {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.torcidaNotificationBellEmpty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.torcidaNotificationBellEmptyIcon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.notificationBellItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+.notificationBellItemUnread {
+    background: rgba(227, 6, 19, 0.06);
+}
+
+.notificationBellItemRead {
+    background: transparent;
+}
+
+.notificationBellItemIcon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.notificationBellItemContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.notificationBellItemText {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.notificationBellItemDate {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.notificationBellItemDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    flex-shrink: 0;
+    margin-top: 4px;
+}

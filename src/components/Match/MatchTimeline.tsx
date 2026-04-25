@@ -1,6 +1,29 @@
 import { useState, useEffect, useRef, type FC } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotification } from "../NotificationContext";
+import "./MatchTimeline.css";
+import {
+  getBeachCurrentGamePoints,
+  getBasketballEventData,
+  getBasketballQuarterDurationSeconds,
+  getBeachScoreState,
+  getEventIcon,
+  getEventLabel,
+  getMatchInitialMinute,
+  getMatchTeamShortName,
+  getMatchTeamSuffixName,
+  formatClock,
+  getStoredSwimmingParticipants,
+  getSwimmingEntries,
+  getTeamEmblem,
+  getTeamShortName,
+  getTimelineScoreLabel,
+  getVolleyballCurrentSetPoints,
+  hasSwimmingTime,
+  normalizeSwimmingTime,
+  parseSwimmingTimeParts,
+  sanitizeSwimmingTime,
+} from "./MatchTimeline/utils";
 import {
   Play,
   Pause,
@@ -10,7 +33,6 @@ import {
   Filter,
   PlusCircle,
   Trophy,
-  MessageCircle,
   ChevronLeft,
   Trash2,
 } from "lucide-react";
@@ -19,7 +41,6 @@ import {
   type Match,
   type MatchEvent,
   AVAILABLE_SPORTS,
-  COURSE_EMBLEMS,
 } from "../../data/mockData";
 
 interface MatchTimelineProps {
@@ -35,238 +56,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     athletes,
     addMatch,
     courses: coursesList,
-    ensureMatchMvpCandidates,
     deleteMatch,
     deleteScheduledMatches,
   } = useData();
 
-  const MVP_ELIGIBLE_SPORTS = new Set([
-    "Basquetebol",
-    "Basquete 3x3",
-    "Futebol Society",
-    "Futsal",
-    "Futebol X1",
-    "Handebol",
-    "Vôlei",
-  ]);
-
-  const seedMvpCandidatesOnFinish = async (finishedMatch: Match) => {
-    if (!MVP_ELIGIBLE_SPORTS.has(finishedMatch.sport)) return;
-
-    const rawEvents = finishedMatch.events;
-    let events: MatchEvent[] = [];
-
-    if (Array.isArray(rawEvents)) {
-      events = rawEvents;
-    } else if (typeof rawEvents === "string") {
-      try {
-        const parsed = JSON.parse(rawEvents) as MatchEvent[];
-        events = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        events = [];
-      }
-    }
-
-    const playerPoints: Record<
-      string,
-      {
-        playerName: string;
-        teamId: string;
-        teamName: string;
-        institution: string;
-        course: string;
-        points: number;
-      }
-    > = {};
-
-    const isBasketball =
-      finishedMatch.sport === "Basquetebol" ||
-      finishedMatch.sport === "Basquete 3x3";
-    const isVolley = finishedMatch.sport === "Vôlei";
-
-    const countableEvents = new Set<MatchEvent["type"]>([
-      "goal",
-      "penalty_scored",
-    ]);
-
-    events.forEach((event) => {
-      if (!countableEvents.has(event.type) || !event.player || !event.teamId) {
-        return;
-      }
-
-      // Para vôlei: conta todos os pontos marcados por jogador identificado
-      if (isVolley && !(event.type === "goal" && event.player)) {
-        return;
-      }
-
-      // Valida que o teamId do evento corresponde a um dos dois times reais
-      const isTeamA = event.teamId === finishedMatch.teamA.id;
-      const isTeamB = event.teamId === finishedMatch.teamB.id;
-      if (!isTeamA && !isTeamB) return; // evento com teamId inválido — ignora
-
-      const key = `${event.teamId}::${event.player.trim().toLowerCase()}`;
-      if (!playerPoints[key]) {
-        const team = isTeamA ? finishedMatch.teamA : finishedMatch.teamB;
-        const nameParts = team.name.split(" - ");
-        playerPoints[key] = {
-          playerName: event.player.trim(),
-          teamId: event.teamId,
-          teamName: nameParts[0] || team.name,
-          institution: team.faculty || nameParts[1] || "Nao informado",
-          course: team.course || nameParts[0] || "Nao informado",
-          points: 0,
-        };
-      }
-
-      if (isBasketball) {
-        const parsed = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
-        playerPoints[key].points += parsed;
-      } else {
-        playerPoints[key].points += 1;
-      }
-    });
-
-    // Valida consistência: remove candidatos cujo time não marcou nenhum gol.
-    // Em partidas 0x0, mantém todos (sem gols registrados, qualquer destaque é válido).
-    // Para vôlei, mantém todos os candidatos com ACEs independente do placar de sets.
-    const scoreA = finishedMatch.scoreA;
-    const scoreB = finishedMatch.scoreB;
-    const isScoreless = scoreA === 0 && scoreB === 0;
-
-    const scoreByTeam: Record<string, number> = {
-      [finishedMatch.teamA.id]: scoreA,
-      [finishedMatch.teamB.id]: scoreB,
-    };
-
-    const validCandidates = isScoreless || isVolley
-      ? Object.values(playerPoints)
-      : Object.values(playerPoints).filter(c => (scoreByTeam[c.teamId] ?? 0) > 0);
-
-    const top3 = validCandidates
-      .sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        return a.playerName.localeCompare(b.playerName);
-      })
-      .slice(0, 3)
-      .map((candidate) => ({
-        matchId: finishedMatch.id,
-        sport: finishedMatch.sport,
-        playerName: candidate.playerName,
-        teamId: candidate.teamId,
-        teamName: candidate.teamName,
-        institution: candidate.institution,
-        course: candidate.course,
-        points: candidate.points,
-      }));
-
-    if (top3.length === 0) {
-      showNotification(
-        "Partida finalizada, mas não encontrei eventos válidos para gerar candidatos MVP.",
-      );
-      return;
-    }
-
-    const success = await ensureMatchMvpCandidates(top3);
-    if (!success) {
-      showNotification(
-        "Não foi possível salvar os candidatos ao MVP. Verifique as permissões/políticas no banco.",
-      );
-      return;
-    }
-
-    showNotification("Candidatos MVP salvos para esta partida.", "success");
-  };
-
-  const finishMatch = (updatedMatch: Match) => {
-    if (updatedMatch.status === "finished" && !updatedMatch.mvpVotingStartedAt) {
-      // Registra o timestamp quando a partida foi finalizada para votação MVP
-      updatedMatch.mvpVotingStartedAt = Date.now();
-    }
-    if (updatedMatch.status === "finished") {
-      void seedMvpCandidatesOnFinish(updatedMatch);
-    }
-    updateMatch(updatedMatch);
-    setIsRunning(false);
-  };
-
-  // Helper to get team emblem with strict matching
-  const getTeamEmblem = (team: any) => {
-    if (!team) return null;
-    if (typeof team === 'object' && team.logo) return team.logo;
-    
-    const possibleKeys: string[] = [];
-    let identifiedCourse = '';
-    let identifiedFaculty = '';
-    
-    if (typeof team === 'string') {
-      possibleKeys.push(team);
-      if (team.includes(' - ')) {
-        [identifiedCourse, identifiedFaculty] = team.split(' - ');
-      } else {
-        identifiedCourse = team;
-      }
-    } else {
-      // 1. Chave exata (Nome Completo)
-      if (team.name) {
-        possibleKeys.push(team.name);
-        if (team.name.includes(' - ') && (!team.course || !team.faculty)) {
-          const [c, f] = team.name.split(' - ');
-          identifiedCourse = c;
-          identifiedFaculty = f;
-        }
-      }
-      
-      // 2. Chave composta (Curso - Faculdade)
-      if (team.course && team.faculty) {
-        possibleKeys.push(`${team.course} - ${team.faculty}`);
-        identifiedCourse = identifiedCourse || team.course;
-        identifiedFaculty = identifiedFaculty || team.faculty;
-      }
-      
-      // 3. Apenas o curso
-      if (team.course) {
-        possibleKeys.push(team.course);
-        identifiedCourse = identifiedCourse || team.course;
-      }
-      
-      // 4. Nome splitado (primeira parte)
-      if (team.name && team.name.includes(' - ')) {
-        const firstPart = team.name.split(' - ')[0];
-        possibleKeys.push(firstPart);
-        identifiedCourse = identifiedCourse || firstPart;
-      }
-    }
-    
-    const emblemKeys = Object.keys(COURSE_EMBLEMS);
-    
-    // FASE 1: TENTATIVA DE MATCH EXATO (Prioritária)
-    for (const pk of possibleKeys) {
-      const normalizedPk = String(pk).trim().toLowerCase();
-      if (!normalizedPk) continue;
-      
-      const exactKey = emblemKeys.find(k => k.toLowerCase() === normalizedPk);
-      if (exactKey) return `/emblemas/${COURSE_EMBLEMS[exactKey]}`;
-    }
-    
-    // FASE 2: TENTATIVA DE MATCH PARCIAL (Apenas se falhar o exato)
-    if (identifiedCourse && identifiedFaculty) {
-      const courseLow = identifiedCourse.toLowerCase();
-      const facultyLow = identifiedFaculty.toLowerCase();
-      const bestKey = emblemKeys.find(k => {
-        const kLow = k.toLowerCase();
-        return kLow.includes(courseLow) && kLow.includes(facultyLow);
-      });
-      if (bestKey) return `/emblemas/${COURSE_EMBLEMS[bestKey]}`;
-    }
-
-    // FASE 3 REMOVIDA: Para evitar que cursos genéricos ("Direito") recebam emblemas de outras instituições.
-    
-    return null;
-  };
-
-  const [activeMatchId, setActiveMatchId] = useState<string | null>(
-    matchId || null,
-  );
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(matchId || null);
   const [currentMinute, setCurrentMinute] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [showPlayerInput, setShowPlayerInput] = useState<{
@@ -277,8 +71,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  // Shoot-out obrigatório pendente (Futebol X1 — 2º amarelo)
   const [pendingShootout, setPendingShootout] = useState<{
     teamId: string;
     team: "A" | "B";
@@ -286,7 +78,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     reason: string;
   } | null>(null);
 
-  // Filters
   const [filterSport, setFilterSport] = useState<string>("Todos");
   const [filterLocation, setFilterLocation] = useState<string>("Todos");
   const [filterCategory, setFilterCategory] = useState<string>("Todos");
@@ -303,261 +94,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     location: "",
   });
 
-  // Estado para armazenar emblemas previsualizados
   const [emblemA, setEmblemA] = useState<string | null>(null);
   const [emblemB, setEmblemB] = useState<string | null>(null);
 
-  // Locations oficiais
-  const OFFICIAL_LOCATIONS = [
-    "Arena Rebouças",
-    "Arena Unisanta (Praça das Bandeiras)",
-    "Bloco A - Quadra",
-    "Centro de Treinamento (CT)",
-    "Clube dos Ingleses",
-    "Ginásio Laerte Gonçalves",
-    "Ginásio Poliesportivo",
-    "Piscina Olímpica",
-  ];
-
-  const FIXED_LOCATIONS: Record<string, string> = {
-    Natação: "Piscina Olímpica",
-    "Basquete 3x3": "Ginásio Poliesportivo",
-    "Futebol Society": "Centro de Treinamento (CT)",
-    "Futebol X1": "Centro de Treinamento (CT)",
-    "Beach Tennis": "Arena Unisanta (Praça das Bandeiras)",
-    Futevôlei: "Arena Unisanta (Praça das Bandeiras)",
-    Tamboréu: "Arena Unisanta (Praça das Bandeiras)",
-    "Vôlei de Praia": "Arena Unisanta (Praça das Bandeiras)",
-    Caratê: "Bloco A - Quadra",
-    Judô: "Bloco A - Quadra",
-    Xadrez: "Bloco A - Quadra",
-    "Tênis de Mesa": "Clube dos Ingleses",
-  };
-
-  const FILTERED_LOCATIONS: Record<string, string[]> = {
-    Basquetebol: ["Ginásio Poliesportivo", "Arena Rebouças"],
-    Vôlei: ["Ginásio Laerte Gonçalves", "Arena Rebouças", "Ginásio Poliesportivo"],
-    Futsal: ["Ginásio Poliesportivo", "Ginásio Laerte Gonçalves"],
-    Handebol: ["Ginásio Laerte Gonçalves", "Ginásio Poliesportivo"],
-  };
-
-  const activeMatches = matches.filter((m: Match) => m.status !== "finished");
-  
-  const dynamicSports = Array.from(new Set(activeMatches.map((m: Match) => m.sport).filter(Boolean))).sort();
-  const sportsOptions = dynamicSports.length > 0 ? dynamicSports : AVAILABLE_SPORTS;
-  
-  const dynamicLocations = Array.from(new Set(activeMatches.map((m: Match) => m.location).filter(Boolean))).sort();
-  const locationOptions = dynamicLocations.length > 0 ? dynamicLocations : OFFICIAL_LOCATIONS;
-
-  const dynamicCategories = Array.from(new Set(activeMatches.map((m: Match) => m.category).filter(Boolean))).sort();
-  const categoryOptions = dynamicCategories.length > 0 ? dynamicCategories : ["Masculino", "Feminino"];
-
-  // Filter matches: Only scheduled or live
-  const filteredMatches = matches
-    .filter((m: Match) => {
-      const matchesStatus = m.status !== "finished";
-      
-      const normalize = (str?: string) => (str || "").trim().toLowerCase();
-      
-      const matchesSport = filterSport === "Todos" || normalize(m.sport) === normalize(filterSport);
-      
-      const locMatch = normalize(m.location) === normalize(filterLocation) || 
-                       (normalize(m.location) && normalize(filterLocation) && 
-                       (normalize(m.location).includes(normalize(filterLocation)) || normalize(filterLocation).includes(normalize(m.location))));
-      const matchesLocation = filterLocation === "Todos" || locMatch;
-      
-      const matchesCategory = filterCategory === "Todos" || normalize(m.category) === normalize(filterCategory);
-
-      return matchesStatus && matchesSport && matchesLocation && matchesCategory;
-    })
-    .sort((a: Match, b: Match) => {
-      // Partidas ao vivo sempre no topo
-      if (a.status === "live" && b.status !== "live") return -1;
-      if (b.status === "live" && a.status !== "live") return 1;
-      
-      // Para partidas agendadas, ordenar por data e hora
-      if (a.status === "scheduled" && b.status === "scheduled") {
-        // Converter data de DD/MM/YYYY ou YYYY-MM-DD para timestamp
-        const parseDate = (dateStr: string, timeStr: string) => {
-          let date: Date;
-          if (dateStr.includes('/')) {
-            // Formato DD/MM/YYYY
-            const [day, month, year] = dateStr.split('/');
-            date = new Date(`${year}-${month}-${day}`);
-          } else {
-            // Formato YYYY-MM-DD
-            date = new Date(dateStr);
-          }
-          
-          // Adicionar hora se disponível
-          if (timeStr) {
-            const [hours, minutes] = timeStr.split(':');
-            date.setHours(parseInt(hours), parseInt(minutes));
-          }
-          
-          return date.getTime();
-        };
-        
-        const timeA = parseDate(a.date, a.time);
-        const timeB = parseDate(b.date, b.time);
-        
-        return timeA - timeB; // Mais próximas primeiro
-      }
-      
-      return 0;
-    });
-
-  const selectedMatch = matches.find((m) => m.id === activeMatchId) || null;
-  const isBeachTennis = selectedMatch?.sport === "Beach Tennis";
-  const isHandebol = selectedMatch?.sport === "Handebol";
-  const isVolleyball =
-    selectedMatch?.sport === "Vôlei" ||
-    selectedMatch?.sport === "Vôlei de Praia" ||
-    selectedMatch?.sport === "Futevôlei";
-  // Apenas Vôlei e Vôlei de Praia exibem botões ACE/ERRO nos cards de atletas
-  const isVolleyballAceSport =
-    selectedMatch?.sport === "Vôlei" ||
-    selectedMatch?.sport === "Vôlei de Praia";
-  const isFutebolX1 = selectedMatch?.sport === "Futebol X1";
-  const isFutsal = selectedMatch?.sport === "Futsal";
-  const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
-
-  // Disputa de pênaltis: ativa quando jogo terminou empatado no tempo regulamentar
-  const isPenaltyShootoutSport = isFutsal || isFutebolSociety || isFutebolX1;
-
-  // Detecta se a disputa já foi iniciada (evento halftime com descrição especial)
-  const shootoutStarted = (selectedMatch?.events || []).some(
-    (e) => e.type === "halftime" && e.description?.startsWith("⚽ Início da Disputa de Pênaltis")
-  );
-
-  // Calcula placar da disputa de pênaltis a partir dos eventos
-  const shootoutStats = (() => {
-    if (!selectedMatch) return { scoredA: 0, scoredB: 0, totalA: 0, totalB: 0, usedPlayersA: [] as string[], usedPlayersB: [] as string[], nextTeam: "A" as "A" | "B", isSuddenDeath: false };
-    const startIdx = (selectedMatch.events || []).findIndex(
-      (e) => e.type === "halftime" && e.description?.startsWith("⚽ Início da Disputa de Pênaltis")
-    );
-    if (startIdx === -1) return { scoredA: 0, scoredB: 0, totalA: 0, totalB: 0, usedPlayersA: [] as string[], usedPlayersB: [] as string[], nextTeam: "A" as "A" | "B", isSuddenDeath: false };
-    // Lê o time que iniciou do evento
-    const startDesc = (selectedMatch.events || [])[startIdx]?.description || "";
-    const firstTeamMatch = startDesc.match(/first=([AB])/);
-    const firstTeam: "A" | "B" = (firstTeamMatch?.[1] as "A" | "B") || "A";
-    const shootoutEvents = (selectedMatch.events || []).slice(startIdx + 1).filter(
-      (e) => e.type === "penalty_scored" || e.type === "penalty_missed"
-    );
-    const scoredA = shootoutEvents.filter((e) => e.type === "penalty_scored" && e.teamId === selectedMatch.teamA.id).length;
-    const scoredB = shootoutEvents.filter((e) => e.type === "penalty_scored" && e.teamId === selectedMatch.teamB.id).length;
-    const totalA = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamA.id).length;
-    const totalB = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamB.id).length;
-    // Jogadores já utilizados nesta rodada (para controle de repetição)
-    const usedPlayersA = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamA.id && e.player).map((e) => e.player as string);
-    const usedPlayersB = shootoutEvents.filter((e) => e.teamId === selectedMatch.teamB.id && e.player).map((e) => e.player as string);
-    // Próximo time a cobrar: alternância baseada no time que iniciou
-    const totalKicks = totalA + totalB;
-    // Se A iniciou: par=A, ímpar=B. Se B iniciou: par=B, ímpar=A
-    const nextTeam: "A" | "B" = totalKicks % 2 === 0 ? firstTeam : (firstTeam === "A" ? "B" : "A");
-    const isSuddenDeath = totalA >= 3 && totalB >= 3;
-    return { scoredA, scoredB, totalA, totalB, usedPlayersA, usedPlayersB, nextTeam, isSuddenDeath };
-  })();
-  const isBasketball =
-    selectedMatch?.sport === "Basquetebol" ||
-    selectedMatch?.sport === "Basquete 3x3";
-  const isTableTennis = selectedMatch?.sport === "Tênis de Mesa";
-  const isSetSport = isVolleyball || isTableTennis;
-  const isBasketball3x3 = selectedMatch?.sport === "Basquete 3x3";
-  const isSwimming = selectedMatch?.sport === "Natação";
-  const isKarate = selectedMatch?.sport === "Caratê";
-  const isJudo = selectedMatch?.sport === "Judô";
-  const isXadrez = selectedMatch?.sport === "Xadrez";
-  const isTamboreu = selectedMatch?.sport === "Tamboréu";
-  const isNoTimerSport = [
-    "Vôlei",
-    "Vôlei de Praia",
-    "Tênis de Mesa",
-    "Futevôlei",
-    "Beach Tennis",
-    "Tamboréu",
-  ].includes(selectedMatch?.sport || "");
-
-  type TimelineEvent = MatchEvent & {
-    timelineScore: string;
-    timelineQuarter?: string;
-  };
-
-  const [swimmingRankings, setSwimmingRankings] = useState<
-    Record<string, number>
-  >({});
+  const [swimmingRankings, setSwimmingRankings] = useState<Record<string, number>>({});
   const [athleteNames, setAthleteNames] = useState<Record<string, string>>({});
-  const [swimmingTimes, setSwimmingTimes] = useState<Record<string, string>>(
-    {},
-  );
+  const [swimmingTimes, setSwimmingTimes] = useState<Record<string, string>>({});
   const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
-
-  // Parseia string MM:SS.CC em partes individuais
-  const parseSwimmingTimeParts = (value: string) => {
-    const m = value.match(/^(\d{0,2}):(\d{0,2})\.(\d{0,2})$/);
-    if (m) return { mm: m[1], ss: m[2], cc: m[3] };
-    return { mm: "", ss: "", cc: "" };
-  };
-
-  // Normaliza cada segmento para zero-padded (para ordenação correta)
-  const normalizeSwimmingTime = (value: string) => {
-    const { mm, ss, cc } = parseSwimmingTimeParts(value);
-    if (!mm && !ss && !cc) return "";
-    return `${mm.padStart(2, "0")}:${ss.padStart(2, "0")}.${cc.padStart(2, "0")}`;
-  };
-
-  // Verifica se o tempo tem algum dígito preenchido
-  const hasSwimmingTime = (value: string) => /\d/.test(value);
-
-  /**
-   * Sanitiza e valida MM:SS.CC:
-   * - Seconds > 59 são convertidos automaticamente em minutos (ex: 90s → +1min 30s)
-   * - Centesimos são limitados a 99
-   * - Todos os campos são zero-padded para 2 dígitos
-   */
-  const sanitizeSwimmingTime = (mm: string, ss: string, cc: string) => {
-    const rawMM = parseInt(mm || "0", 10);
-    const rawSS = parseInt(ss || "0", 10);
-    const rawCC = Math.min(parseInt(cc || "0", 10), 99);
-    // Carry-over: segundos > 59 viram minutos
-    const totalSeconds = rawMM * 60 + rawSS;
-    const finalMM = Math.min(Math.floor(totalSeconds / 60), 99);
-    const finalSS = totalSeconds % 60;
-    return {
-      mm: String(finalMM).padStart(2, "0"),
-      ss: String(finalSS).padStart(2, "0"),
-      cc: String(rawCC).padStart(2, "0"),
-    };
-  };
-
-  // Auto-Ranking automático baseado no tempo (recalcula sempre que algum tempo muda)
-  // swimmingEntries é derivado de selectedMatch.participants — não precisa estar no dep array
-  useEffect(() => {
-    if (!isSwimming || !isRankingModalOpen || !selectedMatch) return;
-
-    const participants = getStoredSwimmingParticipants();
-    const allIds = participants.map(p => p.id);
-
-    const idsWithTime = allIds.filter(id => hasSwimmingTime(swimmingTimes[id] || ""));
-    const idsWithoutTime = new Set(allIds.filter(id => !hasSwimmingTime(swimmingTimes[id] || "")));
-
-    // Ordena do menor (mais rápido) para o maior tempo usando valor normalizado
-    const sorted = [...idsWithTime].sort((idA, idB) => {
-      const tA = normalizeSwimmingTime(swimmingTimes[idA] || "") || "99:99.99";
-      const tB = normalizeSwimmingTime(swimmingTimes[idB] || "") || "99:99.99";
-      return tA.localeCompare(tB);
-    });
-
-    setSwimmingRankings(prev => {
-      const next = { ...prev };
-      // Remove posição de quem não tem tempo
-      idsWithoutTime.forEach(id => { delete next[id]; });
-      // Atribui posições sequenciais
-      sorted.forEach((id, index) => { next[id] = index + 1; });
-      return next;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swimmingTimes, isSwimming, isRankingModalOpen]);
 
   const [osaekomiTeam, setOsaekomiTeam] = useState<"A" | "B" | null>(null);
   const [osaekomiSeconds, setOsaekomiSeconds] = useState(0);
@@ -571,58 +114,105 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const prevScoreRef = useRef<{ a: number; b: number; id: string } | null>(null);
   const [penaltyShootoutActive, setPenaltyShootoutActive] = useState(false);
   const [shootoutFirstTeam, setShootoutFirstTeam] = useState<"A" | "B">("A");
-  // Feedback visual ao registrar ACE / ERRO
   const [_volleyActionFeedback, setVolleyActionFeedback] = useState<{ playerId: string; type: "ace" | "erro" } | null>(null);
-  // Seletor de jogador para ponto no Vôlei de Praia
   const [beachPointPicker, setBeachPointPicker] = useState<{ team: "A" | "B" } | null>(null);
 
-  // Flash do placar: branco por padrão, vermelho por 4s ao marcar
-  useEffect(() => {
-    if (!selectedMatch) { prevScoreRef.current = null; return; }
-    const prev = prevScoreRef.current;
-    const curr = { a: selectedMatch.scoreA, b: selectedMatch.scoreB, id: selectedMatch.id };
-    if (prev !== null && prev.id === curr.id) {
-      if (curr.a > prev.a && curr.b > prev.b) {
-        setFlashTeam("both");
-        setTimeout(() => setFlashTeam(null), 4000);
-      } else if (curr.a > prev.a) {
-        setFlashTeam("A");
-        setTimeout(() => setFlashTeam(null), 4000);
-      } else if (curr.b > prev.b) {
-        setFlashTeam("B");
-        setTimeout(() => setFlashTeam(null), 4000);
-      }
+  const selectedMatch = matches.find((match) => match.id === activeMatchId) || null;
+
+  const seedMvpCandidatesOnFinish = async (_finishedMatch: Match) => {
+    return;
+  };
+
+  const finishMatch = (updatedMatch: Match) => {
+    if (updatedMatch.status === "finished") {
+      void seedMvpCandidatesOnFinish(updatedMatch);
     }
-    prevScoreRef.current = curr;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMatch?.scoreA, selectedMatch?.scoreB, selectedMatch?.id]);
-
-  const getBasketballQuarterDurationSeconds = (match: Match | null) => {
-    if (!match) return 15 * 60;
-    if (match.sport === "Basquete 3x3") return 10 * 60; // único tempo de 10 min
-    return match.category === "Feminino" ? 10 * 60 : 15 * 60;
+    updateMatch(updatedMatch);
+    setIsRunning(false);
   };
 
-  const getCurrentEventMinute = () => currentMinute;
+  const activeMatches = matches.filter((match) => match.status !== "finished");
+  const dynamicSports = Array.from(new Set(activeMatches.map((match) => match.sport).filter(Boolean))).sort();
+  const sportsOptions = dynamicSports.length > 0 ? dynamicSports : AVAILABLE_SPORTS;
+  const dynamicLocations = Array.from(new Set(activeMatches.map((match) => match.location).filter(Boolean))).sort();
+  const locationOptions = dynamicLocations.length > 0 ? dynamicLocations : ["Arena Rebouças", "Arena Unisanta", "Bloco A - Quadra"];
+  const dynamicCategories = Array.from(new Set(activeMatches.map((match) => match.category).filter(Boolean))).sort();
+  const categoryOptions = dynamicCategories.length > 0 ? dynamicCategories : ["Masculino", "Feminino"];
+
+  const filteredMatches = matches
+    .filter((match) => {
+      const matchesStatus = match.status !== "finished";
+      const normalize = (value?: string) => (value || "").trim().toLowerCase();
+      const matchesSport = filterSport === "Todos" || normalize(match.sport) === normalize(filterSport);
+      const matchesLocation = filterLocation === "Todos" || normalize(match.location) === normalize(filterLocation);
+      const matchesCategory = filterCategory === "Todos" || normalize(match.category) === normalize(filterCategory);
+      return matchesStatus && matchesSport && matchesLocation && matchesCategory;
+    })
+    .sort((left, right) => {
+      if (left.status === "live" && right.status !== "live") return -1;
+      if (right.status === "live" && left.status !== "live") return 1;
+      return 0;
+    });
+
+  const isBeachTennis = selectedMatch?.sport === "Beach Tennis";
+  const isHandebol = selectedMatch?.sport === "Handebol";
+  const isVolleyball =
+    selectedMatch?.sport === "Vôlei" ||
+    selectedMatch?.sport === "Vôlei de Praia" ||
+    selectedMatch?.sport === "Futevôlei";
+  const isVolleyballAceSport = selectedMatch?.sport === "Vôlei" || selectedMatch?.sport === "Vôlei de Praia" || selectedMatch?.sport === "Futevôlei";
+  const isFutsal = selectedMatch?.sport === "Futsal";
+  const isFutebolSociety = selectedMatch?.sport === "Futebol Society";
+  const isFutebolX1 = selectedMatch?.sport === "Futebol X1";
+  const isBasketball = selectedMatch?.sport === "Basquetebol" || selectedMatch?.sport === "Basquete 3x3";
+  const isBasketball3x3 = selectedMatch?.sport === "Basquete 3x3";
+  const isKarate = selectedMatch?.sport === "Caratê";
+  const isJudo = selectedMatch?.sport === "Judô";
+  const isXadrez = selectedMatch?.sport === "Xadrez";
+  const isNoTimerSport = ["Vôlei", "Vôlei de Praia", "Tênis de Mesa", "Futevôlei", "Beach Tennis", "Natação", "Xadrez", "Tamboréu"].includes(selectedMatch?.sport || "");
+  const isSwimming = selectedMatch?.sport === "Natação";
+  const isTamboreu = selectedMatch?.sport === "Tamboréu";
+  const isSetSport = isVolleyball || selectedMatch?.sport === "Tênis de Mesa";
+  const isPenaltyShootoutSport = selectedMatch?.sport === "Futebol X1" || selectedMatch?.sport === "Futebol Society";
+  const shootoutStarted = (selectedMatch?.events || []).some(
+    (event) => event.type === "halftime" && event.description?.startsWith("🏈 Início da Disputa de Pênaltis"),
+  );
+
   const BEACH_POINT_LABELS = ["0", "15", "30", "40"];
-  const TIMER_TICK_MS = 1000;
-  const TIMER_INCREMENT_SECONDS = 1;
-  const X1_TIMER_INCREMENT = 1;
-  const BASKETBALL_DECREMENT_SECONDS = 1;
-  const formatClock = (totalSeconds: number) => {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+  const OFFICIAL_LOCATIONS = [
+    "Arena Rebouças",
+    "Arena Unisanta (Praça das Bandeiras)",
+    "Ginásio Poliesportivo",
+    "Piscina Olímpica",
+    "Quadra Externa",
+    "Sala de Xadrez",
+    "Tenda Principal",
+  ];
+
+  const FIXED_LOCATIONS: Record<string, string> = {
+    Natação: "Piscina Olímpica",
+    "Basquete 3x3": "Ginásio Poliesportivo",
+    Xadrez: "Sala de Xadrez",
   };
 
-  const getEventTimestamp = (eventId: string) => {
-    const raw = eventId.split("_")[1] || eventId;
-    const parsed = parseInt(raw, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+  const FILTERED_LOCATIONS: Record<string, string[]> = {
+    Basquetebol: ["Ginásio Poliesportivo", "Arena Rebouças"],
+    "Basquete 3x3": ["Ginásio Poliesportivo"],
+    Futebol: ["Arena Rebouças", "Arena Unisanta (Praça das Bandeiras)"],
+    "Futebol Society": ["Arena Rebouças", "Quadra Externa"],
+    Futsal: ["Ginásio Poliesportivo", "Quadra Externa"],
+    "Futebol X1": ["Arena Rebouças", "Quadra Externa"],
+    Handebol: ["Ginásio Poliesportivo", "Arena Rebouças"],
+    Vôlei: ["Ginásio Poliesportivo", "Quadra Externa"],
+    "Vôlei de Praia": ["Quadra Externa"],
+    Futevôlei: ["Quadra Externa"],
+    "Tênis de Mesa": ["Ginásio Poliesportivo", "Sala de Xadrez"],
+    Tamboréu: ["Arena Rebouças", "Quadra Externa"],
   };
 
-  const normalizeSex = (value?: string) => (value || "").trim().toLowerCase();
   const normalizeSport = (value?: string) => (value || "").trim().toLowerCase();
+  const normalizeSex = (value?: string) => (value || "").trim().toLowerCase();
 
   const toSportList = (sports: unknown): string[] => {
     if (Array.isArray(sports)) {
@@ -652,15 +242,15 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const athleteMatchesTeamAndMatch = (
     athlete: (typeof athletes)[number],
     team: Match["teamA"],
+    match: Match | null = selectedMatch,
   ) => {
-    if (!selectedMatch) return false;
+    if (!match) return false;
 
     const athleteCourse = athlete.course.toLowerCase();
     const athleteInst = athlete.institution.toLowerCase();
     const teamCourse = (team.course || "").toLowerCase();
     const teamFaculty = (team.faculty || "").toLowerCase();
 
-    // Especial para FEFESP / Educação Física
     const isFefespMatch =
       (teamCourse.includes("fefesp") ||
         teamCourse.includes("educação física")) &&
@@ -668,69 +258,99 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         athleteCourse.includes("educação física") ||
         athleteInst.includes("fefesp"));
 
-    // Match normal por curso e faculdade
     const courseMatch =
       athleteCourse.includes(teamCourse) || teamCourse.includes(athleteCourse);
     const facultyMatch =
       athleteInst.includes(teamFaculty) || teamFaculty.includes(athleteInst);
 
     const sameTeam = isFefespMatch || (courseMatch && facultyMatch);
-    const sameSport = athleteHasSport(athlete, selectedMatch.sport);
+    const sameSport = athleteHasSport(athlete, match.sport);
     const athleteSex = (athlete as { sex?: string }).sex;
     const sameSex =
       !athleteSex ||
-      normalizeSex(athleteSex) === normalizeSex(selectedMatch.category);
+      normalizeSex(athleteSex) === normalizeSex(match.category);
 
     return sameTeam && sameSport && sameSex;
   };
 
-  const getBeachScoreState = (match: Match | null) => {
-    const initialState = {
-      gamePointsA: 0,
-      gamePointsB: 0,
-    };
+  const shootoutStats = (() => {
+    if (!selectedMatch) {
+      return {
+        scoredA: 0,
+        scoredB: 0,
+        totalA: 0,
+        totalB: 0,
+        usedPlayersA: [] as string[],
+        usedPlayersB: [] as string[],
+        nextTeam: "A" as "A" | "B",
+        isSuddenDeath: false,
+      };
+    }
 
-    if (!match) return initialState;
+    const startIdx = (selectedMatch.events || []).findIndex(
+      (event) => event.type === "halftime" && event.description?.startsWith("🏈 Início da Disputa de Pênaltis"),
+    );
 
-    return [...(match.events || [])]
-      .sort(
-        (a, b) =>
-          a.minute - b.minute ||
-          getEventTimestamp(a.id) - getEventTimestamp(b.id),
-      )
-      .reduce((state, event) => {
-        if (event.type === "set_win") {
-          return {
-            ...state,
-            gamePointsA: 0,
-            gamePointsB: 0,
-          };
-        }
+    if (startIdx === -1) {
+      return {
+        scoredA: 0,
+        scoredB: 0,
+        totalA: 0,
+        totalB: 0,
+        usedPlayersA: [] as string[],
+        usedPlayersB: [] as string[],
+        nextTeam: "A" as "A" | "B",
+        isSuddenDeath: false,
+      };
+    }
 
-        if (event.type !== "goal") {
-          return state;
-        }
+    const startDesc = (selectedMatch.events || [])[startIdx]?.description || "";
+    const firstTeamMatch = startDesc.match(/first=([AB])/);
+    const firstTeam: "A" | "B" = (firstTeamMatch?.[1] as "A" | "B") || "A";
+    const shootoutEvents = (selectedMatch.events || []).slice(startIdx + 1).filter(
+      (event) => event.type === "penalty_scored" || event.type === "penalty_missed",
+    );
+    const scoredA = shootoutEvents.filter(
+      (event) => event.type === "penalty_scored" && event.teamId === selectedMatch.teamA.id,
+    ).length;
+    const scoredB = shootoutEvents.filter(
+      (event) => event.type === "penalty_scored" && event.teamId === selectedMatch.teamB.id,
+    ).length;
+    const totalA = shootoutEvents.filter((event) => event.teamId === selectedMatch.teamA.id).length;
+    const totalB = shootoutEvents.filter((event) => event.teamId === selectedMatch.teamB.id).length;
+    const usedPlayersA = shootoutEvents
+      .filter((event) => event.teamId === selectedMatch.teamA.id && event.player)
+      .map((event) => event.player as string);
+    const usedPlayersB = shootoutEvents
+      .filter((event) => event.teamId === selectedMatch.teamB.id && event.player)
+      .map((event) => event.player as string);
+    const totalKicks = totalA + totalB;
+    const nextTeam: "A" | "B" = totalKicks % 2 === 0 ? firstTeam : firstTeam === "A" ? "B" : "A";
+    const isSuddenDeath = totalA >= 3 && totalB >= 3;
 
-        return {
-          ...state,
-          gamePointsA:
-            event.teamId === match.teamA.id
-              ? state.gamePointsA + 1
-              : state.gamePointsA,
-          gamePointsB:
-            event.teamId === match.teamB.id
-              ? state.gamePointsB + 1
-              : state.gamePointsB,
-        };
-      }, initialState);
+    return { scoredA, scoredB, totalA, totalB, usedPlayersA, usedPlayersB, nextTeam, isSuddenDeath };
+  })();
+
+  const getSelectedMatchTeamShortName = (side: "A" | "B") => {
+    if (!selectedMatch) return "";
+    return side === "A" ? getTeamShortName(selectedMatch.teamA) : getTeamShortName(selectedMatch.teamB);
   };
+
+  const selectedMatchTeamAShortName = getTeamShortName(selectedMatch?.teamA);
+  const selectedMatchTeamBShortName = getTeamShortName(selectedMatch?.teamB);
+
+  const getSelectedMatchTeamId = (side: "A" | "B") => {
+    if (!selectedMatch) return "";
+    return side === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+  };
+
+  const getCurrentEventMinute = () => currentMinute;
 
   const beachScoreState = getBeachScoreState(selectedMatch);
   const beachSetsState = (selectedMatch?.events || []).reduce(
     (acc, event) => {
       if (event.type !== "set_win") return acc;
       if (!event.description?.startsWith("Set para ")) return acc;
-
       if (event.teamId === selectedMatch?.teamA.id) acc.setsA += 1;
       if (event.teamId === selectedMatch?.teamB.id) acc.setsB += 1;
       return acc;
@@ -738,98 +358,60 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     { setsA: 0, setsB: 0 },
   );
 
+  // Flash do placar: branco por padrão, vermelho por 4s ao marcar
   useEffect(() => {
-    let interval: number | null = null;
-    if (isRunning && !isNoTimerSport) {
-      interval = window.setInterval(() => {
-        setCurrentMinute((prev) => {
-          if (isBasketball || isKarate || (isJudo && !isGoldenScore)) {
-            if (prev <= 0) {
-              if (isJudo && selectedMatch && selectedMatch.scoreA === selectedMatch.scoreB) {
-                setIsGoldenScore(true);
-                return 0;
-              }
-              setIsRunning(false);
-              return 0;
-            }
-            return Math.max(0, prev - (isKarate || isJudo ? 1 : BASKETBALL_DECREMENT_SECONDS));
-          }
-
-          if (isJudo && isGoldenScore) {
-            return prev + 1;
-          }
-
-          if (isFutebolX1) {
-            return prev + X1_TIMER_INCREMENT;
-          }
-
-          return prev + TIMER_INCREMENT_SECONDS;
-        });
-      }, TIMER_TICK_MS);
+    if (!selectedMatch) {
+      prevScoreRef.current = null;
+      return;
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, isBasketball, isFutebolX1, isNoTimerSport, isKarate]);
+
+    const prev = prevScoreRef.current;
+    const curr = { a: selectedMatch.scoreA, b: selectedMatch.scoreB, id: selectedMatch.id };
+
+    if (prev !== null && prev.id === curr.id) {
+      if (curr.a > prev.a && curr.b > prev.b) {
+        setFlashTeam("both");
+        setTimeout(() => setFlashTeam(null), 4000);
+      } else if (curr.a > prev.a) {
+        setFlashTeam("A");
+        setTimeout(() => setFlashTeam(null), 4000);
+      } else if (curr.b > prev.b) {
+        setFlashTeam("B");
+        setTimeout(() => setFlashTeam(null), 4000);
+      }
+    }
+
+    prevScoreRef.current = curr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatch?.scoreA, selectedMatch?.scoreB, selectedMatch?.id]);
 
   useEffect(() => {
-    if (!selectedMatch || selectedMatch.status === "finished" || !isKarate) return;
-    if (selectedMatch.events?.some(e => e.type === "end")) return;
+    if (!isSwimming || !isRankingModalOpen || !selectedMatch) return;
 
-    const diff = Math.abs(selectedMatch.scoreA - selectedMatch.scoreB);
-    if (diff >= 8) {
-      const winningTeam = selectedMatch.scoreA > selectedMatch.scoreB ? "A" : "B";
-      const winnerName = winningTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const participants = getStoredSwimmingParticipants(selectedMatch);
+    const allIds = participants.map((participant) => participant.id);
 
-      const endEvent: MatchEvent = {
-        id: `evt_${Date.now()}_end_sup`,
-        type: "end",
-        minute: getCurrentEventMinute(),
-        description: `Luta Encerrada por Superioridade Técnica (8 pontos). Vitória: ${winnerName}`,
-      };
+    const idsWithTime = allIds.filter((id) => hasSwimmingTime(swimmingTimes[id] || ""));
+    const idsWithoutTime = new Set(allIds.filter((id) => !hasSwimmingTime(swimmingTimes[id] || "")));
 
-      const finishedMatch: Match = {
-        ...selectedMatch,
-        status: "finished",
-        events: [...(selectedMatch.events || []), endEvent],
-      };
+    const sorted = [...idsWithTime].sort((idA, idB) => {
+      const tA = normalizeSwimmingTime(swimmingTimes[idA] || "") || "99:99.99";
+      const tB = normalizeSwimmingTime(swimmingTimes[idB] || "") || "99:99.99";
+      return tA.localeCompare(tB);
+    });
 
-      finishMatch(finishedMatch);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMatch?.scoreA, selectedMatch?.scoreB, isKarate]);
-
-  useEffect(() => {
-    let interval: number | undefined;
-    if (osaekomiTeam && selectedMatch && selectedMatch.status !== "finished") {
-      interval = window.setInterval(() => {
-        setOsaekomiSeconds((prev) => {
-          const next = prev + 1;
-
-          if (next === 10) {
-            handleJudoPoint(osaekomiTeam, "waza_ari", isGoldenScore ? "Waza-ari no Golden Score" : "Waza-ari por Finalização (10s)");
-            if (isGoldenScore) {
-              setOsaekomiTeam(null);
-              return 0;
-            }
-          } else if (next === 20) {
-            handleJudoPoint(osaekomiTeam, "ippon", "Ippon por Finalização (20s)");
-            setOsaekomiTeam(null);
-            return 0;
-          }
-
-          return next;
-        });
-      }, 1000);
-    } else {
-      setOsaekomiSeconds(0);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [osaekomiTeam, selectedMatch?.status]);
+    setSwimmingRankings((previous) => {
+      const next = { ...previous };
+      idsWithoutTime.forEach((id) => {
+        delete next[id];
+      });
+      sorted.forEach((id, index) => {
+        next[id] = index + 1;
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swimmingTimes, isSwimming, isRankingModalOpen]);
 
   const handleSelectMatch = (match: Match) => {
     setActiveMatchId(match.id);
@@ -859,25 +441,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       return;
     }
 
-    if (match.sport === "Basquetebol" || match.sport === "Basquete 3x3" || match.sport === "Caratê" || match.sport === "Judô") {
-      const sortedEvents = [...(match.events || [])].sort(
-        compareTimelineEventsAsc,
-      );
-      const lastEvent =
-        sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
-      const durationSeconds = match.sport === "Caratê" ? 180 : (match.sport === "Judô" ? 240 : getBasketballQuarterDurationSeconds(match));
-      setCurrentMinute(
-        lastEvent && lastEvent.minute !== undefined
-          ? lastEvent.minute
-          : durationSeconds,
-      );
-    } else {
-      const lastMinute = (match.events || []).reduce(
-        (max, event) => Math.max(max, event.minute || 0),
-        0,
-      );
-      setCurrentMinute(lastMinute * 60);
-    }
+    setCurrentMinute(getMatchInitialMinute(match));
     setIsRunning(match.status === "live");
   };
 
@@ -928,8 +492,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
             opponentTeamId === selectedMatch.teamA.id ? "A" : "B";
           const opponentTeamName =
             opponentTeam === "A"
-              ? selectedMatch.teamA.name.split(" - ")[0]
-              : selectedMatch.teamB.name.split(" - ")[0];
+              ? getTeamShortName(selectedMatch.teamA)
+              : getTeamShortName(selectedMatch.teamB);
 
           // Registra o 2º amarelo e reseta o contador do jogador
           const eventsWithoutPlayerYellows = existingEvents.filter(
@@ -974,8 +538,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (selectedMatch.sport === "Futebol Society") {
       const teamName =
         teamId === selectedMatch.teamA.id
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
+          ? selectedMatchTeamAShortName
+          : selectedMatchTeamBShortName;
       if (type === "goal")
         customDescription = player
           ? `⚽ GOL! ${player}`
@@ -997,8 +561,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (selectedMatch.sport === "Futsal") {
       const teamName =
         teamId === selectedMatch.teamA.id
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
+          ? selectedMatchTeamAShortName
+          : selectedMatchTeamBShortName;
       if (type === "goal")
         customDescription = player
           ? `⚽ GOL! ${player}`
@@ -1087,32 +651,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     return updatedMatch;
   };
 
-  // ─── Beach Tennis — lógica automática ───────────────────────────────────────
-  // Retorna os pontos do game atual (desde o último "Game para" ou início)
-  const getBeachCurrentGamePoints = (match: Match): { ptsA: number; ptsB: number; isTiebreak: boolean } => {
-    const events = match.events || [];
-    const isTiebreak = [...events].some(
-      (e) => e.type === "halftime" && e.description?.startsWith("🎾 Início do Tie-break")
-    );
-    // Pega eventos de ponto desde o último "Game para"
-    const lastGameWinIdx = [...events].map((e, i) => ({ e, i })).reverse()
-      .find(({ e }) => e.type === "set_win" && e.description?.startsWith("Game para "))?.i ?? -1;
-    const relevantEvents = lastGameWinIdx === -1 ? events : events.slice(lastGameWinIdx + 1);
-    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === match.teamA.id).length;
-    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === match.teamB.id).length;
-    return { ptsA, ptsB, isTiebreak };
-  };
-
   const handleBeachPoint = (team: "A" | "B") => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     if (!requireGameStarted()) return;
 
     const isFinal = selectedMatch.stage === "Fase Final";
     const targetGames = isFinal ? 8 : 6;
-    const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamShort = team === "A"
-      ? selectedMatch.teamA.name.split(" - ")[0]
-      : selectedMatch.teamB.name.split(" - ")[0];
+    const teamId = getSelectedMatchTeamId(team);
+    const teamShort = getMatchTeamShortName(selectedMatch, team);
 
     const { ptsA, ptsB, isTiebreak } = getBeachCurrentGamePoints(selectedMatch);
     const newPtsA = team === "A" ? ptsA + 1 : ptsA;
@@ -1135,10 +681,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       const winTiebreak = (newPtsA >= 7 || newPtsB >= 7) && Math.abs(newPtsA - newPtsB) >= 2;
       if (winTiebreak) {
         const winner = newPtsA > newPtsB ? "A" : "B";
-        const winnerTeamId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-        const winnerName = winner === "A"
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerTeamId = getSelectedMatchTeamId(winner);
+        const winnerName = getSelectedMatchTeamShortName(winner);
         newGamesA = winner === "A" ? newGamesA + 1 : newGamesA;
         newGamesB = winner === "B" ? newGamesB + 1 : newGamesB;
         extraEvents.push({
@@ -1168,10 +712,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       const winGame = newPtsA >= 4 || newPtsB >= 4;
       if (winGame) {
         const winner = newPtsA >= 4 ? "A" : "B";
-        const winnerTeamId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-        const winnerName = winner === "A"
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerTeamId = getSelectedMatchTeamId(winner);
+        const winnerName = getSelectedMatchTeamShortName(winner);
         newGamesA = winner === "A" ? newGamesA + 1 : newGamesA;
         newGamesB = winner === "B" ? newGamesB + 1 : newGamesB;
         extraEvents.push({
@@ -1185,7 +727,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const tiebreakNeeded = newGamesA === targetGames && newGamesB === targetGames;
         const setWon = !tiebreakNeeded &&
           ((newGamesA >= targetGames && newGamesA - newGamesB >= 2) ||
-           (newGamesB >= targetGames && newGamesB - newGamesA >= 2));
+            (newGamesB >= targetGames && newGamesB - newGamesA >= 2));
 
         if (tiebreakNeeded) {
           extraEvents.push({
@@ -1196,8 +738,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           });
         } else if (setWon) {
           const setWinnerName = newGamesA > newGamesB
-            ? selectedMatch.teamA.name.split(" - ")[0]
-            : selectedMatch.teamB.name.split(" - ")[0];
+            ? selectedMatchTeamAShortName
+            : selectedMatchTeamBShortName;
           extraEvents.push({
             id: `evt_${Date.now() + 3}_end`,
             type: "end",
@@ -1240,11 +782,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (!requireGameStarted()) return;
 
     const teamId =
-      team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName =
-      team === "A"
-        ? selectedMatch.teamA.name.split(" - ")[0]
-        : selectedMatch.teamB.name.split(" - ")[0];
+      getSelectedMatchTeamId(team);
+    const teamName = getSelectedMatchTeamShortName(team);
 
     // Derive current set points from events for the description
     const lastSetWinEvent = [...(selectedMatch.events || [])]
@@ -1291,15 +830,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const _handleVolleyAce = (team: "A" | "B", playerName: string, playerId: string) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     if (!requireGameStarted()) return;
-    const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const scoringTeamId = getSelectedMatchTeamId(team);
+    const teamName = team === "A" ? getTeamShortName(selectedMatch.teamA) : getTeamShortName(selectedMatch.teamB);
     // Recalcular pontuação do set atual antes de adicionar o ponto (igual a handleVolleyPoint)
-    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
-    const relevantEvents = lastSetWinEvent
-      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
-      : selectedMatch.events || [];
-    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
-    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const { ptsA, ptsB } = getVolleyballCurrentSetPoints(selectedMatch);
     const nextPtsA = team === "A" ? ptsA + 1 : ptsA;
     const nextPtsB = team === "B" ? ptsB + 1 : ptsB;
     const aceEvent: MatchEvent = {
@@ -1329,14 +863,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (!selectedMatch || selectedMatch.status === "finished") return;
     if (!requireGameStarted()) return;
     const adversaryTeam: "A" | "B" = team === "A" ? "B" : "A";
-    const adversaryTeamId = adversaryTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const adversaryName = adversaryTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
-    const lastSetWinEvent = [...(selectedMatch.events || [])].reverse().find((e) => e.type === "set_win");
-    const relevantEvents = lastSetWinEvent
-      ? selectedMatch.events?.slice(selectedMatch.events.indexOf(lastSetWinEvent) + 1) || []
-      : selectedMatch.events || [];
-    const ptsA = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamA.id).length;
-    const ptsB = relevantEvents.filter((e) => e.type === "goal" && e.teamId === selectedMatch.teamB.id).length;
+    const adversaryTeamId = getSelectedMatchTeamId(adversaryTeam);
+    const adversaryName = getMatchTeamShortName(selectedMatch, adversaryTeam);
+    const { ptsA, ptsB } = getVolleyballCurrentSetPoints(selectedMatch);
     const nextPtsA = adversaryTeam === "A" ? ptsA + 1 : ptsA;
     const nextPtsB = adversaryTeam === "B" ? ptsB + 1 : ptsB;
     const erroEvent: MatchEvent = {
@@ -1361,13 +890,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   // Função interna que aplica a lógica de set/fim de jogo a partir de um match já mutado
   const handleVolleyPointInternal = (scoringTeam: "A" | "B", updatedMatch: Match, nextPtsA: number, nextPtsB: number) => {
     if (!selectedMatch) return;
-    const scoringTeamId = scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const scoringTeamId = getSelectedMatchTeamId(scoringTeam);
     const currentPhase = selectedMatch.stage || "Fase de Classificação";
 
     if (selectedMatch.sport === "Vôlei" && currentPhase === "Fase de Classificação") {
       if (nextPtsA >= 25 || nextPtsB >= 25) {
         const winner = nextPtsA >= 25 ? "A" : "B";
-        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerName = getMatchTeamShortName(selectedMatch, winner);
         updatedMatch.status = "finished";
         updatedMatch.scoreA = winner === "A" ? 1 : 0;
         updatedMatch.scoreB = winner === "B" ? 1 : 0;
@@ -1384,7 +913,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       const targetScore = currentSet <= 2 ? 25 : 15;
       if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
         const winner = nextPtsA > nextPtsB ? "A" : "B";
-        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerName = getMatchTeamShortName(selectedMatch, winner);
         const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
         const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
         updatedMatch.scoreA = newScoreA;
@@ -1409,7 +938,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       if (currentPhaseBeach === "Fase de Classificação") {
         if (nextPtsA >= 21 || nextPtsB >= 21) {
           const winner = nextPtsA >= 21 ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getMatchTeamShortName(selectedMatch, winner);
           updatedMatch.status = "finished";
           updatedMatch.scoreA = winner === "A" ? 1 : 0;
           updatedMatch.scoreB = winner === "B" ? 1 : 0;
@@ -1426,7 +955,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const targetScore = currentSet <= 2 ? 18 : 15;
         if ((nextPtsA >= targetScore || nextPtsB >= targetScore) && Math.abs(nextPtsA - nextPtsB) >= 2) {
           const winner = nextPtsA > nextPtsB ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getMatchTeamShortName(selectedMatch, winner);
           const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
           const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
           updatedMatch.scoreA = newScoreA;
@@ -1468,12 +997,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     const scoringTeam = team;
 
-    const scoringTeamId =
-      scoringTeam === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
+    const scoringTeamId = getSelectedMatchTeamId(scoringTeam);
 
     const description = (playerName && playerName.trim())
-      ? `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]} — ${playerName.trim()}`
-      : `Ponto para ${scoringTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
+      ? `Ponto para ${scoringTeam === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName} — ${playerName.trim()}`
+      : `Ponto para ${scoringTeam === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName}`;
 
     // Calculate current set points for the snapshot
     const lastSetWinEvent = [...(selectedMatch.events || [])]
@@ -1518,7 +1046,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       if (nextPtsA >= 25 || nextPtsB >= 25) {
         updatedMatch.status = "finished";
         const winner = nextPtsA >= 25 ? "A" : "B";
-        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerName = winner === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName;
 
         updatedMatch.events = [
           ...(updatedMatch.events || []),
@@ -1556,7 +1084,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         Math.abs(nextPtsA - nextPtsB) >= 2
       ) {
         const winner = nextPtsA > nextPtsB ? "A" : "B";
-        const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const winnerName = winner === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName;
 
         const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
         const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
@@ -1607,7 +1135,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         if (nextPtsA >= targetScore || nextPtsB >= targetScore) {
           updatedMatch.status = "finished";
           const winner = nextPtsA >= targetScore ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getSelectedMatchTeamShortName(winner);
 
           updatedMatch.events = [
             ...(updatedMatch.events || []),
@@ -1643,7 +1171,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           Math.abs(nextPtsA - nextPtsB) >= 2
         ) {
           const winner = nextPtsA > nextPtsB ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getSelectedMatchTeamShortName(winner);
 
           const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
           const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
@@ -1697,7 +1225,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         ) {
           updatedMatch.status = "finished";
           const winner = nextPtsA > nextPtsB ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getSelectedMatchTeamShortName(winner);
 
           updatedMatch.events = [
             ...(updatedMatch.events || []),
@@ -1733,7 +1261,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           Math.abs(nextPtsA - nextPtsB) >= 2
         ) {
           const winner = nextPtsA > nextPtsB ? "A" : "B";
-          const winnerName = winner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+          const winnerName = getSelectedMatchTeamShortName(winner);
 
           const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
           const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
@@ -1849,10 +1377,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleBasketballTimeout = (team: "A" | "B") => {
     if (!selectedMatch || !isBasketball) return;
 
-    const teamName =
-      team === "A"
-        ? selectedMatch.teamA.name.split(" - ")[0]
-        : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getSelectedMatchTeamShortName(team);
 
     const timeoutEvent: MatchEvent = {
       id: `evt_${Date.now()}`,
@@ -1917,9 +1442,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const nextB = team === "B" ? selectedMatch.scoreB + points : selectedMatch.scoreB;
     const currentQuarter =
       (selectedMatch.events || []).filter((e) => e.type === "halftime").length + 1;
-    const teamShort = team === "A"
-      ? selectedMatch.teamA.name.split(" - ")[0]
-      : selectedMatch.teamB.name.split(" - ")[0];
+    const teamShort = getSelectedMatchTeamShortName(team);
 
     const hasPlayer = playerName && playerName.trim();
     const description = hasPlayer
@@ -1969,7 +1492,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     const nextA = team === "A" ? currentA + points : currentA;
     const nextB = team === "B" ? currentB + points : currentB;
 
-    const description = `${typeLabel} (+${points}) conquistado por ${team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}`;
+    const description = `${typeLabel} (+${points}) conquistado por ${getSelectedMatchTeamShortName(team)}`;
 
     const updatedMatch: Match = {
       ...selectedMatch,
@@ -2006,7 +1529,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     const scoringTeamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = team === "A" ? getTeamShortName(selectedMatch.teamA) : getTeamShortName(selectedMatch.teamB);
 
     if (type === "ippon" || isGoldenScore) {
       const victoryType = isGoldenScore ? "Ponto de Ouro" : (type === "ippon" ? "IPPON" : "Waza-ari-awasete-Ippon");
@@ -2088,8 +1611,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (!requireGameStarted()) return;
 
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const opponentName = team === "A" ? selectedMatch.teamB.name.split(" - ")[0] : selectedMatch.teamA.name.split(" - ")[0];
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const opponentName = getMatchTeamShortName(selectedMatch, team === "A" ? "B" : "A");
+    const teamName = getMatchTeamShortName(selectedMatch, team);
 
     const currentShidos = selectedMatch.events?.filter(e => e.type === "shido" && e.teamId === teamId).length || 0;
 
@@ -2141,7 +1664,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     setOsaekomiTeam(team);
     setOsaekomiSeconds(0);
 
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getMatchTeamShortName(selectedMatch, team);
 
     const updatedMatch: Match = {
       ...selectedMatch,
@@ -2162,7 +1685,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleToketa = () => {
     if (!osaekomiTeam || !selectedMatch) return;
 
-    const teamName = osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getMatchTeamShortName(selectedMatch, osaekomiTeam);
 
     setOsaekomiTeam(null);
     setOsaekomiSeconds(0);
@@ -2192,7 +1715,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getMatchTeamShortName(selectedMatch, team);
 
     const updatedMatch: Match = {
       ...selectedMatch,
@@ -2226,8 +1749,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
-    const opponentName = team === "A" ? selectedMatch.teamB.name.split(" - ")[0] : selectedMatch.teamA.name.split(" - ")[0];
+    const teamName = getMatchTeamShortName(selectedMatch, team);
+    const opponentName = getMatchTeamShortName(selectedMatch, team === "A" ? "B" : "A");
 
     if (selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === teamId)) {
       return;
@@ -2278,7 +1801,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const handleHantei = (team: "A" | "B") => {
     if (!selectedMatch) return;
     if (!requireGameStarted()) return;
-    const winnerName = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+    const winnerName = getMatchTeamShortName(selectedMatch, team);
 
     const endEvent: MatchEvent = {
       id: `evt_${Date.now()}_end_hantei`,
@@ -2308,14 +1831,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
     if (result === "A") {
       scoreA = 1;
-      description = `${reason} (+1.0 pts) - Vitória de ${selectedMatch.teamA.name.split(" - ")[0]}`;
+      description = `${reason} (+1.0 pts) - Vitória de ${getTeamShortName(selectedMatch.teamA)}`;
       teamId = selectedMatch.teamA.id;
-      resultado = selectedMatch.teamA.name.split(" - ")[0];
+      resultado = getTeamShortName(selectedMatch.teamA);
     } else if (result === "B") {
       scoreB = 1;
-      description = `${reason} (+1.0 pts) - Vitória de ${selectedMatch.teamB.name.split(" - ")[0]}`;
+      description = `${reason} (+1.0 pts) - Vitória de ${getTeamShortName(selectedMatch.teamB)}`;
       teamId = selectedMatch.teamB.id;
-      resultado = selectedMatch.teamB.name.split(" - ")[0];
+      resultado = getTeamShortName(selectedMatch.teamB);
     } else if (result === "Draw") {
       scoreA = 0.5;
       scoreB = 0.5;
@@ -2372,14 +1895,8 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (aWins || bWins) {
       const winner = aWins ? "A" : "B";
       const winnerId = winner === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-      const winnerName =
-        winner === "A"
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
-      const loserName =
-        winner === "A"
-          ? selectedMatch.teamB.name.split(" - ")[0]
-          : selectedMatch.teamA.name.split(" - ")[0];
+      const winnerName = getSelectedMatchTeamShortName(winner);
+      const loserName = getSelectedMatchTeamShortName(winner === "A" ? "B" : "A");
 
       const newScoreA = winner === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
       const newScoreB = winner === "B" ? selectedMatch.scoreB + 1 : selectedMatch.scoreB;
@@ -2405,7 +1922,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       const matchOver = newScoreA >= 2 || newScoreB >= 2;
 
       if (matchOver) {
-        const matchWinnerName = newScoreA >= 2 ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
+        const matchWinnerName = getSelectedMatchTeamShortName(newScoreA >= 2 ? "A" : "B");
         const endEvent: MatchEvent = {
           id: `evt_${Date.now() + 1}_end`,
           type: "end",
@@ -2443,10 +1960,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
       setTamboreauPointsB(currentB);
 
       const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-      const teamName =
-        team === "A"
-          ? selectedMatch.teamA.name.split(" - ")[0]
-          : selectedMatch.teamB.name.split(" - ")[0];
+      const teamName = getSelectedMatchTeamShortName(team);
 
       const pointEvent: MatchEvent = {
         id: `evt_${Date.now()}_goal`,
@@ -2476,7 +1990,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (isFutebolX1 && selectedMatch) {
       const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
       const availableAthletes = athletes.filter((a) =>
-        athleteMatchesTeamAndMatch(a, teamObj),
+        athleteMatchesTeamAndMatch(a, teamObj, selectedMatch),
       );
       if (availableAthletes.length > 0) {
         const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
@@ -2495,7 +2009,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (isFutebolX1 && selectedMatch) {
       const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
       const availableAthletes = athletes.filter((a) =>
-        athleteMatchesTeamAndMatch(a, teamObj),
+        athleteMatchesTeamAndMatch(a, teamObj, selectedMatch),
       );
       if (availableAthletes.length > 0) {
         const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
@@ -2518,7 +2032,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         const teamObj =
           team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
         const availableAthletes = athletes.filter((a) =>
-          athleteMatchesTeamAndMatch(a, teamObj),
+          athleteMatchesTeamAndMatch(a, teamObj, selectedMatch),
         );
         if (availableAthletes.length > 0) {
           const playerName = `${availableAthletes[0].firstName} ${availableAthletes[0].lastName}`;
@@ -2545,9 +2059,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     if (pendingShootout && team !== pendingShootout.team) return;
 
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A"
-      ? selectedMatch.teamA.name.split(" - ")[0]
-      : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getSelectedMatchTeamShortName(team);
     const isScored = type === "shootout_scored";
 
     const newScoreA = isScored && team === "A" ? selectedMatch.scoreA + 1 : selectedMatch.scoreA;
@@ -2606,9 +2118,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   const confirmShootoutPenalty = (type: "penalty_scored" | "penalty_missed", team: "A" | "B", playerName: string) => {
     if (!selectedMatch) return;
     const teamId = team === "A" ? selectedMatch.teamA.id : selectedMatch.teamB.id;
-    const teamName = team === "A"
-      ? selectedMatch.teamA.name.split(" - ")[0]
-      : selectedMatch.teamB.name.split(" - ")[0];
+    const teamName = getSelectedMatchTeamShortName(team);
 
     const { scoredA, scoredB, totalA, totalB } = shootoutStats;
     const nextScoredA = type === "penalty_scored" && team === "A" ? scoredA + 1 : scoredA;
@@ -2670,9 +2180,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     }
 
     if (matchOver && winner) {
-      const winnerName = winner === "A"
-        ? selectedMatch.teamA.name.split(" - ")[0]
-        : selectedMatch.teamB.name.split(" - ")[0];
+      const winnerName = getSelectedMatchTeamShortName(winner);
       const endEvent: MatchEvent = {
         id: `evt_${Date.now() + 1}_end`,
         type: "end",
@@ -2776,543 +2284,21 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     setShowResetConfirm(false);
   };
 
-  const getEventIcon = (type: MatchEvent["type"]) => {
-    switch (type) {
-      case "goal":
-        if (isBasketball) return "🏀";
-        if (isBeachTennis) return "🎾";
-        if (isVolleyball) return "🏐";
-        if (isTamboreu) return "🎾";
-        if (isKarate || isJudo) return "🥋";
-        return "⚽";
-      case "swimming_result":
-        return "🏊";
-      case "yellow_card":
-        return "🟨";
-      case "red_card":
-        return "🟥";
-      case "start":
-        return "▶️";
-      case "end":
-        return "🏁";
-      case "halftime":
-        if (isBeachTennis) return "🎾";
-        return "⏸️";
-      case "penalty_scored":
-        return "⚽";
-      case "penalty_missed":
-        return "❌";
-      case "shootout_scored":
-        return "⚽";
-      case "shootout_missed":
-        return "❌";
-      case "set_win":
-        if (isBeachTennis) return "🎾";
-        if (isVolleyball) return "🏐";
-        return "🎾";
-      case "tie_break_start":
-        return "🎾";
-      case "senshu":
-        return "⭐";
-      case "chui":
-        return "⚠️";
-      case "hansoku":
-        return "🛑";
-      case "waza_ari":
-        return "🟡";
-      case "ippon":
-        return "🔴";
-      case "shido":
-        return "⚠️";
-      case "hansoku_make":
-        return "🛑";
-      case "osaekomi":
-        return "⏲️";
-      case "toketa":
-        return "🔌";
-      default:
-        return "•";
-    }
-  };
-
-  const getBasketballEventData = (event: TimelineEvent) => {
-    const pointValue = Number(event.description?.match(/\+(\d+)/)?.[1] || 1);
-    const totalSeconds = Math.max(0, event.minute);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const teamName = !selectedMatch
-      ? "Faculdade"
-      : event.teamId === selectedMatch.teamA.id
-        ? selectedMatch.teamA.name.split(" - ")[0]
-        : event.teamId === selectedMatch.teamB.id
-          ? selectedMatch.teamB.name.split(" - ")[0]
-          : "Faculdade";
-
-    const playerLabel = event.player
-      ? `🏀 ${event.player} +${pointValue}pts`
-      : `+${pointValue} ${pointValue > 1 ? "pontos" : "ponto"} para ${teamName}`;
-
-    return {
-      tempo: `${minutes}:${String(seconds).padStart(2, "0")}`,
-      pontuacaoLabel: playerLabel,
-      placar: (event.timelineScore || "0x0").replace("x", "-"),
-    };
-  };
-
-  const stripPlayerNameFromLabel = (label: string, event: MatchEvent) => {
-    if (!event.player) return label;
-    if (isBasketball && event.type === "goal") return label;
-    if (isHandebol && event.type === "goal") return label;
-    if (isFutebolX1) return label;
-    if (isFutsal) return label;
-    if (isFutebolSociety) return label;
-
-    return label
-      .replace(` - ${event.player}`, "")
-      .replace(`(${event.player})`, "")
-      .replace(new RegExp(`\\s${event.player}$`), "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-  };
-
-  const keepScoreTogether = (label: string) =>
-    label.replace(/(\d+)\s*x\s*(\d+)/g, "$1\u00A0x\u00A0$2");
-
-  const getEventLabel = (event: MatchEvent) => {
-    const teamName = !selectedMatch
-      ? ""
-      : event.teamId === selectedMatch.teamA.id
-        ? selectedMatch.teamA.name
-        : event.teamId === selectedMatch.teamB.id
-          ? selectedMatch.teamB.name
-          : "";
-
-    let label = "";
-    switch (event.type) {
-      case "goal":
-        if (isBasketball) {
-          if (event.player) {
-            const pts = event.description?.match(/\+(\d+)pts/)?.[1]
-              ?? event.description?.match(/\+(\d+)\s*Ponto/)?.[1];
-            const teamShort = teamName.split(" - ")[0];
-            label = pts
-              ? `🏀 ${event.player} +${pts}pts (${teamShort})`
-              : `🏀 ${event.player} (${teamShort})`;
-          } else {
-            label = event.description || "";
-          }
-          break;
-        }
-        if (isHandebol) {
-          const teamShortName = teamName.split(" - ")[0] || teamName;
-          label = event.player
-            ? `GOL! ${teamShortName} - ${event.player}`
-            : `GOL! ${teamShortName}`;
-          break;
-        }
-        if (isVolleyball) {
-          if (event.player && event.player.trim()) {
-            const teamShort = teamName.split(" - ")[0];
-            label = `🏐 ${event.player} (${teamShort})`;
-          } else {
-            label = event.description || `Ponto - ${teamName}`;
-          }
-          break;
-        }
-        if (isTamboreu) {
-          label = event.description || `🎾 Ponto - ${teamName}`;
-          break;
-        }
-        if (isFutebolSociety && event.player) {
-          label = `GOL! ${event.player}`;
-          break;
-        }
-        if (isFutsal && event.player) {
-          label = `GOL! ${event.player}`;
-          break;
-        }
-        if (event.description) {
-          label = event.description;
-          break;
-        }
-        if (isFutebolX1) {
-          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
-          const athleteInfo = event.player
-            ? `${event.player} (${teamName})`
-            : teamName;
-          label = `⚽ GOL! Placar no momento: ${currentScore} - ${athleteInfo}`;
-          break;
-        }
-        if (isKarate || isJudo) {
-          label = `Ponto para ${teamName.split(" - ")[0]}`;
-          break;
-        }
-        label = `${isHandebol ? "GOL!" : "GOL!"} ${teamName}`;
-        break;
-      case "yellow_card":
-        if (event.description) {
-          label = event.description;
-          break;
-        }
-        if (isFutebolSociety && event.player) {
-          label = `Cartão Amarelo - ${event.player} (${teamName})`;
-          break;
-        }
-        if (isFutsal && event.player) {
-          label = `Cartão Amarelo - ${event.player} (${teamName})`;
-          break;
-        }
-        if (isFutebolX1 && event.player) {
-          label = `Cartão Amarelo - ${event.player} (${teamName})`;
-          break;
-        }
-        label = `Cartão Amarelo - ${teamName}`;
-        break;
-      case "red_card":
-        if (event.description) {
-          label = event.description;
-          break;
-        }
-        if (isFutebolSociety && event.player) {
-          label = `Cartão Vermelho - ${event.player} (${teamName})`;
-          break;
-        }
-        if (isFutsal && event.player) {
-          label = `Cartão Vermelho - ${event.player} (${teamName})`;
-          break;
-        }
-        if (isFutebolX1 && event.player) {
-          label = `Cartão Vermelho - ${event.player} (${teamName})`;
-          break;
-        }
-        label = `Cartão Vermelho - ${teamName}`;
-        break;
-      case "penalty_scored":
-        if (isFutebolX1) {
-          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
-          const athleteInfo = event.player
-            ? `${event.player} (${teamName.split(" - ")[0]})`
-            : teamName.split(" - ")[0];
-          label = `🎯 Gol de Pênalti! Placar no momento: ${currentScore} - ${athleteInfo}`;
-          break;
-        }
-        label = `${isHandebol ? "TIRO DE 7 METROS" : "Gol de Pênalti"} - ${teamName}`;
-        break;
-      case "penalty_missed": {
-        const playerInfo = event.player && event.player !== "Pênalti perdido"
-          ? ` - ${event.player}`
-          : "";
-        if (isFutebolX1) {
-          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
-          const athleteInfo = event.player
-            ? `${event.player} (${teamName.split(" - ")[0]})`
-            : teamName.split(" - ")[0];
-          label = `❌ Pênalti Perdido! Placar no momento: ${currentScore} - ${athleteInfo}`;
-          break;
-        }
-        label = `${isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido - ${teamName}${playerInfo}`;
-        break;
-      }
-      case "shootout_scored":
-        if (event.description) {
-          label = event.description;
-          break;
-        }
-        if (isFutebolX1) {
-          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
-          const athleteInfo = event.player
-            ? `${event.player} (${teamName})`
-            : teamName;
-          label = `🎯 Shoot-out Marcado! Placar no momento: ${currentScore} - ${athleteInfo}`;
-          break;
-        }
-        label = `🎯 Shoot-out Marcado - ${teamName}`;
-        break;
-      case "shootout_missed":
-        if (event.description) {
-          label = event.description;
-          break;
-        }
-        if (isFutebolX1) {
-          const currentScore = (event as TimelineEvent).timelineScore || "0x0";
-          label = `❌ Shoot-out Perdido! Placar no momento: ${currentScore} - ${teamName.split(" - ")[0]}`;
-          break;
-        }
-        label = `❌ Shoot-out Perdido - ${teamName}`;
-        break;
-      case "set_win":
-        if (isBeachTennis) {
-          label = event.description || `Game para ${teamName}`;
-          break;
-        }
-        // Para esportes de set (vôlei, tênis de mesa, etc), priorizar a descrição do evento
-        label = event.description || `Set ganho por ${teamName}`;
-        break;
-      case "tie_break_start":
-        label = "Início de Tie-break";
-        break;
-      case "waza_ari":
-        label = event.description || `Waza-ari para ${teamName}`;
-        break;
-      case "ippon":
-        label = event.description || `IPPON! Vitória para ${teamName}`;
-        break;
-      case "shido":
-        label = event.description || `Shido para ${teamName}`;
-        break;
-      case "hansoku_make":
-        label = event.description || `HANSOKU-MAKE! Vitória para ${teamName}`;
-        break;
-      case "start":
-        label = isJudo || isKarate ? "Início da luta" : "Início da partida";
-        break;
-      case "halftime":
-        label = event.description || "Intervalo";
-        break;
-      case "end":
-        label =
-          isSwimming && event.description
-            ? event.description
-            : isJudo
-              ? "Fim de luta"
-              : "Fim de jogo";
-        break;
-      case "swimming_result":
-        label = event.description || "Resultado da prova";
-        break;
-      default:
-        label = event.description || event.type;
-        break;
-    }
-
-    return keepScoreTogether(stripPlayerNameFromLabel(label, event));
-  };
-
-  const compareTimelineEventsAsc = (a: MatchEvent, b: MatchEvent) => {
-    const timestampA = getEventTimestamp(a.id);
-    const timestampB = getEventTimestamp(b.id);
-
-    if (timestampA !== 0 || timestampB !== 0) {
-      const timestampDiff = timestampA - timestampB;
-      if (timestampDiff !== 0) return timestampDiff;
-    }
-
-    const minuteDiff = a.minute - b.minute;
-    if (minuteDiff !== 0) return minuteDiff;
-
-    const isDoubleYellowPair =
-      a.player &&
-      b.player &&
-      a.player === b.player &&
-      a.teamId === b.teamId &&
-      ((a.type === "yellow_card" && b.type === "red_card") ||
-        (a.type === "red_card" && b.type === "yellow_card"));
-
-    if (isDoubleYellowPair) {
-      return a.type === "yellow_card" ? -1 : 1;
-    }
-
-    return getEventTimestamp(a.id) - getEventTimestamp(b.id);
-  };
-
-  const getTimelineScoreLabel = (events: MatchEvent[]) => {
-    if (!selectedMatch) return [] as TimelineEvent[];
-
-    let regularScoreA = 0;
-    let regularScoreB = 0;
-    let setScoreA = 0;
-    let setScoreB = 0;
-    let setPointsA = 0;
-    let setPointsB = 0;
-    let beachGamesA = 0;
-    let beachGamesB = 0;
-    let beachPointsA = 0;
-    let beachPointsB = 0;
-    let basketballQuarter = 1;
-
-    const mappedEvents = [...events]
-      .sort(compareTimelineEventsAsc)
-      .map((event) => {
-        const timelineQuarter = isBasketball
-          ? `Q${basketballQuarter}`
-          : undefined;
-        if (isSwimming) {
-          return {
-            ...event,
-            timelineScore: "",
-            timelineQuarter,
-          };
-        }
-        if (isBeachTennis) {
-          if (event.type === "goal") {
-            if (event.teamId === selectedMatch.teamA.id) beachPointsA += 1;
-            if (event.teamId === selectedMatch.teamB.id) beachPointsB += 1;
-          }
-
-          if (
-            event.type === "set_win" &&
-            event.description?.startsWith("Game para ")
-          ) {
-            if (event.teamId === selectedMatch.teamA.id) beachGamesA += 1;
-            if (event.teamId === selectedMatch.teamB.id) beachGamesB += 1;
-            beachPointsA = 0;
-            beachPointsB = 0;
-          }
-
-          // Tie-break: reseta pontos ao iniciar
-          if (event.type === "halftime" && event.description?.startsWith("🎾 Início do Tie-break")) {
-            beachPointsA = 0;
-            beachPointsB = 0;
-          }
-
-          // Detecta se estamos em tie-break (algum evento halftime de tie-break já ocorreu)
-          const inTiebreak = events
-            .slice(0, events.indexOf(event) + 1)
-            .some((e) => e.type === "halftime" && e.description?.startsWith("🎾 Início do Tie-break"));
-
-          const ptLabelA = inTiebreak ? String(beachPointsA) : (BEACH_POINT_LABELS[Math.min(beachPointsA, 3)] ?? "0");
-          const ptLabelB = inTiebreak ? String(beachPointsB) : (BEACH_POINT_LABELS[Math.min(beachPointsB, 3)] ?? "0");
-
-          return {
-            ...event,
-            timelineScore: `Games ${beachGamesA}x${beachGamesB} | ${inTiebreak ? "Tie-break" : "Pontos"} ${ptLabelA}-${ptLabelB}`,
-            timelineQuarter,
-          };
-        }
-
-        if (isSetSport) {
-          if (event.type === "goal") {
-            if (event.teamId === selectedMatch.teamA.id) setPointsA += 1;
-            if (event.teamId === selectedMatch.teamB.id) setPointsB += 1;
-          }
-
-          if (event.type === "set_win") {
-            if (event.teamId === selectedMatch.teamA.id) setScoreA += 1;
-            if (event.teamId === selectedMatch.teamB.id) setScoreB += 1;
-            setPointsA = 0;
-            setPointsB = 0;
-          }
-
-          return {
-            ...event,
-            timelineScore: `Sets ${setScoreA}x${setScoreB} | Pontos ${setPointsA}-${setPointsB}`,
-            timelineQuarter,
-          };
-        }
-
-        if (isTamboreu) {
-          if (event.type === "goal") {
-            if (event.teamId === selectedMatch.teamA.id) setPointsA += 1;
-            if (event.teamId === selectedMatch.teamB.id) setPointsB += 1;
-          }
-
-          if (event.type === "set_win") {
-            if (event.teamId === selectedMatch.teamA.id) setScoreA += 1;
-            if (event.teamId === selectedMatch.teamB.id) setScoreB += 1;
-            setPointsA = 0;
-            setPointsB = 0;
-          }
-
-          return {
-            ...event,
-            timelineScore: event.type === "goal"
-              ? `🎾 ${setPointsA} x ${setPointsB}`
-              : "",
-            timelineQuarter,
-          };
-        }
-
-        if (
-          event.type === "goal" ||
-          event.type === "penalty_scored" ||
-          event.type === "shootout_scored"
-        ) {
-          const increment = isBasketball || isKarate || isJudo
-            ? Number(event.description?.match(/\+(\d+)/)?.[1] || 1)
-            : 1;
-
-          if (event.teamId === selectedMatch.teamA.id)
-            regularScoreA += increment;
-          if (event.teamId === selectedMatch.teamB.id)
-            regularScoreB += increment;
-        }
-
-        const mappedEvent: TimelineEvent = {
-          ...event,
-          timelineScore: `${regularScoreA}x${regularScoreB}`,
-          timelineQuarter,
-        };
-
-        if (isBasketball && event.type === "halftime") {
-          basketballQuarter += 1;
-        }
-
-        return mappedEvent;
-      });
-
-    if (isSwimming) {
-      return mappedEvents;
-    }
-
-    return mappedEvents.reverse().map((event) => {
-      if (!isBasketball) return event;
-
-      const descriptionHasQuarter = event.description?.includes("[Q");
-      if (
-        event.type !== "goal" ||
-        !event.description ||
-        descriptionHasQuarter ||
-        !event.timelineQuarter
-      ) {
-        return event;
-      }
-
-      return {
-        ...event,
-        description: `[${event.timelineQuarter}] ${event.description}`,
-      };
-    });
-  };
-
   const timelineEvents = selectedMatch
-    ? getTimelineScoreLabel(selectedMatch.events || [])
+    ? getTimelineScoreLabel(selectedMatch.events || [], {
+      selectedMatch,
+      isSwimming,
+      isBasketball,
+      isBeachTennis,
+      isSetSport,
+      isTamboreu,
+      isKarate,
+      isJudo,
+    })
     : [];
 
-  const getStoredSwimmingParticipants = (): Match["teamA"][] => {
-    if (!selectedMatch?.participants) return [];
-    if (Array.isArray(selectedMatch.participants))
-      return selectedMatch.participants;
-    if (typeof selectedMatch.participants === "string") {
-      try {
-        const parsed = JSON.parse(
-          selectedMatch.participants,
-        ) as Match["teamA"][];
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  };
-
-  const getSwimmingEntries = () => {
-    const participants = getStoredSwimmingParticipants();
-    if (!selectedMatch || participants.length === 0)
-      return [] as Array<{
-        id: string;
-        participant: Match["teamA"];
-        defaultName: string;
-      }>;
-
-    return participants.map((participant) => ({
-      id: participant.id,
-      participant,
-      defaultName: "",
-    }));
-  };
-
-  const storedSwimmingParticipants = getStoredSwimmingParticipants();
-  const swimmingEntries = isSwimming ? getSwimmingEntries() : [];
+  const storedSwimmingParticipants = getStoredSwimmingParticipants(selectedMatch);
+  const swimmingEntries = isSwimming ? getSwimmingEntries(selectedMatch) : [];
   const maxSwimmingRank = swimmingEntries.length > 0 ? swimmingEntries.length : 8;
 
   const handleSaveNewMatch = () => {
@@ -3495,38 +2481,38 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </button>
               <button
                 onClick={() => {
-                setIsNewMatchOpen(true);
-                // Limpar cache de emblemas ao abrir formulário
-                setEmblemA(null);
-                setEmblemB(null);
-                // Resetar form para garantir campos limpos
-                setNewMatchForm({
-                  teamA: "",
-                  teamB: "",
-                  swimmingTeams: Array(8).fill(""),
-                  sport: "",
-                  category: "Masculino",
-                  stage: "Fase de Classificação",
-                  date: new Date().toISOString().split("T")[0],
-                  time: "",
-                  location: "",
-                });
-              }}
-              style={{
-                background: "var(--accent-color)",
-                color: "white",
-                padding: "10px 20px",
-                borderRadius: "8px",
-                border: "none",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <PlusCircle size={18} /> Nova Partida
-            </button>
+                  setIsNewMatchOpen(true);
+                  // Limpar cache de emblemas ao abrir formulário
+                  setEmblemA(null);
+                  setEmblemB(null);
+                  // Resetar form para garantir campos limpos
+                  setNewMatchForm({
+                    teamA: "",
+                    teamB: "",
+                    swimmingTeams: Array(8).fill(""),
+                    sport: "",
+                    category: "Masculino",
+                    stage: "Fase de Classificação",
+                    date: new Date().toISOString().split("T")[0],
+                    time: "",
+                    location: "",
+                  });
+                }}
+                style={{
+                  background: "var(--accent-color)",
+                  color: "white",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <PlusCircle size={18} /> Nova Partida
+              </button>
             </div>
           </div>
         </div>
@@ -3828,9 +2814,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               textAlign: "right",
                             }}
                           >
-                            {match.teamA.name.split(" - ")[0]}
+                            {getTeamShortName(match.teamA)}
                           </span>
-                          {match.teamA.name.split(" - ")[1] && (
+                          {getMatchTeamSuffixName(match, "A") && (
                             <span
                               style={{
                                 fontSize: "11px",
@@ -3839,7 +2825,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 marginTop: "-4px"
                               }}
                             >
-                              {match.teamA.name.split(" - ")[1]}
+                              {getMatchTeamSuffixName(match, "A")}
                             </span>
                           )}
                         </div>
@@ -3911,9 +2897,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               textAlign: "left",
                             }}
                           >
-                            {match.teamB.name.split(" - ")[0]}
+                            {getTeamShortName(match.teamB)}
                           </span>
-                          {match.teamB.name.split(" - ")[1] && (
+                          {getMatchTeamSuffixName(match, "B") && (
                             <span
                               style={{
                                 fontSize: "11px",
@@ -3922,7 +2908,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                 marginTop: "-4px"
                               }}
                             >
-                              {match.teamB.name.split(" - ")[1]}
+                              {getMatchTeamSuffixName(match, "B")}
                             </span>
                           )}
                         </div>
@@ -4022,7 +3008,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     onChange={(e) => {
                       const selectedSport = e.target.value;
                       let nextLocation = newMatchForm.location;
-                      
+
                       if (FIXED_LOCATIONS[selectedSport]) {
                         nextLocation = FIXED_LOCATIONS[selectedSport];
                       } else if (FILTERED_LOCATIONS[selectedSport] && !FILTERED_LOCATIONS[selectedSport].includes(nextLocation)) {
@@ -4440,18 +3426,10 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "stretch", width: "100%", background: "var(--bg-main)" }}>
-      <div style={{ ...styles.container, flex: 1, minWidth: 0, paddingRight: showChat && activeMatchId ? "0" : "20px" }} className="match-timeline-root">
-        <div style={{ ...styles.header, marginBottom: "20px" }}>
-          <div
-            className="match-timeline-header-row"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              width: "100%",
-            }}
-          >
+    <div className="match-timeline-layout">
+      <div style={styles.container} className="match-timeline-root match-timeline-root-pane">
+        <div style={styles.header} className="match-timeline-header">
+          <div className="match-timeline-header-row">
             <div>
               <h1 style={styles.title}>⚽ Controle de Partida</h1>
               <button
@@ -4463,27 +3441,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 Trocar partida
               </button>
             </div>
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              <button
-                onClick={() => setShowChat((v) => !v)}
-                style={{
-                  ...styles.resetBtn,
-                  background: showChat ? "var(--accent-color)" : "rgba(255,255,255,0.05)",
-                  color: showChat ? "#fff" : "var(--text-secondary)",
-                  borderColor: showChat ? "var(--accent-color)" : "var(--border-color)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  borderRadius: "8px",
-                  transition: "all 0.2s"
-                }}
-              >
-                <MessageCircle size={16} />
-                {showChat ? "Fechar Chat" : "Abrir Chat"}
-              </button>
-
+            <div className="match-timeline-header-actions">
               <button
                 style={styles.resetBtn}
                 className="reset-btn-hover"
@@ -4495,71 +3453,39 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           </div>
         </div>
 
-        <div style={styles.content}>
+        <div style={styles.content} className="match-timeline-content">
           {/* Placar */}
           <div style={styles.scoreboard} className="match-timeline-scoreboard">
             {isSwimming ? (
-              <div
-                style={{ width: "100%", textAlign: "center", padding: "20px 0" }}
-              >
-                <h2
-                  style={{
-                    ...styles.teamName,
-                    fontSize: "48px",
-                    color: "var(--accent-color)",
-                    textShadow: "0 0 20px rgba(59, 130, 246, 0.4)",
-                  }}
-                >
+              <div className="match-timeline-swimming-card">
+                <h2 className="match-timeline-swimming-title">
                   🏊 Natação
                 </h2>
-                <div
-                  style={{
-                    marginTop: "10px",
-                    fontSize: "18px",
-                    color: "var(--text-secondary)",
-                    fontWeight: 600,
-                  }}
-                >
+                <div className="match-timeline-swimming-subtitle">
                   {selectedMatch.category} • {selectedMatch.location.replace(/\s*\(.*?\)\s*$/, '').trim()}
                 </div>
               </div>
             ) : (
               <>
-                <div style={styles.teamLeft}>
+                <div style={styles.teamLeft} className="match-timeline-team-column match-timeline-team-left">
                   {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) && (
-                    <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                    <div className="match-timeline-team-disqualified">
                       DESCLASSIFICADO (HANSOKU)
                     </div>
                   )}
                   <h2
-                    style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
-                    className="match-timeline-team-name"
+                    style={styles.teamName}
+                    className={`match-timeline-team-name ${selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) ? "match-timeline-team-name--disqualified" : ""}`}
                   >
                     {selectedMatch.teamA.name}
                     {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamA.id) && (
-                      <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                      <span title="Senshu (Primeiro Ponto)" className="match-timeline-senshu-star">⭐</span>
                     )}
                   </h2>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{
-                      ...styles.score,
-                      color: (flashTeam === "A" || flashTeam === "both") ? "var(--accent-color)" : "white",
-                      transition: "color 0.4s ease",
-                    }}>{selectedMatch.scoreA}</div>
+                  <div className="match-timeline-team-score-row">
+                    <div className={`match-timeline-score ${flashTeam === "A" || flashTeam === "both" ? "match-timeline-score--active" : "match-timeline-score--team-a"}`}>{selectedMatch.scoreA}</div>
                     {isSetSport && (
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                        }}
-                      >
+                      <div className="match-timeline-set-score">
                         {(() => {
                           const lastSetWinEvent = [
                             ...(selectedMatch.events || []),
@@ -4576,7 +3502,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               e.type === "goal" &&
                               e.teamId === selectedMatch.teamA.id,
                           ).length;
-                        })()}{" "}
+                        })()} {" "}
                         pts
                       </div>
                     )}
@@ -4727,41 +3653,25 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   </div>
                 )}
 
-                <div style={styles.teamRight}>
+                <div style={styles.teamRight} className="match-timeline-team-column match-timeline-team-right">
                   {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) && (
-                    <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                    <div className="match-timeline-team-disqualified">
                       DESCLASSIFICADO (HANSOKU)
                     </div>
                   )}
                   <h2
-                    style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
-                    className="match-timeline-team-name"
+                    style={styles.teamName}
+                    className={`match-timeline-team-name ${selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) ? "match-timeline-team-name--disqualified" : ""}`}
                   >
                     {selectedMatch.teamB.name}
                     {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamB.id) && (
-                      <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                      <span title="Senshu (Primeiro Ponto)" className="match-timeline-senshu-star">⭐</span>
                     )}
                   </h2>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{
-                      ...styles.score,
-                      color: (flashTeam === "B" || flashTeam === "both") ? "var(--accent-color)" : "white",
-                      transition: "color 0.4s ease",
-                    }}>{selectedMatch.scoreB}</div>
+                  <div className="match-timeline-team-score-row">
+                    <div className={`match-timeline-score ${flashTeam === "B" || flashTeam === "both" ? "match-timeline-score--active" : "match-timeline-score--team-b"}`}>{selectedMatch.scoreB}</div>
                     {isSetSport && (
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                        }}
-                      >
+                      <div className="match-timeline-set-score">
                         {(() => {
                           const lastSetWinEvent = [
                             ...(selectedMatch.events || []),
@@ -4778,7 +3688,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               e.type === "goal" &&
                               e.teamId === selectedMatch.teamB.id,
                           ).length;
-                        })()}{" "}
+                        })()} {" "}
                         pts
                       </div>
                     )}
@@ -4814,9 +3724,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   {(["A", "B"] as const).map((team) => {
-                    const name = team === "A"
-                      ? selectedMatch.teamA.name.split(" - ")[0]
-                      : selectedMatch.teamB.name.split(" - ")[0];
+                    const name = getSelectedMatchTeamShortName(team);
                     const color = team === "A" ? "#3b82f6" : "#ef4444";
                     const isSelected = shootoutFirstTeam === team;
                     return (
@@ -4866,7 +3774,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
               {/* Indicador de vez */}
               <div style={{ textAlign: 'center', marginBottom: '14px', fontSize: '13px', fontWeight: 700, color: shootoutStats.nextTeam === "A" ? "#3b82f6" : "#ef4444" }}>
-                ▶ Vez de cobrar: {shootoutStats.nextTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}
+                ▶ Vez de cobrar: {getSelectedMatchTeamShortName(shootoutStats.nextTeam)}
               </div>
 
               {/* Placar da disputa */}
@@ -4884,7 +3792,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   return (
                     <div key={team} style={{ textAlign: 'center', flex: 1 }}>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                        {teamObj.name.split(" - ")[0]}
+                        {getTeamShortName(teamObj)}
                       </div>
                       <div style={{ fontSize: '44px', fontWeight: 900, color, lineHeight: 1 }}>{scored}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -4916,9 +3824,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                   const isMyTurn = shootoutStats.nextTeam === team;
                   const color = team === "A" ? "#3b82f6" : "#ef4444";
                   const bg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
-                  const name = team === "A"
-                    ? selectedMatch.teamA.name.split(" - ")[0]
-                    : selectedMatch.teamB.name.split(" - ")[0];
+                  const name = getSelectedMatchTeamShortName(team);
                   return (
                     <div key={team} style={{ display: 'flex', flexDirection: 'column', gap: '8px', opacity: isMyTurn ? 1 : 0.35 }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, textAlign: 'center', color }}>{name}</div>
@@ -5101,18 +4007,18 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       }}
                     >
                       {!isBasketball3x3 && (
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(245, 158, 11, 0.15)",
-                          borderColor: "#f59e0b",
-                          color: "#f59e0b",
-                        }}
-                        onClick={handleBasketballQuarterBreak}
-                        disabled={!isRunning && currentMinute > 0}
-                      >
-                        Intervalo entre Quartos
-                      </button>
+                        <button
+                          style={{
+                            ...styles.eventBtn,
+                            background: "rgba(245, 158, 11, 0.15)",
+                            borderColor: "#f59e0b",
+                            color: "#f59e0b",
+                          }}
+                          onClick={handleBasketballQuarterBreak}
+                          disabled={!isRunning && currentMinute > 0}
+                        >
+                          Intervalo entre Quartos
+                        </button>
                       )}
                       <button
                         style={{
@@ -5124,7 +4030,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         onClick={() => handleBasketballTimeout("A")}
                         disabled={!isRunning}
                       >
-                        Tempo {selectedMatch.teamA.name.split(" - ")[0]}
+                        Tempo {selectedMatchTeamAShortName}
                       </button>
                       <button
                         style={{
@@ -5136,7 +4042,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         onClick={() => handleBasketballTimeout("B")}
                         disabled={!isRunning}
                       >
-                        Tempo {selectedMatch.teamB.name.split(" - ")[0]}
+                        Tempo {selectedMatchTeamBShortName}
                       </button>
                     </div>
                   </div>
@@ -5202,14 +4108,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     onClick={() => handleBeachPoint("A")}
                   >
                     <Plus size={20} />
-                    Ponto {selectedMatch.teamA.name.split(" - ")[0]}
+                    Ponto {selectedMatchTeamAShortName}
                   </button>
                   <button
                     style={{ ...styles.eventBtn, ...styles.teamBBtn }}
                     onClick={() => handleBeachPoint("B")}
                   >
                     <Plus size={20} />
-                    Ponto {selectedMatch.teamB.name.split(" - ")[0]}
+                    Ponto {selectedMatchTeamBShortName}
                   </button>
                 </div>
               </div>
@@ -5245,7 +4151,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     >
                       <Trophy size={24} color="#aaa" />
                       Vitória
-                      <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatch.teamA.name.split(" - ")[0]}</span>
+                      <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatchTeamAShortName}</span>
                     </button>
 
                     <button
@@ -5266,13 +4172,13 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     >
                       <Trophy size={24} color="#aaa" />
                       Vitória
-                      <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatch.teamB.name.split(" - ")[0]}</span>
+                      <span style={{ fontSize: "14px", color: "#aaa" }}>{selectedMatchTeamBShortName}</span>
                     </button>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                     <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-                      Selecione o motivo da Vitória de {chessWinner === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]}
+                      Selecione o motivo da Vitória de {chessWinner === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName}
                     </div>
 
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
@@ -5320,2100 +4226,1827 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
 
-        {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
-          <div style={styles.eventSection}>
-            <h3 style={styles.sectionTitle}>
-              {isSetSport
-                ? isVolleyball
-                  ? "🏐 Pontos"
-                  : "🏓 Pontos"
-                : "⚽ Gols"}
-            </h3>
-            {isSetSport && isVolleyball && (() => {
-              const stage = selectedMatch.stage || "Fase de Classificação";
-              const isFinal = stage === "Fase Final";
-              const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
-              const sport = selectedMatch.sport;
-              let targetPts: number;
-              if (sport === "Vôlei") {
-                targetPts = isFinal ? (currentSet <= 2 ? 25 : 15) : 25;
-              } else if (sport === "Vôlei de Praia") {
-                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 21;
-              } else {
-                // Futevôlei
-                targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 18;
-              }
-              return (
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 12px", marginBottom: "10px",
-                  background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
-                  borderRadius: "8px",
-                  border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
-                }}>
-                  <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
-                    {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
-                    {isFinal && ` · Set ${currentSet}/3`}
-                  </span>
-                  <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
-                    Alvo: {targetPts} pts{isFinal ? " (vant. 2)" : ""}
-                  </span>
-                </div>
-              );
-            })()}
-            <div
-              style={styles.eventButtons}
-              className="match-timeline-event-grid"
-            >
-              <button
-                style={{ ...styles.eventBtn, ...styles.teamABtn }}
-                onClick={() =>
-                  isSetSport ? handleVolleyPoint("A") : handleGoal("A")
-                }
-              >
-                <Plus size={20} />
-                {isSetSport ? "Ponto" : "Gol"}{" "}
-                {selectedMatch.teamA.name.split(" - ")[0]}
-              </button>
-              <button
-                style={{ ...styles.eventBtn, ...styles.teamBBtn }}
-                onClick={() =>
-                  isSetSport ? handleVolleyPoint("B") : handleGoal("B")
-                }
-              >
-                <Plus size={20} />
-                {isSetSport ? "Ponto" : "Gol"}{" "}
-                {selectedMatch.teamB.name.split(" - ")[0]}
-              </button>
-            </div>
-          </div>
-        )}
-
-            {isVolleyballAceSport && selectedMatch && selectedMatch.status !== "finished" && (
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>🏐 Ações de Atletas (ACE / ERRO)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                  {(["A", "B"] as const).map((team) => {
-                    const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
-                    const availableAthletes = athletes.filter((a) =>
-                      athleteMatchesTeamAndMatch(a, teamObj),
-                    );
-
-                    return (
-                      <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", marginBottom: "4px", color: "white", background: team === "A" ? "rgba(59, 130, 246, 0.2)" : "rgba(239, 68, 68, 0.2)", padding: "4px", borderRadius: "4px" }}>
-                          {teamObj.name.split(" - ")[0]}
+                {!isBeachTennis && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
+                  <div style={styles.eventSection}>
+                    <h3 style={styles.sectionTitle}>
+                      {isSetSport
+                        ? isVolleyball
+                          ? "🏐 Pontos"
+                          : "🏓 Pontos"
+                        : "⚽ Gols"}
+                    </h3>
+                    {isSetSport && isVolleyball && (() => {
+                      const stage = selectedMatch.stage || "Fase de Classificação";
+                      const isFinal = stage === "Fase Final";
+                      const currentSet = selectedMatch.scoreA + selectedMatch.scoreB + 1;
+                      const sport = selectedMatch.sport;
+                      let targetPts: number;
+                      if (sport === "Vôlei") {
+                        targetPts = isFinal ? (currentSet <= 2 ? 25 : 15) : 25;
+                      } else if (sport === "Vôlei de Praia") {
+                        targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 21;
+                      } else {
+                        // Futevôlei
+                        targetPts = isFinal ? (currentSet <= 2 ? 18 : 15) : 18;
+                      }
+                      return (
+                        <div style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "8px 12px", marginBottom: "10px",
+                          background: isFinal ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)",
+                          borderRadius: "8px",
+                          border: `1px solid ${isFinal ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
+                        }}>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: isFinal ? "#f59e0b" : "var(--accent-color)", textTransform: "uppercase" }}>
+                            {isFinal ? "🏆 Fase Final" : "📋 Fase de Classificação"}
+                            {isFinal && ` · Set ${currentSet}/3`}
+                          </span>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                            Alvo: {targetPts} pts{isFinal ? " (vant. 2)" : ""}
+                          </span>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {availableAthletes.map((athlete) => {
-                            const playerName = `${athlete.firstName} ${athlete.lastName}`;
-                            const isAceFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "ace";
-                            const isErroFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "erro";
-
-                            return (
-                              <div
-                                key={athlete.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 10px',
-                                  background: 'rgba(255,255,255,0.03)',
-                                  borderRadius: '8px',
-                                  border: '1px solid rgba(255,255,255,0.05)'
-                                }}
-                              >
-                                <span style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                  {athlete.firstName}
-                                </span>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  <button
-                                    className="volley-ace-btn"
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '11px',
-                                      fontWeight: 800,
-                                      borderRadius: '4px',
-                                      border: '1px solid #22c55e',
-                                      background: isAceFeedback ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
-                                      color: isAceFeedback ? 'white' : '#22c55e',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      animation: isAceFeedback ? 'volley-btn-glow 0.5s' : 'none'
-                                    }}
-                                    onClick={() => _handleVolleyAce(team, playerName, athlete.id)}
-                                  >
-                                    ACE
-                                  </button>
-                                  <button
-                                    className="volley-erro-btn"
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '11px',
-                                      fontWeight: 800,
-                                      borderRadius: '4px',
-                                      border: '1px solid #ef4444',
-                                      background: isErroFeedback ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
-                                      color: isErroFeedback ? 'white' : '#ef4444',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      animation: isErroFeedback ? 'volley-btn-glow 0.5s' : 'none'
-                                    }}
-                                    onClick={() => _handleVolleyErro(team, playerName, athlete.id)}
-                                  >
-                                    ERRO
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {availableAthletes.length === 0 && (
-                            <div style={{ fontSize: "11px", color: "#666", textAlign: "center", fontStyle: "italic" }}>
-                              Sem atletas
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {isSetSport && (
-              <div style={styles.eventSection}>
-                <h3 style={styles.sectionTitle}>🏆 Sets</h3>
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleSetWin("A")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set Ganho {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "var(--accent-color)",
-                      borderColor: "var(--accent-color)",
-                    }}
-                    onClick={() => handleSetWin("B")}
-                  >
-                    <Trophy size={18} style={{ marginRight: "8px" }} />
-                    Set Ganho {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {isTamboreu && (
-              <div style={styles.eventSection}>
-                {/* Modal Fim de Jogo Tamboréu */}
-                {tamboreauMatchWinner && (
-                  <div
-                    style={{
-                      position: "fixed",
-                      inset: 0,
-                      background: "rgba(0,0,0,0.85)",
-                      zIndex: 9999,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                      );
+                    })()}
                     <div
-                      style={{
-                        background: "#18181b",
-                        border: "2px solid #22c55e",
-                        borderRadius: "20px",
-                        padding: "40px 48px",
-                        textAlign: "center",
-                        maxWidth: "420px",
-                        width: "90%",
-                        boxShadow: "0 0 60px rgba(34,197,94,0.3)",
-                      }}
+                      style={styles.eventButtons}
+                      className="match-timeline-event-grid"
                     >
-                      <div style={{ fontSize: "56px", marginBottom: "12px" }}>🏆</div>
-                      <div style={{ fontSize: "13px", color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", marginBottom: "8px" }}>
-                        Fim de Jogo · Tamboréu
-                      </div>
-                      <div style={{ fontSize: "26px", fontWeight: 900, color: "white", marginBottom: "8px" }}>
-                        {tamboreauMatchWinner.name}
-                      </div>
-                      <div style={{ fontSize: "15px", color: "var(--text-secondary)", marginBottom: "28px" }}>
-                        venceu por <span style={{ color: "white", fontWeight: 700 }}>{tamboreauMatchWinner.setsA} x {tamboreauMatchWinner.setsB}</span> sets
-                      </div>
                       <button
-                        style={{
-                          background: "#22c55e",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "10px",
-                          padding: "14px 32px",
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          width: "100%",
-                        }}
-                        onClick={() => {
-                          setTamboreauMatchWinner(null);
-                          navigate("/");
-                        }}
+                        style={{ ...styles.eventBtn, ...styles.teamABtn }}
+                        onClick={() =>
+                          isSetSport ? handleVolleyPoint("A") : handleGoal("A")
+                        }
                       >
-                        Ver Resultados
+                        <Plus size={20} />
+                        {isSetSport ? "Ponto" : "Gol"}{" "}
+                        {selectedMatchTeamAShortName}
+                      </button>
+                      <button
+                        style={{ ...styles.eventBtn, ...styles.teamBBtn }}
+                        onClick={() =>
+                          isSetSport ? handleVolleyPoint("B") : handleGoal("B")
+                        }
+                      >
+                        <Plus size={20} />
+                        {isSetSport ? "Ponto" : "Gol"}{" "}
+                        {selectedMatchTeamBShortName}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Pontos do Set Atual */}
-                <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
-                  🎾 Pontos do Set Atual
-                </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "24px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div style={{ fontSize: "52px", fontWeight: 900, color: "#3b82f6", minWidth: "60px", textAlign: "center" }}>
-                    {tamboreauPointsA}
-                  </div>
-                  <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--text-secondary)" }}>x</div>
-                  <div style={{ fontSize: "52px", fontWeight: 900, color: "#ef4444", minWidth: "60px", textAlign: "center" }}>
-                    {tamboreauPointsB}
-                  </div>
-                </div>
+                {isVolleyballAceSport && selectedMatch && selectedMatch.status !== "finished" && (
+                  <div style={styles.eventSection}>
+                    <h3 style={styles.sectionTitle}>🏐 Ações de Atletas (ACE / ERRO)</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                      {(["A", "B"] as const).map((team) => {
+                        const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                        const availableAthletes = athletes.filter((a) =>
+                          athleteMatchesTeamAndMatch(a, teamObj, selectedMatch),
+                        );
 
-                {/* Botões de ponto */}
-                <div
-                  style={styles.eventButtons}
-                  className="match-timeline-event-grid"
-                >
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "#1d4ed8",
-                      borderColor: "#3b82f6",
-                      color: "white",
-                      fontSize: "16px",
-                      fontWeight: 700,
-                      padding: "20px",
-                    }}
-                    onClick={() => handleTamboreauPoint("A")}
-                    disabled={selectedMatch.status === "finished"}
-                  >
-                    <Plus size={22} />
-                    Ponto {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.eventBtn,
-                      background: "#b91c1c",
-                      borderColor: "#ef4444",
-                      color: "white",
-                      fontSize: "16px",
-                      fontWeight: 700,
-                      padding: "20px",
-                    }}
-                    onClick={() => handleTamboreauPoint("B")}
-                    disabled={selectedMatch.status === "finished"}
-                  >
-                    <Plus size={22} />
-                    Ponto {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
+                        return (
+                          <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", marginBottom: "4px", color: "white", background: team === "A" ? "rgba(59, 130, 246, 0.2)" : "rgba(239, 68, 68, 0.2)", padding: "4px", borderRadius: "4px" }}>
+                              {getTeamShortName(teamObj)}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {availableAthletes.map((athlete) => {
+                                const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                                const isAceFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "ace";
+                                const isErroFeedback = _volleyActionFeedback?.playerId === athlete.id && _volleyActionFeedback.type === "erro";
 
-                {/* Indicador de regra */}
-                <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                  Set fecha em 10 pts (vantagem de 2) · Máximo 12 pts · Melhor de 3 sets
-                </div>
-
-                {/* Cronologia da Partida */}
-                {(selectedMatch.events || []).filter((e) =>
-                  e.type === "start" || e.type === "set_win" || e.type === "end"
-                ).length > 0 && (
-                    <div style={{ marginTop: "24px" }}>
-                      <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
-                        📋 Cronologia da Partida
-                      </h3>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "8px",
-                          maxHeight: "260px",
-                          overflowY: "auto",
-                          padding: "4px 2px",
-                        }}
-                      >
-                        {[...(selectedMatch.events || [])]
-                          .filter((e) => e.type === "start" || e.type === "set_win" || e.type === "end")
-                          .sort((a, b) => {
-                            const tsA = parseInt(a.id.split("_")[1] || "0", 10);
-                            const tsB = parseInt(b.id.split("_")[1] || "0", 10);
-                            return tsA - tsB;
-                          })
-                          .map((event) => {
-                            const isSetWin = event.type === "set_win";
-                            const isEnd = event.type === "end";
-                            const isStart = event.type === "start";
-                            const color = isEnd ? "#22c55e" : isSetWin ? "#f59e0b" : "var(--text-secondary)";
-                            const icon = isEnd ? "🏁" : isSetWin ? "🏆" : "▶️";
-                            return (
-                              <div
-                                key={event.id}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "flex-start",
-                                  gap: "10px",
-                                  padding: "10px 14px",
-                                  background: isEnd
-                                    ? "rgba(34,197,94,0.08)"
-                                    : isSetWin
-                                      ? "rgba(245,158,11,0.08)"
-                                      : "rgba(255,255,255,0.04)",
-                                  borderRadius: "8px",
-                                  borderLeft: `3px solid ${color}`,
-                                }}
-                              >
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{icon}</span>
-                                <span style={{ fontSize: "13px", color, fontWeight: isStart ? 400 : 600, lineHeight: 1.4 }}>
-                                  {event.description || (isStart ? "Início" : event.type)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
+                                return (
+                                  <div
+                                    key={athlete.id}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 10px',
+                                      background: 'rgba(255,255,255,0.03)',
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(255,255,255,0.05)'
+                                    }}
+                                  >
+                                    <span style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {athlete.firstName}
+                                    </span>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                      <button
+                                        className="volley-ace-btn"
+                                        style={{
+                                          padding: '4px 8px',
+                                          fontSize: '11px',
+                                          fontWeight: 800,
+                                          borderRadius: '4px',
+                                          border: '1px solid #22c55e',
+                                          background: isAceFeedback ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
+                                          color: isAceFeedback ? 'white' : '#22c55e',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s',
+                                          animation: isAceFeedback ? 'volley-btn-glow 0.5s' : 'none'
+                                        }}
+                                        onClick={() => _handleVolleyAce(team, playerName, athlete.id)}
+                                      >
+                                        ACE
+                                      </button>
+                                      <button
+                                        className="volley-erro-btn"
+                                        style={{
+                                          padding: '4px 8px',
+                                          fontSize: '11px',
+                                          fontWeight: 800,
+                                          borderRadius: '4px',
+                                          border: '1px solid #ef4444',
+                                          background: isErroFeedback ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
+                                          color: isErroFeedback ? 'white' : '#ef4444',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s',
+                                          animation: isErroFeedback ? 'volley-btn-glow 0.5s' : 'none'
+                                        }}
+                                        onClick={() => _handleVolleyErro(team, playerName, athlete.id)}
+                                      >
+                                        ERRO
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {availableAthletes.length === 0 && (
+                                <div style={{ fontSize: "11px", color: "#666", textAlign: "center", fontStyle: "italic" }}>
+                                  Sem atletas
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-              </div>
-            )}
+                  </div>
+                )}
 
-            {isBasketball && (
-              <div style={styles.eventSection}>
-                <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
-                  🏀 Pontuação
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "15px" }}>
-                  {(["A", "B"] as const).map((team) => {
-                    const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
-                    const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
-                    const teamBg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
-                    const isDisabled = isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21);
-                    return (
-                      <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {teamObj.name.split(" - ")[0]}
-                        </div>
-                        <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
-                          onClick={() => handleBasketballPoint(team, 1)} disabled={isDisabled}>
-                          +1 {isBasketball3x3 ? "(Dentro da linha)" : "(Lance Livre)"}
-                        </button>
-                        <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
-                          onClick={() => handleBasketballPoint(team, 2)} disabled={isDisabled}>
-                          +2 {isBasketball3x3 ? "(Fora da linha)" : "(Quadra)"}
-                        </button>
-                        {!isBasketball3x3 && (
-                          <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
-                            onClick={() => handleBasketballPoint(team, 3)}>
-                            +3 (Fora)
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {isKarate && (
-              <div style={styles.eventSection}>
-                <h3
-                  style={{ ...styles.sectionTitle, color: "var(--accent-color)", marginBottom: "8px" }}
-                >
-                  🥋 Pontuação WKF
-                </h3>
-                <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "16px", textAlign: "center", fontStyle: "italic", lineHeight: "1.5", background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    Na Modalidade Caratê o atleta vencedor é decidido caso algum atleta faça 8 pontos de vantagem ou tenha marcado mais pontos ao fim do tempo.
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                    gap: "15px",
-                  }}
-                >
-                  {[
-                    { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0] },
-                    { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0] }
-                  ].map(({ teamKey, teamName }) => (
+                {isSetSport && (
+                  <div style={styles.eventSection}>
+                    <h3 style={styles.sectionTitle}>🏆 Sets</h3>
                     <div
-                      key={teamKey}
-                      style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                      style={styles.eventButtons}
+                      className="match-timeline-event-grid"
                     >
+                      <button
+                        style={{
+                          ...styles.eventBtn,
+                          background: "var(--accent-color)",
+                          borderColor: "var(--accent-color)",
+                        }}
+                        onClick={() => handleSetWin("A")}
+                      >
+                        <Trophy size={18} style={{ marginRight: "8px" }} />
+                        Set Ganho {selectedMatchTeamAShortName}
+                      </button>
+                      <button
+                        style={{
+                          ...styles.eventBtn,
+                          background: "var(--accent-color)",
+                          borderColor: "var(--accent-color)",
+                        }}
+                        onClick={() => handleSetWin("B")}
+                      >
+                        <Trophy size={18} style={{ marginRight: "8px" }} />
+                        Set Ganho {selectedMatchTeamBShortName}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isTamboreu && (
+                  <div style={styles.eventSection}>
+                    {/* Modal Fim de Jogo Tamboréu */}
+                    {tamboreauMatchWinner && (
                       <div
                         style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          textAlign: "center",
-                          marginBottom: "4px",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          position: "fixed",
+                          inset: 0,
+                          background: "rgba(0,0,0,0.85)",
+                          zIndex: 9999,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: "4px"
-                        }}
-                      >
-                        {teamName}
-                      </div>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(100, 116, 139, 0.15)",
-                          borderColor: "#64748b",
-                          color: "#64748b",
-                        }}
-                        onClick={() => handleKaratePoint(teamKey as "A" | "B", 1, "Yuko")}
-                      >
-                        Yuko (+1)
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(234, 179, 8, 0.15)",
-                          borderColor: "#eab308",
-                          color: "#eab308",
-                        }}
-                        onClick={() => handleKaratePoint(teamKey as "A" | "B", 2, "Waza-ari")}
-                      >
-                        Waza-ari (+2)
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(239, 68, 68, 0.15)",
-                          borderColor: "#ef4444",
-                          color: "#ef4444",
-                        }}
-                        onClick={() => handleKaratePoint(teamKey as "A" | "B", 3, "Ippon")}
-                      >
-                        Ippon (+3)
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(251, 191, 36, 0.15)",
-                          borderColor: "#f59e0b",
-                          color: "#f59e0b",
-                          marginTop: "8px"
-                        }}
-                        onClick={() => handleSenshu(teamKey as "A" | "B")}
-                      >
-                        Senshu (Vantagem)
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isKarate && (
-              <div style={styles.eventSection}>
-                <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)" }}>
-                  ⚠️ Penalidades (Chui)
-                </h3>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                    gap: "15px",
-                  }}
-                >
-                  {[
-                    { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0], teamId: selectedMatch.teamA.id },
-                    { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0], teamId: selectedMatch.teamB.id }
-                  ].map(({ teamKey, teamName, teamId }) => {
-                    const isHansoku = selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === teamId);
-                    const chuiCount = selectedMatch.events?.filter(e => e.type === "chui" && e.teamId === teamId).length || 0;
-
-                    let btnLabel = "Adicionar Penalidade";
-                    if (isHansoku) btnLabel = "Hansoku (Desclassificado)";
-                    else if (chuiCount > 0) btnLabel = `Chui ${chuiCount} - Próx: ${chuiCount === 3 ? "Hansoku" : `Chui ${chuiCount + 1}`}`;
-
-                    return (
-                      <button
-                        key={teamKey}
-                        style={{
-                          ...styles.eventBtn,
-                          background: isHansoku ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
-                          borderColor: "var(--danger-color, #ef4444)",
-                          color: isHansoku ? "white" : "#ef4444",
-                          padding: "16px",
-                          fontSize: "14px",
-                          fontWeight: 800,
-                          opacity: isHansoku ? 0.7 : 1,
-                          cursor: isHansoku ? "not-allowed" : "pointer"
-                        }}
-                        onClick={() => handleKaratePenalty(teamKey as "A" | "B")}
-                        disabled={isHansoku || selectedMatch.status === "finished"}
-                      >
-                        {btnLabel} ({teamName})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {isKarate && currentMinute === 0 && !isRunning && selectedMatch.status !== "finished" && selectedMatch.scoreA === selectedMatch.scoreB && (
-              <div style={styles.eventSection}>
-                <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
-                  ⚖️ Decisão de Hantei (Empate)
-                </h3>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button
-                    style={{ ...styles.eventBtn, background: "rgba(59, 130, 246, 0.15)", borderColor: "#3b82f6", color: "#3b82f6" }}
-                    onClick={() => handleHantei("A")}
-                  >
-                    Hantei para {selectedMatch.teamA.name.split(" - ")[0]}
-                  </button>
-                  <button
-                    style={{ ...styles.eventBtn, background: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", color: "#ef4444" }}
-                    onClick={() => handleHantei("B")}
-                  >
-                    Hantei para {selectedMatch.teamB.name.split(" - ")[0]}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {isJudo && (
-              <div style={styles.eventSection}>
-                <h3
-                  style={{ ...styles.sectionTitle, color: isGoldenScore ? "var(--warning-color, #f59e0b)" : "var(--accent-color)" }}
-                >
-                  🥋 Pontuação Judô {isGoldenScore && " (GOLDEN SCORE)"}
-                </h3>
-
-                {/* Painel de regras */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "8px",
-                  marginBottom: "14px",
-                  padding: "10px 12px",
-                  background: "rgba(255,255,255,0.03)",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#22c55e", whiteSpace: "nowrap" }}>IPPON (2 pts)</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Vitória direta. Encerra a luta.</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#eab308", whiteSpace: "nowrap" }}>WAZA-ARI (1 pt)</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Ponto técnico. 2 = Ippon.</span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                    gap: "15px",
-                  }}
-                >
-                  {[
-                    { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0] },
-                    { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0] }
-                  ].map(({ teamKey, teamName }) => (
-                    <div
-                      key={teamKey}
-                      style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          textAlign: "center",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {teamName}
-                      </div>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(234, 179, 8, 0.15)",
-                          borderColor: "#eab308",
-                          color: "#eab308",
-                        }}
-                        onClick={() => handleJudoPoint(teamKey as "A" | "B", "waza_ari")}
-                        disabled={selectedMatch.status === "finished"}
-                      >
-                        Waza-ari (+1)
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: "rgba(34, 197, 94, 0.15)",
-                          borderColor: "#22c55e",
-                          color: "#22c55e",
-                        }}
-                        onClick={() => handleJudoPoint(teamKey as "A" | "B", "ippon")}
-                        disabled={selectedMatch.status === "finished"}
-                      >
-                        Ippon (Vitória)
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn,
-                          background: osaekomiTeam === teamKey ? "rgba(59, 130, 246, 0.8)" : "rgba(59, 130, 246, 0.15)",
-                          borderColor: "#3b82f6",
-                          color: osaekomiTeam === teamKey ? "white" : "#3b82f6",
-                          marginTop: "8px",
-                          opacity: (osaekomiTeam && osaekomiTeam !== teamKey) ? 0.5 : 1,
-                        }}
-                        onClick={() => osaekomiTeam === teamKey ? handleToketa() : handleOsaekomi(teamKey as "A" | "B")}
-                        disabled={selectedMatch.status === "finished" || !!(osaekomiTeam && osaekomiTeam !== teamKey)}
-                      >
-                        {osaekomiTeam === teamKey ? "Toketa (Sair)" : "Finalização"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {osaekomiTeam && (
-                  <div style={{
-                    marginTop: "20px",
-                    padding: "15px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    borderRadius: "12px",
-                    border: "2px solid #3b82f6",
-                    textAlign: "center",
-                    animation: "pulse 2s infinite"
-                  }}>
-                    <div style={{ color: "#3b82f6", fontWeight: 800, fontSize: "14px", textTransform: "uppercase", marginBottom: "5px" }}>
-                      ⏲️ Finalização em Curso ({osaekomiTeam === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0]})
-                    </div>
-                    <div style={{ fontSize: "36px", fontWeight: 900, color: "#3b82f6" }}>
-                      {osaekomiSeconds}s
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "5px" }}>
-                      10s = Waza-ari | 20s = Ippon
-                    </div>
-                  </div>
-                )}
-
-                <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)", marginTop: "20px" }}>
-                  ⚠️ Penalidades (Shido)
-                </h3>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                    gap: "15px",
-                  }}
-                >
-                  {[
-                    { teamKey: "A", teamName: selectedMatch.teamA.name.split(" - ")[0], teamId: selectedMatch.teamA.id },
-                    { teamKey: "B", teamName: selectedMatch.teamB.name.split(" - ")[0], teamId: selectedMatch.teamB.id }
-                  ].map(({ teamKey, teamName, teamId }) => {
-                    const isHansokuMake = selectedMatch.events?.some(e => e.type === "hansoku_make" && e.teamId === teamId);
-                    const shidoCount = selectedMatch.events?.filter(e => e.type === "shido" && e.teamId === teamId).length || 0;
-
-                    let btnLabel = "Adicionar Shido";
-                    if (isHansokuMake) btnLabel = "Hansoku-make (Desclassificado)";
-                    else if (shidoCount > 0) btnLabel = `Shido ${shidoCount} - Próx: ${shidoCount === 2 ? "Hansoku-make" : `Shido ${shidoCount + 1}`}`;
-
-                    return (
-                      <button
-                        key={teamKey}
-                        style={{
-                          ...styles.eventBtn,
-                          background: isHansokuMake ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
-                          borderColor: "var(--danger-color, #ef4444)",
-                          color: isHansokuMake ? "white" : "#ef4444",
-                          padding: "16px",
-                          fontSize: "14px",
-                          fontWeight: 800,
-                          opacity: isHansokuMake ? 0.7 : 1,
-                          cursor: isHansokuMake ? "not-allowed" : "pointer"
-                        }}
-                        onClick={() => handleJudoShido(teamKey as "A" | "B")}
-                        disabled={isHansokuMake || selectedMatch.status === "finished"}
-                      >
-                        {btnLabel} ({teamName})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
-              <>
-                <div style={{
-                  ...styles.eventSection,
-                  ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
-                }}>
-                  <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
-                  <div style={styles.eventButtons} className="match-timeline-event-grid">
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.yellowBtn }}
-                      onClick={() => handleCard("yellow_card", "A")}
-                    >
-                      🟨 {selectedMatch.teamA.name.split(" - ")[0]}
-                    </button>
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.yellowBtn }}
-                      onClick={() => handleCard("yellow_card", "B")}
-                    >
-                      🟨 {selectedMatch.teamB.name.split(" - ")[0]}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{
-                  ...styles.eventSection,
-                  ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
-                }}>
-                  <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
-                  <div
-                    style={styles.eventButtons}
-                    className="match-timeline-event-grid"
-                  >
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.redBtn }}
-                      onClick={() => handleCard("red_card", "A")}
-                    >
-                      🟥 {selectedMatch.teamA.name.split(" - ")[0]}
-                    </button>
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.redBtn }}
-                      onClick={() => handleCard("red_card", "B")}
-                    >
-                      🟥 {selectedMatch.teamB.name.split(" - ")[0]}
-                    </button>
-                  </div>
-                </div>
-
-                {isFutebolX1 && (
-                  <div style={{
-                    ...styles.eventSection,
-                    ...(pendingShootout ? {
-                      border: '2px solid #f59e0b',
-                      borderRadius: '10px',
-                      padding: '12px',
-                      background: 'rgba(245,158,11,0.06)',
-                    } : {}),
-                  }}>
-                    <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
-
-                    {/* Banner de alerta quando há shoot-out pendente */}
-                    {pendingShootout && (
-                      <div style={{
-                        background: 'rgba(245,158,11,0.15)',
-                        border: '1px solid #f59e0b',
-                        borderRadius: '8px',
-                        padding: '10px 14px',
-                        marginBottom: '12px',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        color: '#f59e0b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                      }}>
-                        ⚠️ {pendingShootout.reason}
-                      </div>
-                    )}
-
-                    <div style={styles.eventButtons} className="match-timeline-event-grid">
-                      <button
-                        style={{
-                          ...styles.eventBtn, ...styles.penaltyBtn,
-                          ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
-                          ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
-                        }}
-                        onClick={() => handleShootout("shootout_scored", "A")}
-                        disabled={!!pendingShootout && pendingShootout.team !== "A"}
-                      >
-                        🎯 Shoot-out Marcado{" "}{selectedMatch.teamA.name.split(" - ")[0]}
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn, ...styles.penaltyBtn,
-                          ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
-                          ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
-                        }}
-                        onClick={() => handleShootout("shootout_scored", "B")}
-                        disabled={!!pendingShootout && pendingShootout.team !== "B"}
-                      >
-                        🎯 Shoot-out Marcado{" "}{selectedMatch.teamB.name.split(" - ")[0]}
-                      </button>
-                    </div>
-                    <div style={{ ...styles.eventButtons, marginTop: "12px" }} className="match-timeline-event-grid">
-                      <button
-                        style={{
-                          ...styles.eventBtn, ...styles.penaltyMissedBtn,
-                          ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
-                          ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
-                        }}
-                        onClick={() => handleShootout("shootout_missed", "A")}
-                        disabled={!!pendingShootout && pendingShootout.team !== "A"}
-                      >
-                        ❌ Shoot-out Perdido{" "}{selectedMatch.teamA.name.split(" - ")[0]}
-                      </button>
-                      <button
-                        style={{
-                          ...styles.eventBtn, ...styles.penaltyMissedBtn,
-                          ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
-                          ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
-                        }}
-                        onClick={() => handleShootout("shootout_missed", "B")}
-                        disabled={!!pendingShootout && pendingShootout.team !== "B"}
-                      >
-                        ❌ Shoot-out Perdido{" "}{selectedMatch.teamB.name.split(" - ")[0]}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div style={styles.eventSection}>
-                  <h3 style={styles.sectionTitle}>
-                    🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênaltis"}
-                  </h3>
-                  <div
-                    style={styles.eventButtons}
-                    className="match-timeline-event-grid"
-                  >
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                      onClick={() => handlePenalty("penalty_scored", "A")}
-                    >
-                      🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Marcado{" "}
-                      {selectedMatch.teamA.name.split(" - ")[0]}
-                    </button>
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
-                      onClick={() => handlePenalty("penalty_scored", "B")}
-                    >
-                      🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Marcado{" "}
-                      {selectedMatch.teamB.name.split(" - ")[0]}
-                    </button>
-                  </div>
-                  <div
-                    style={{ ...styles.eventButtons, marginTop: "12px" }}
-                    className="match-timeline-event-grid"
-                  >
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                      onClick={() => handlePenalty("penalty_missed", "A")}
-                    >
-                      ❌ {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido{" "}
-                      {selectedMatch.teamA.name.split(" - ")[0]}
-                    </button>
-                    <button
-                      style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                      onClick={() => handlePenalty("penalty_missed", "B")}
-                    >
-                      ❌ {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido{" "}
-                      {selectedMatch.teamB.name.split(" - ")[0]}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Painel de cobranças da disputa de pênaltis */}
-                {isPenaltyShootoutSport && shootoutStarted && selectedMatch.status !== "finished" && (
-                  <div style={{ ...styles.eventSection, background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: "12px" }}>
-                    <h3 style={{ ...styles.sectionTitle, color: "#f59e0b", marginBottom: "12px" }}>
-                      🥅 Disputa de Pênaltis
-                    </h3>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", marginBottom: "16px", padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "10px" }}>
-                      {(["A", "B"] as const).map((team) => {
-                        const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
-                        const scored = team === "A" ? shootoutStats.scoredA : shootoutStats.scoredB;
-                        const total = team === "A" ? shootoutStats.totalA : shootoutStats.totalB;
-                        const color = team === "A" ? "#3b82f6" : "#ef4444";
-                        return (
-                          <div key={team} style={{ textAlign: "center", flex: 1 }}>
-                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "2px" }}>{teamObj.name.split(" - ")[0]}</div>
-                            <div style={{ fontSize: "40px", fontWeight: 900, color }}>{scored}</div>
-                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{total} cobranças</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                      {(["A", "B"] as const).map((team) => {
-                        const color = team === "A" ? "#3b82f6" : "#ef4444";
-                        const bg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
-                        const name = team === "A" ? selectedMatch.teamA.name.split(" - ")[0] : selectedMatch.teamB.name.split(" - ")[0];
-                        return (
-                          <div key={team} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            <div style={{ fontSize: "12px", fontWeight: 700, textAlign: "center", color }}>{name}</div>
-                            <button style={{ ...styles.eventBtn, background: bg, borderColor: color, color, fontWeight: 700 }}
-                              onClick={() => handleShootoutPenalty("penalty_scored", team)}>
-                              🎯 Pênalti Marcado
-                            </button>
-                            <button style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
-                              onClick={() => handleShootoutPenalty("penalty_missed", team)}>
-                              ❌ Pênalti Perdido
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Modal de Confirmação de Reset */}
-            {showResetConfirm && (
-              <div style={styles.modal}>
-                <div style={styles.modalContent}>
-                  <h3 style={styles.modalTitle}>⚠️ Confirmar Reset</h3>
-                  <p
-                    style={{
-                      textAlign: "center",
-                      marginBottom: "20px",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    Tem certeza que deseja resetar esta partida?
-                    <br />
-                    Todos os eventos e placar serão apagados.
-                  </p>
-                  <div style={styles.modalButtons}>
-                    <button
-                      style={{ ...styles.modalBtn, ...styles.confirmBtn }}
-                      onClick={handleResetMatch}
-                    >
-                      Sim, Resetar
-                    </button>
-                    <button
-                      style={{ ...styles.modalBtn, ...styles.cancelBtn }}
-                      onClick={() => setShowResetConfirm(false)}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal de Classificação de Natação */}
-            {isRankingModalOpen && selectedMatch && (
-              <div style={styles.modal}>
-                <div
-                  style={{
-                    ...styles.modalContentLarge,
-                    maxWidth: "900px",
-                    width: "95%",
-                    maxHeight: "90vh",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <h3 style={styles.modalTitle}>🏁 Classificação da Prova</h3>
-                  <div style={{ ...styles.modalSubtitle, marginBottom: "20px" }}>
-                    Preencha o atleta de cada equipe, a posição e o tempo
-                  </div>
-
-                  <div
-                    style={{
-                      overflowY: "auto",
-                      padding: "10px",
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                      gap: "12px",
-                      flex: 1,
-                    }}
-                    className="custom-scrollbar"
-                  >
-                    {swimmingEntries.length === 0 && (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          padding: "20px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        Nenhuma equipe encontrada para esta prova.
-                      </div>
-                    )}
-                    {swimmingEntries.map((entry) => (
-                      <div
-                        key={entry.id}
-                        style={{
-                          background: "rgba(255,255,255,0.05)",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid var(--border-color)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "12px",
                         }}
                       >
                         <div
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
+                            background: "#18181b",
+                            border: "2px solid #22c55e",
+                            borderRadius: "20px",
+                            padding: "40px 48px",
+                            textAlign: "center",
+                            maxWidth: "420px",
+                            width: "90%",
+                            boxShadow: "0 0 60px rgba(34,197,94,0.3)",
                           }}
                         >
-                          {entry.participant.logo && (
-                            <img
-                              src={entry.participant.logo}
-                              alt=""
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                objectFit: "contain",
-                              }}
-                            />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "13px", fontWeight: 700 }}>
-                              {entry.participant.name}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "var(--text-secondary)",
-                              }}
-                            >
-                              {entry.participant.faculty}
-                            </div>
+                          <div style={{ fontSize: "56px", marginBottom: "12px" }}>🏆</div>
+                          <div style={{ fontSize: "13px", color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", marginBottom: "8px" }}>
+                            Fim de Jogo · Tamboréu
                           </div>
-                          <select
-                            value={swimmingRankings[entry.id] || ""}
-                            disabled={hasSwimmingTime(swimmingTimes[entry.id] || "")}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setSwimmingRankings((prev) => {
-                                if (!value) {
-                                  const { [entry.id]: _removed, ...rest } = prev; // eslint-disable-line @typescript-eslint/no-unused-vars
-                                  return rest;
-                                }
-                                return { ...prev, [entry.id]: parseInt(value, 10) };
-                              });
-                            }}
+                          <div style={{ fontSize: "26px", fontWeight: 900, color: "white", marginBottom: "8px" }}>
+                            {tamboreauMatchWinner.name}
+                          </div>
+                          <div style={{ fontSize: "15px", color: "var(--text-secondary)", marginBottom: "28px" }}>
+                            venceu por <span style={{ color: "white", fontWeight: 700 }}>{tamboreauMatchWinner.setsA} x {tamboreauMatchWinner.setsB}</span> sets
+                          </div>
+                          <button
                             style={{
-                              background: "#222",
+                              background: "#22c55e",
                               color: "white",
-                              border: "1px solid #444",
-                              borderRadius: "6px",
-                              padding: "5px",
-                              fontSize: "12px",
-                              fontWeight: 800,
-                              opacity: hasSwimmingTime(swimmingTimes[entry.id] || "") ? 0.6 : 1,
-                              cursor: hasSwimmingTime(swimmingTimes[entry.id] || "") ? "not-allowed" : "pointer"
+                              border: "none",
+                              borderRadius: "10px",
+                              padding: "14px 32px",
+                              fontSize: "15px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              width: "100%",
+                            }}
+                            onClick={() => {
+                              setTamboreauMatchWinner(null);
+                              navigate("/");
                             }}
                           >
-                            <option value="">Posição</option>
-                            {Array.from(
-                              { length: maxSwimmingRank },
-                              (_, i) => i + 1,
-                            ).map((n) => (
-                              <option key={n} value={n}>
-                                {n}º Lugar
-                              </option>
-                            ))}
-                          </select>
+                            Ver Resultados
+                          </button>
                         </div>
-                        <select
-                          value={
-                            athleteNames[entry.id] !== undefined
-                              ? athleteNames[entry.id]
-                              : entry.defaultName || ""
-                          }
-                          onChange={(e) =>
-                            setAthleteNames((prev) => ({
-                              ...prev,
-                              [entry.id]: e.target.value,
-                            }))
-                          }
-                          style={{
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid #333",
-                            borderRadius: "6px",
-                            padding: "8px",
-                            color: "white",
-                            fontSize: "13px",
-                            width: "100%",
-                          }}
-                        >
-                          <option value="">Selecione o atleta...</option>
-                          {athletes
-                            .filter((a) => athleteMatchesTeamAndMatch(a, entry.participant))
-                            .map((a, idx) => {
-                              const fullName = `${a.firstName} ${a.lastName}`;
-                              return (
-                                <option key={idx} value={fullName}>
-                                  {fullName}
-                                </option>
-                              );
-                            })}
-                        </select>
-                         {/* 3 campos separados: MM : SS . CC — versão corrigida */}
-                        {(() => {
-                          const parts = parseSwimmingTimeParts(swimmingTimes[entry.id] || "");
-
-                          const inputBase: React.CSSProperties = {
-                            width: "38px",
-                            textAlign: "center",
-                            background: "#121212",
-                            border: "1.5px solid #333",
-                            borderRadius: "8px",
-                            padding: "9px 4px",
-                            color: "#ffffff",
-                            fontSize: "16px",
-                            fontWeight: 700,
-                            fontFamily: "'Courier New', monospace",
-                            outline: "none",
-                            transition: "border-color 0.15s, box-shadow 0.15s",
-                            boxSizing: "border-box" as const,
-                          };
-                          const sep: React.CSSProperties = {
-                            color: "#555",
-                            fontSize: "20px",
-                            fontWeight: 700,
-                            userSelect: "none" as const,
-                            lineHeight: 1,
-                          };
-
-                          // Lê o estado mais recente via updater funcional (evita stale closure)
-                          const handleBlur = () => {
-                            setSwimmingTimes(prev => {
-                              const p = parseSwimmingTimeParts(prev[entry.id] || "");
-                              if (!p.mm && !p.ss && !p.cc) return prev;
-                              // Valida overflow de segundos
-                              const ssNum = parseInt(p.ss || "0", 10);
-                              if (p.ss && ssNum > 59) {
-                                const s = sanitizeSwimmingTime(p.mm, p.ss, p.cc);
-                                return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
-                              }
-                              // Zero-pad apenas campos que já foram digitados (não preenche vazios)
-                              const mm = p.mm ? p.mm.padStart(2, "0") : "";
-                              const ss = p.ss ? p.ss.padStart(2, "0") : "";
-                              const cc = p.cc ? p.cc.padStart(2, "0") : "";
-                              const val = mm || ss || cc ? `${mm}:${ss}.${cc}` : "";
-                              return { ...prev, [entry.id]: val };
-                            });
-                          };
-
-                          // Reseta estilo ao perder foco (fix: onBlur resets border)
-                          const handleBlurStyle = (e: React.FocusEvent<HTMLInputElement>) => {
-                            e.target.style.borderColor = "#333";
-                            e.target.style.boxShadow = "none";
-                          };
-                          const handleFocusStyle = (e: React.FocusEvent<HTMLInputElement>) => {
-                            e.target.style.borderColor = "#3b82f6";
-                            e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.2)";
-                          };
-
-                          return (
-                            <div style={{
-                              display: "flex", alignItems: "center", gap: "3px",
-                              background: "rgba(255,255,255,0.03)", borderRadius: "10px",
-                              padding: "6px 10px", border: "1px solid rgba(255,255,255,0.06)",
-                              width: "fit-content",
-                            }}>
-                              {/* Minutos */}
-                              <input
-                                id={`swim-mm-${entry.id}`}
-                                maxLength={2}
-                                inputMode="numeric"
-                                placeholder="MM"
-                                value={parts.mm}
-                                onChange={(e) => {
-                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                                  // Lê parts.ss e parts.cc do estado atual (via closure do render)
-                                  setSwimmingTimes(prev => {
-                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
-                                    const val = v || p.ss || p.cc ? `${v}:${p.ss}.${p.cc}` : "";
-                                    return { ...prev, [entry.id]: val };
-                                  });
-                                  if (v.length === 2) document.getElementById(`swim-ss-${entry.id}`)?.focus();
-                                }}
-                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
-                                onFocus={handleFocusStyle}
-                                style={inputBase}
-                              />
-                              <span style={sep}>:</span>
-                              {/* Segundos */}
-                              <input
-                                id={`swim-ss-${entry.id}`}
-                                maxLength={2}
-                                inputMode="numeric"
-                                placeholder="SS"
-                                value={parts.ss}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Backspace" && parts.ss === "")
-                                    document.getElementById(`swim-mm-${entry.id}`)?.focus();
-                                }}
-                                onChange={(e) => {
-                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                                  setSwimmingTimes(prev => {
-                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
-                                    if (v.length === 2 && parseInt(v, 10) > 59) {
-                                      // Auto-conversão imediata: 90s → +1min 30s
-                                      const s = sanitizeSwimmingTime(p.mm, v, p.cc);
-                                      return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
-                                    }
-                                    const val = p.mm || v || p.cc ? `${p.mm}:${v}.${p.cc}` : "";
-                                    return { ...prev, [entry.id]: val };
-                                  });
-                                  if (v.length === 2) document.getElementById(`swim-cc-${entry.id}`)?.focus();
-                                }}
-                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
-                                onFocus={handleFocusStyle}
-                                style={inputBase}
-                              />
-                              <span style={sep}>.</span>
-                              {/* Centésimos */}
-                              <input
-                                id={`swim-cc-${entry.id}`}
-                                maxLength={2}
-                                inputMode="numeric"
-                                placeholder="CC"
-                                value={parts.cc}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Backspace" && parts.cc === "")
-                                    document.getElementById(`swim-ss-${entry.id}`)?.focus();
-                                }}
-                                onChange={(e) => {
-                                  const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                                  setSwimmingTimes(prev => {
-                                    const p = parseSwimmingTimeParts(prev[entry.id] || "");
-                                    const val = p.mm || p.ss || v ? `${p.mm}:${p.ss}.${v}` : "";
-                                    return { ...prev, [entry.id]: val };
-                                  });
-                                }}
-                                onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
-                                onFocus={handleFocusStyle}
-                                style={inputBase}
-                              />
-                            </div>
-                          );
-                        })()}
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
-                    <button
-                      onClick={() => {
-                        if (storedSwimmingParticipants.length === 0) {
-                          showNotification(
-                            "Nenhuma equipe registrada na prova. Edite a partida e selecione as equipes antes de classificar.",
-                          );
-                          return;
-                        }
-
-                        const totalEntries = swimmingEntries.length;
-                        const preparedEntries = swimmingEntries
-                          .map((entry) => {
-                            const nameValue =
-                              athleteNames[entry.id] !== undefined
-                                ? athleteNames[entry.id]
-                                : entry.defaultName;
-                            return {
-                              entry,
-                              rank: swimmingRankings[entry.id],
-                              name: nameValue.trim(),
-                              time: (swimmingTimes[entry.id] || "").trim(),
-                            };
-                          })
-                          .filter((item) => item.rank && item.name);
-
-                        const ranks = preparedEntries.map(
-                          (item) => item.rank as number,
-                        );
-                        const hasDuplicateRanks =
-                          new Set(ranks).size !== ranks.length;
-                        if (hasDuplicateRanks) {
-                          showNotification(
-                            "Existem posições duplicadas. Ajuste para continuar.",
-                          );
-                          return;
-                        }
-
-                        if (preparedEntries.length === 0) {
-                          showNotification(
-                            "Informe ao menos uma posição e nome para finalizar.",
-                          );
-                          return;
-                        }
-
-                        if (preparedEntries.length < totalEntries) {
-                          if (
-                            !confirm(
-                              `Apenas ${preparedEntries.length} de ${totalEntries} equipes foram ranqueadas. Deseja finalizar assim mesmo?`,
-                            )
-                          )
-                            return;
-                        }
-
-                        const sortedResults = [...preparedEntries].sort(
-                          (a, b) => (a.rank as number) - (b.rank as number),
-                        );
-
-                        const baseTimestamp = Date.now();
-                        const resultEvents: MatchEvent[] = sortedResults.map(
-                          (item, index) => {
-                            const timeLabel = item.time ? ` (${item.time})` : "";
-                            return {
-                              id: `evt_${baseTimestamp + index}_swim`,
-                              type: "swimming_result",
-                              minute: getCurrentEventMinute(),
-                              description: `${item.rank}º - ${item.name}${timeLabel} - ${item.entry.participant.name}`,
-                            };
-                          },
-                        );
-
-                        const endEvent: MatchEvent = {
-                          id: `evt_${baseTimestamp + resultEvents.length + 1}_end`,
-                          type: "end",
-                          minute: getCurrentEventMinute(),
-                          description: "Fim da prova",
-                        };
-
-                        const filteredEvents = (selectedMatch.events || []).filter(
-                          (event) =>
-                            event.type !== "swimming_result" &&
-                            event.type !== "end",
-                        );
-
-                        const updatedMatch = {
-                          ...selectedMatch,
-                          participants: storedSwimmingParticipants,
-                          teamA:
-                            storedSwimmingParticipants[0] || selectedMatch.teamA,
-                          teamB:
-                            storedSwimmingParticipants[1] || selectedMatch.teamB,
-                          status: "finished" as const,
-                          events: [...filteredEvents, ...resultEvents, endEvent],
-                        } as Match;
-
-                        updateMatch(updatedMatch);
-                        setIsRunning(false);
-                        setIsRankingModalOpen(false);
-                        showNotification("Resultado salvo e prova finalizada!");
-                      }}
+                    {/* Pontos do Set Atual */}
+                    <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
+                      🎾 Pontos do Set Atual
+                    </h3>
+                    <div
                       style={{
-                        flex: 2,
-                        background: "var(--success-color)",
-                        color: "white",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "none",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                        fontSize: "16px",
-                        boxShadow: "0 4px 15px rgba(16, 185, 129, 0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "24px",
+                        marginBottom: "16px",
                       }}
                     >
-                      Confirmar e Finalizar
-                    </button>
-                    <button
-                      onClick={() => setIsRankingModalOpen(false)}
-                      style={{
-                        flex: 1,
-                        background: "#333",
-                        color: "white",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "none",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                        fontSize: "16px",
-                      }}
+                      <div style={{ fontSize: "52px", fontWeight: 900, color: "#3b82f6", minWidth: "60px", textAlign: "center" }}>
+                        {tamboreauPointsA}
+                      </div>
+                      <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--text-secondary)" }}>x</div>
+                      <div style={{ fontSize: "52px", fontWeight: 900, color: "#ef4444", minWidth: "60px", textAlign: "center" }}>
+                        {tamboreauPointsB}
+                      </div>
+                    </div>
+
+                    {/* Botões de ponto */}
+                    <div
+                      style={styles.eventButtons}
+                      className="match-timeline-event-grid"
                     >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Cronologia de Eventos */}
-            <div style={styles.timeline}>
-              <h3 style={styles.sectionTitle}>📋 Cronologia</h3>
-              <div style={styles.timelineList} className="timeline-list-beauty">
-                {!selectedMatch.events || selectedMatch.events.length === 0 ? (
-                  <p style={styles.noEvents}>Nenhum evento registrado ainda.</p>
-                ) : (
-                  timelineEvents.map((event) => {
-                    const isTeamA = event.teamId === selectedMatch.teamA.id;
-                    const isTeamB = event.teamId === selectedMatch.teamB.id;
-                    const isGeneral = !event.teamId;
-                    const rowJustify = isGeneral
-                      ? "center"
-                      : isTeamA
-                        ? "flex-start"
-                        : "flex-end";
-                    const cardWidth = isGeneral ? "46%" : "48%";
-                    const shortTeamName = isTeamA
-                      ? selectedMatch.teamA.name.split(" - ")[0]
-                      : isTeamB
-                        ? selectedMatch.teamB.name.split(" - ")[0]
-                        : "Jogo";
-
-                    return (
-                      <div
-                        key={event.id}
-                        className="timeline-row-beauty"
+                      <button
                         style={{
-                          display: "flex",
-                          justifyContent: rowJustify,
-                          marginBottom: "6px",
+                          ...styles.eventBtn,
+                          background: "#1d4ed8",
+                          borderColor: "#3b82f6",
+                          color: "white",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          padding: "20px",
                         }}
+                        onClick={() => handleTamboreauPoint("A")}
+                        disabled={selectedMatch.status === "finished"}
                       >
-                        <div
-                          className={`timeline-item-beauty ${isTeamA ? "timeline-team-a" : ""} ${isTeamB ? "timeline-team-b" : ""} ${isGeneral ? "timeline-neutral" : ""}`}
-                          style={{ ...styles.timelineItem, width: cardWidth }}
-                        >
-                          {isBasketball && event.type === "goal" ? (
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                                width: "100%",
-                                gap: "6px",
-                                alignItems: "center",
-                              }}
-                            >
-                              {(() => {
-                                const data = getBasketballEventData(event);
+                        <Plus size={22} />
+                        Ponto {selectedMatchTeamAShortName}
+                      </button>
+                      <button
+                        style={{
+                          ...styles.eventBtn,
+                          background: "#b91c1c",
+                          borderColor: "#ef4444",
+                          color: "white",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          padding: "20px",
+                        }}
+                        onClick={() => handleTamboreauPoint("B")}
+                        disabled={selectedMatch.status === "finished"}
+                      >
+                        <Plus size={22} />
+                        Ponto {selectedMatchTeamBShortName}
+                      </button>
+                    </div>
+
+                    {/* Indicador de regra */}
+                    <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
+                      Set fecha em 10 pts (vantagem de 2) · Máximo 12 pts · Melhor de 3 sets
+                    </div>
+
+                    {/* Cronologia da Partida */}
+                    {(selectedMatch.events || []).filter((e) =>
+                      e.type === "start" || e.type === "set_win" || e.type === "end"
+                    ).length > 0 && (
+                        <div style={{ marginTop: "24px" }}>
+                          <h3 style={{ ...styles.sectionTitle, marginBottom: "12px" }}>
+                            📋 Cronologia da Partida
+                          </h3>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "8px",
+                              maxHeight: "260px",
+                              overflowY: "auto",
+                              padding: "4px 2px",
+                            }}
+                          >
+                            {[...(selectedMatch.events || [])]
+                              .filter((e) => e.type === "start" || e.type === "set_win" || e.type === "end")
+                              .sort((a, b) => {
+                                const tsA = parseInt(a.id.split("_")[1] || "0", 10);
+                                const tsB = parseInt(b.id.split("_")[1] || "0", 10);
+                                return tsA - tsB;
+                              })
+                              .map((event) => {
+                                const isSetWin = event.type === "set_win";
+                                const isEnd = event.type === "end";
+                                const isStart = event.type === "start";
+                                const color = isEnd ? "#22c55e" : isSetWin ? "#f59e0b" : "var(--text-secondary)";
+                                const icon = isEnd ? "🏁" : isSetWin ? "🏆" : "▶️";
                                 return (
-                                  <>
-                                    {isTeamA ? (
-                                      <>
-                                        <span
-                                          style={{
-                                            fontSize: "13px",
-                                            fontWeight: 700,
-                                            color: "var(--text-primary)",
-                                          }}
-                                        >
-                                          {data.tempo}
-                                        </span>
-                                        <span
-                                          style={{
-                                            fontSize: "12px",
-                                            fontWeight: 800,
-                                            color: "var(--accent-color)",
-                                            textAlign: "center",
-                                          }}
-                                        >
-                                          {data.pontuacaoLabel}
-                                        </span>
-                                        <span
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "flex-end",
-                                            gap: "6px",
-                                            fontSize: "13px",
-                                            fontWeight: 800,
-                                            color: "var(--text-primary)",
-                                            textAlign: "right",
-                                          }}
-                                        >
-                                          <span>{data.placar}</span>
-                                          <span
-                                            style={{
-                                              width: "3px",
-                                              height: "14px",
-                                              borderRadius: "999px",
-                                              background: "#3b82f6",
-                                            }}
-                                          />
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            fontSize: "13px",
-                                            fontWeight: 800,
-                                            color: "var(--text-primary)",
-                                          }}
-                                        >
-                                          <span
-                                            style={{
-                                              width: "3px",
-                                              height: "14px",
-                                              borderRadius: "999px",
-                                              background: "#ef4444",
-                                            }}
-                                          />
-                                          <span>{data.placar}</span>
-                                        </span>
-                                        <span
-                                          style={{
-                                            fontSize: "12px",
-                                            fontWeight: 800,
-                                            color: "var(--accent-color)",
-                                            textAlign: "center",
-                                          }}
-                                        >
-                                          {data.pontuacaoLabel}
-                                        </span>
-                                        <span
-                                          style={{
-                                            fontSize: "13px",
-                                            fontWeight: 700,
-                                            color: "var(--text-primary)",
-                                            textAlign: "right",
-                                          }}
-                                        >
-                                          {data.tempo}
-                                        </span>
-                                      </>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          ) : (
-                            <>
-                              {!isSetSport && !isNoTimerSport && !isSwimming && (
-                                <span style={styles.eventTimePill}>
-                                  {formatClock(event.minute)}
-                                </span>
-                              )}
-                              <span style={styles.eventIconBubble}>
-                                {getEventIcon(event.type)}
-                              </span>
-                              <div
-                                style={{
-                                  ...styles.eventContentWrap,
-                                  textAlign: isTeamB
-                                    ? "right"
-                                    : isGeneral
-                                      ? "center"
-                                      : "left",
-                                }}
-                              >
-                                <span style={styles.eventText}>
-                                  {getEventLabel(event)}
-                                </span>
-                                {event.timelineScore && !isBasketball && (
-                                  <span
+                                  <div
+                                    key={event.id}
                                     style={{
-                                      fontSize: "12px",
-                                      color: "var(--accent-color)",
-                                      marginLeft: "8px",
-                                      fontWeight: 700,
-                                      background: "rgba(227, 6, 19, 0.1)",
-                                      padding: "2px 6px",
-                                      borderRadius: "4px",
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: "10px",
+                                      padding: "10px 14px",
+                                      background: isEnd
+                                        ? "rgba(34,197,94,0.08)"
+                                        : isSetWin
+                                          ? "rgba(245,158,11,0.08)"
+                                          : "rgba(255,255,255,0.04)",
+                                      borderRadius: "8px",
+                                      borderLeft: `3px solid ${color}`,
                                     }}
                                   >
-                                    {event.timelineScore}
-                                  </span>
-                                )}
-                                {event.teamId && !isBasketball && (
-                                  <span style={styles.eventMetaTag}>
-                                    {shortTeamName}
-                                  </span>
-                                )}
-                              </div>
-                            </>
-                          )}
+                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>{icon}</span>
+                                    <span style={{ fontSize: "13px", color, fontWeight: isStart ? 400 : 600, lineHeight: 1.4 }}>
+                                      {event.description || (isStart ? "Início" : event.type)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      )}
+                  </div>
                 )}
-              </div>
-            </div>
 
-            <style>{`
-                    .change-match-btn-hover:hover {
-                        background-color: rgba(255, 255, 255, 0.1) !important;
-                        border-color: var(--accent-color) !important;
-                        color: var(--text-primary) !important;
-                        transform: translateX(-4px);
-                        box-shadow: 0 0 15px rgba(227, 6, 19, 0.2);
-                    }
+                {isBasketball && (
+                  <div style={styles.eventSection}>
+                    <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
+                      🏀 Pontuação
+                    </h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "15px" }}>
+                      {(["A", "B"] as const).map((team) => {
+                        const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                        const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
+                        const teamBg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
+                        const isDisabled = isBasketball3x3 && (selectedMatch.scoreA >= 21 || selectedMatch.scoreB >= 21);
+                        return (
+                          <div key={team} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {getTeamShortName(teamObj)}
+                            </div>
+                            <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                              onClick={() => handleBasketballPoint(team, 1)} disabled={isDisabled}>
+                              +1 {isBasketball3x3 ? "(Dentro da linha)" : "(Lance Livre)"}
+                            </button>
+                            <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                              onClick={() => handleBasketballPoint(team, 2)} disabled={isDisabled}>
+                              +2 {isBasketball3x3 ? "(Fora da linha)" : "(Quadra)"}
+                            </button>
+                            {!isBasketball3x3 && (
+                              <button style={{ ...styles.eventBtn, background: teamBg, borderColor: teamColor, color: teamColor }}
+                                onClick={() => handleBasketballPoint(team, 3)}>
+                                +3 (Fora)
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
-                    .reset-btn-hover:hover {
-                        background-color: var(--bg-hover) !important;
-                        border-color: var(--accent-color) !important;
-                    }
-                    
-                    .player-item-hover:hover {
-                        background-color: var(--bg-hover) !important;
-                        border-color: var(--accent-color) !important;
-                        transform: translateY(-2px);
-                    }
+                {isKarate && (
+                  <div style={styles.eventSection}>
+                    <h3
+                      style={{ ...styles.sectionTitle, color: "var(--accent-color)", marginBottom: "8px" }}
+                    >
+                      🥋 Pontuação WKF
+                    </h3>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "16px", textAlign: "center", fontStyle: "italic", lineHeight: "1.5", background: "rgba(255,255,255,0.03)", padding: "8px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      Na Modalidade Caratê o atleta vencedor é decidido caso algum atleta faça 8 pontos de vantagem ou tenha marcado mais pontos ao fim do tempo.
+                    </div>
 
-                    /* Botões ACE e ERRO — hover e feedback */
-                    .volley-ace-btn:hover:not(:disabled) {
-                        background: rgba(34, 197, 94, 0.35) !important;
-                        transform: scale(1.08);
-                        box-shadow: 0 0 10px rgba(34, 197, 94, 0.45) !important;
-                    }
-                    .volley-ace-btn:active:not(:disabled) {
-                        transform: scale(0.95);
-                    }
-                    .volley-erro-btn:hover:not(:disabled) {
-                        background: rgba(239, 68, 68, 0.3) !important;
-                        transform: scale(1.08);
-                        box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
-                    }
-                    .volley-erro-btn:active:not(:disabled) {
-                        transform: scale(0.95);
-                    }
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                        gap: "15px",
+                      }}
+                    >
+                      {[
+                        { teamKey: "A", teamName: selectedMatchTeamAShortName },
+                        { teamKey: "B", teamName: selectedMatchTeamBShortName }
+                      ].map(({ teamKey, teamName }) => (
+                        <div
+                          key={teamKey}
+                          style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              textAlign: "center",
+                              marginBottom: "4px",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                          >
+                            {teamName}
+                          </div>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(100, 116, 139, 0.15)",
+                              borderColor: "#64748b",
+                              color: "#64748b",
+                            }}
+                            onClick={() => handleKaratePoint(teamKey as "A" | "B", 1, "Yuko")}
+                          >
+                            Yuko (+1)
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(234, 179, 8, 0.15)",
+                              borderColor: "#eab308",
+                              color: "#eab308",
+                            }}
+                            onClick={() => handleKaratePoint(teamKey as "A" | "B", 2, "Waza-ari")}
+                          >
+                            Waza-ari (+2)
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(239, 68, 68, 0.15)",
+                              borderColor: "#ef4444",
+                              color: "#ef4444",
+                            }}
+                            onClick={() => handleKaratePoint(teamKey as "A" | "B", 3, "Ippon")}
+                          >
+                            Ippon (+3)
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(251, 191, 36, 0.15)",
+                              borderColor: "#f59e0b",
+                              color: "#f59e0b",
+                              marginTop: "8px"
+                            }}
+                            onClick={() => handleSenshu(teamKey as "A" | "B")}
+                          >
+                            Senshu (Vantagem)
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                    @keyframes volley-btn-glow {
-                        0%   { transform: scale(1); }
-                        25%  { transform: scale(1.03); }
-                        60%  { transform: scale(1.01); }
-                        100% { transform: scale(1); }
-                    }
-                    
-                    /* Custom scrollbar */
-                    .player-list::-webkit-scrollbar {
-                        width: 8px;
-                    }
-                    
-                    .player-list::-webkit-scrollbar-track {
-                        background: var(--bg-main);
-                        border-radius: 4px;
-                    }
-                    
-                    .player-list::-webkit-scrollbar-thumb {
-                        background: var(--border-color);
-                        border-radius: 4px;
-                    }
-                    
-                    .player-list::-webkit-scrollbar-thumb:hover {
-                        background: var(--text-secondary);
-                    }
-                    
-                    @keyframes pulse {
-                        0%, 100% {
-                            opacity: 1;
-                        }
-                        50% {
-                            opacity: 0.5;
-                        }
-                    }
-                    
-                    .pulse-animation {
-                        animation: pulse 1.5s ease-in-out infinite;
-                    }
+                {isKarate && (
+                  <div style={styles.eventSection}>
+                    <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)" }}>
+                      ⚠️ Penalidades (Chui)
+                    </h3>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                        gap: "15px",
+                      }}
+                    >
+                      {[
+                        { teamKey: "A", teamName: selectedMatchTeamAShortName, teamId: selectedMatch.teamA.id },
+                        { teamKey: "B", teamName: selectedMatchTeamBShortName, teamId: selectedMatch.teamB.id }
+                      ].map(({ teamKey, teamName, teamId }) => {
+                        const isHansoku = selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === teamId);
+                        const chuiCount = selectedMatch.events?.filter(e => e.type === "chui" && e.teamId === teamId).length || 0;
 
-                    .timeline-list-beauty {
-                        position: relative;
-                        padding-left: 4px;
-                    }
+                        let btnLabel = "Adicionar Penalidade";
+                        if (isHansoku) btnLabel = "Hansoku (Desclassificado)";
+                        else if (chuiCount > 0) btnLabel = `Chui ${chuiCount} - Próx: ${chuiCount === 3 ? "Hansoku" : `Chui ${chuiCount + 1}`}`;
 
-                    .timeline-list-beauty::before {
-                        content: '';
-                        position: absolute;
-                        left: 50%;
-                        top: 6px;
-                        bottom: 6px;
-                        width: 2px;
-                        background: linear-gradient(180deg, rgba(227, 6, 19, 0.55), rgba(227, 6, 19, 0.1));
-                        transform: translateX(-50%);
-                    }
-
-                    .timeline-item-beauty {
-                        position: relative;
-                        margin-left: 0;
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-                    }
-
-                    .timeline-item-beauty::before {
-                        display: none;
-                    }
-
-                    .timeline-team-a {
-                        border-left: none !important;
-                    }
-
-                    .timeline-team-a::before {
-                        display: none;
-                    }
-
-                    .timeline-team-b {
-                        border-left: none !important;
-                    }
-
-                    .timeline-neutral {
-                        border-left: none !important;
-                    }
-
-                    .timeline-neutral::before {
-                        display: none;
-                    }
-
-                    .match-timeline-section-title {
-                        display: block;
-                        color: var(--text-primary);
-                        line-height: 1.25;
-                        word-break: break-word;
-                    }
-
-                    @media (max-height: 860px) {
-                        .new-match-modal {
-                            max-height: calc(100vh - 10px) !important;
-                            padding: 14px !important;
-                        }
-
-                        .new-match-form {
-                            gap: 12px !important;
-                        }
-
-                        .new-match-modal h2 {
-                            font-size: 24px !important;
-                            margin-bottom: 12px !important;
-                        }
-                    }
-
-                    @media (max-height: 760px) {
-                        .new-match-overlay {
-                            padding: 4px !important;
-                        }
-
-                        .new-match-modal {
-                            max-height: calc(100vh - 8px) !important;
-                            border-radius: 12px !important;
-                            padding: 12px !important;
-                        }
-
-                        .new-match-two-cols {
-                            grid-template-columns: 1fr !important;
-                        }
-
-                        .new-match-actions {
-                            flex-direction: column !important;
-                        }
-
-                        .new-match-modal button,
-                        .new-match-modal select,
-                        .new-match-modal input {
-                            padding-top: 10px !important;
-                            padding-bottom: 10px !important;
-                            font-size: 13px !important;
-                        }
-                    }
-
-                    @media (max-width: 768px) {
-                        .match-timeline-root {
-                            padding: 12px !important;
-                        }
-
-                        .match-timeline-header-row {
-                            flex-direction: column;
-                            align-items: stretch !important;
-                            gap: 12px;
-                        }
-
-                        .match-timeline-scoreboard {
-                            padding: 18px 12px !important;
-                            gap: 10px;
-                        }
-
-                        .match-timeline-team-name {
-                            font-size: 1.05rem !important;
-                            line-height: 1.3 !important;
-                        }
-
-                        .match-timeline-time-display {
-                            padding: 0 6px !important;
-                        }
-
-                        .match-timeline-control-grid,
-                        .match-timeline-event-grid {
-                            grid-template-columns: 1fr !important;
-                        }
-
-                        .match-timeline-root button {
-                            min-height: 44px;
-                        }
-                    }
-
-                    @media (max-width: 480px) {
-                        .match-timeline-section-title {
-                            display: block !important;
-                            font-size: 1rem !important;
-                            margin-bottom: 12px !important;
-                        }
-
-                        .match-timeline-scoreboard {
-                            display: grid !important;
-                            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-                            align-items: center;
-                        }
-
-                        .match-timeline-team-name {
-                            font-size: 0.95rem !important;
-                            word-break: break-word;
-                        }
-
-                        .match-timeline-time-display {
-                            gap: 4px !important;
-                        }
-
-                        .match-timeline-root h1 {
-                            font-size: 1.45rem !important;
-                        }
-
-                        .match-timeline-root h3 {
-                            font-size: 1rem !important;
-                        }
-
-                        .match-timeline-root .player-list {
-                            max-height: 52dvh;
-                        }
-
-                        .timeline-item-beauty {
-                            width: 94% !important;
-                        }
-
-                        .timeline-list-beauty::before {
-                            left: 50%;
-                        }
-                    }
-
-                    @media (max-width: 390px) {
-                        .match-timeline-root {
-                            padding: 8px !important;
-                        }
-
-                        .match-timeline-scoreboard {
-                            padding: 14px 8px !important;
-                        }
-
-                        .match-timeline-team-name {
-                            font-size: 0.82rem !important;
-                        }
-
-                        .match-timeline-time-display {
-                            gap: 2px !important;
-                        }
-
-                        .match-timeline-root .pulse-animation {
-                            font-size: 10px !important;
-                            padding: 3px 8px !important;
-                        }
-
-                        .match-timeline-root .player-item-hover,
-                        .match-timeline-root .player-list button {
-                            padding: 10px 10px !important;
-                        }
-
-                        .timeline-item-beauty {
-                            width: 96% !important;
-                        }
-
-                        .timeline-item-beauty::before {
-                            left: -16px;
-                        }
-
-                        .timeline-list-beauty::before {
-                            left: 50%;
-                        }
-                    }
-                `}</style>
-          </div>{/* fecha wrapper hideForShootout */}
-
-          {/* Modal de Seleção de Jogador — fora do wrapper para funcionar durante a disputa */}
-          {showPlayerInput && selectedMatch && (
-            <div style={styles.modal}>
-              <div style={styles.modalContentLarge}>
-                <h3 style={styles.modalTitle}>
-                  {showPlayerInput.type === "goal" && (
-                    isBasketball
-                      ? `🏀 +${showPlayerInput.points} Ponto${(showPlayerInput.points ?? 1) > 1 ? "s" : ""} — Quem converteu?`
-                      : isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?"
-                  )}
-                  {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
-                  {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
-                  {showPlayerInput.type === "penalty_scored" && (
-                    showPlayerInput.isShootout ? "🎯 Quem cobrou o pênalti?" : "🎯 Pênalti Marcado"
-                  )}
-                  {showPlayerInput.type === "penalty_missed" && showPlayerInput.isShootout && "❌ Quem cobrou (e perdeu)?"}
-                </h3>
-                <div style={styles.modalSubtitle}>
-                  {showPlayerInput.team === "A"
-                    ? selectedMatch.teamA.name
-                    : selectedMatch.teamB.name}
-                </div>
-                {(() => {
-                  const team =
-                    showPlayerInput.team === "A"
-                      ? selectedMatch.teamA
-                      : selectedMatch.teamB;
-                  const availableAthletes = athletes.filter((a) =>
-                    athleteMatchesTeamAndMatch(a, team),
-                  );
-                  const isShootoutModal = showPlayerInput.isShootout;
-                  // Jogadores já utilizados nesta disputa para este time
-                  const usedPlayers = showPlayerInput.team === "A"
-                    ? shootoutStats.usedPlayersA
-                    : shootoutStats.usedPlayersB;
-                  // Ordena: disponíveis primeiro, já utilizados por último
-                  const sortedAthletes = isShootoutModal
-                    ? [...availableAthletes].sort((a, b) => {
-                      const nameA = `${a.firstName} ${a.lastName}`;
-                      const nameB = `${b.firstName} ${b.lastName}`;
-                      const usedA = usedPlayers.includes(nameA);
-                      const usedB = usedPlayers.includes(nameB);
-                      if (usedA === usedB) return 0;
-                      return usedA ? 1 : -1;
-                    })
-                    : availableAthletes;
-                  return (
-                    <div style={styles.playerList} className="player-list">
-                      {sortedAthletes.map((athlete) => {
-                        const playerName = `${athlete.firstName} ${athlete.lastName}`;
-                        const stats = getPlayerStats(playerName);
-                        const alreadyUsed = isShootoutModal && usedPlayers.includes(playerName);
-                        // Pode cobrar se: não expulso. Se já usou, pode repetir só se todos já cobram
-                        const allUsed = isShootoutModal && availableAthletes.every(a => usedPlayers.includes(`${a.firstName} ${a.lastName}`));
-                        const canAct = isShootoutModal
-                          ? !stats.redCards && (!alreadyUsed || allUsed)
-                          : stats.canPlay;
                         return (
                           <button
-                            key={athlete.id}
-                            className={canAct ? "player-item-hover" : ""}
+                            key={teamKey}
                             style={{
-                              ...styles.playerItem,
-                              ...(canAct ? {} : styles.playerItemDisabled),
+                              ...styles.eventBtn,
+                              background: isHansoku ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
+                              borderColor: "var(--danger-color, #ef4444)",
+                              color: isHansoku ? "white" : "#ef4444",
+                              padding: "16px",
+                              fontSize: "14px",
+                              fontWeight: 800,
+                              opacity: isHansoku ? 0.7 : 1,
+                              cursor: isHansoku ? "not-allowed" : "pointer"
                             }}
-                            onClick={() => canAct && confirmPlayerEvent(playerName)}
-                            disabled={!canAct}
+                            onClick={() => handleKaratePenalty(teamKey as "A" | "B")}
+                            disabled={isHansoku || selectedMatch.status === "finished"}
                           >
-                            <span style={styles.playerName}>{playerName}</span>
-                            <div style={styles.playerStats}>
-                              {isShootoutModal && alreadyUsed && !allUsed && (
-                                <span style={{ ...styles.statBadge, color: '#f59e0b' }}>já cobrou</span>
-                              )}
-                              {stats.redCards > 0 && (
-                                <span style={styles.statBadgeRed}>🟥 EXPULSO</span>
-                              )}
-                              {!isShootoutModal && stats.yellowCards > 0 && (
-                                <span style={styles.statBadge}>🟨 {stats.yellowCards}</span>
-                              )}
-                            </div>
+                            {btnLabel} ({teamName})
                           </button>
                         );
                       })}
-                      {sortedAthletes.length === 0 && (
-                        <div style={{ textAlign: "center", padding: "20px", color: "var(--text-secondary)" }}>
-                          Nenhum atleta encontrado para esta modalidade e sexo nesta equipe.
-                        </div>
-                      )}
                     </div>
-                  );
-                })()}
-                <button
-                  style={{ ...styles.modalBtn, ...styles.cancelBtn, marginTop: "16px" }}
-                  onClick={cancelPlayerInput}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-
-      {/* Modal seletor de jogador para ponto no Vôlei de Praia */}
-      {beachPointPicker && selectedMatch && (() => {
-        const team = beachPointPicker.team;
-        const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
-        const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
-        const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj));
-        return (
-          <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 }}
-            onClick={() => setBeachPointPicker(null)}
-          >
-            <div
-              style={{ background: "var(--bg-card)", borderRadius: "14px", padding: "24px", minWidth: "280px", maxWidth: "360px", width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: teamColor, marginBottom: "4px" }}>
-                  🏐 Ponto — {teamObj.name.split(" - ")[0]}
-                </div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>
-                  Quem fez o ponto?
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto" }}>
-                {availableAthletes.length === 0 ? (
-                  <div style={{ color: "var(--text-secondary)", fontSize: "13px", textAlign: "center", padding: "12px 0" }}>
-                    Nenhum atleta cadastrado para este time.
                   </div>
-                ) : (
-                  availableAthletes.map((athlete) => {
-                    const name = `${athlete.firstName} ${athlete.lastName}`;
-                    return (
+                )}
+
+                {isKarate && currentMinute === 0 && !isRunning && selectedMatch.status !== "finished" && selectedMatch.scoreA === selectedMatch.scoreB && (
+                  <div style={styles.eventSection}>
+                    <h3 style={{ ...styles.sectionTitle, color: "var(--accent-color)" }}>
+                      ⚖️ Decisão de Hantei (Empate)
+                    </h3>
+                    <div style={{ display: "flex", gap: "10px" }}>
                       <button
-                        key={athlete.id}
-                        style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${teamColor}44`, borderRadius: "8px", padding: "10px 14px", color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}
-                        onMouseOver={(e) => (e.currentTarget.style.background = `${teamColor}22`)}
-                        onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-                        onClick={() => {
-                          setBeachPointPicker(null);
-                          handleVolleyPointWithPlayer(team, name);
+                        style={{ ...styles.eventBtn, background: "rgba(59, 130, 246, 0.15)", borderColor: "#3b82f6", color: "#3b82f6" }}
+                        onClick={() => handleHantei("A")}
+                      >
+                        Hantei para {selectedMatchTeamAShortName}
+                      </button>
+                      <button
+                        style={{ ...styles.eventBtn, background: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", color: "#ef4444" }}
+                        onClick={() => handleHantei("B")}
+                      >
+                        Hantei para {selectedMatchTeamBShortName}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isJudo && (
+                  <div style={styles.eventSection}>
+                    <h3
+                      style={{ ...styles.sectionTitle, color: isGoldenScore ? "var(--warning-color, #f59e0b)" : "var(--accent-color)" }}
+                    >
+                      🥋 Pontuação Judô {isGoldenScore && " (GOLDEN SCORE)"}
+                    </h3>
+
+                    {/* Painel de regras */}
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
+                      marginBottom: "14px",
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: "#22c55e", whiteSpace: "nowrap" }}>IPPON (2 pts)</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Vitória direta. Encerra a luta.</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: "#eab308", whiteSpace: "nowrap" }}>WAZA-ARI (1 pt)</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>Ponto técnico. 2 = Ippon.</span>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                        gap: "15px",
+                      }}
+                    >
+                      {[
+                        { teamKey: "A", teamName: selectedMatchTeamAShortName },
+                        { teamKey: "B", teamName: selectedMatchTeamBShortName }
+                      ].map(({ teamKey, teamName }) => (
+                        <div
+                          key={teamKey}
+                          style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              textAlign: "center",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {teamName}
+                          </div>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(234, 179, 8, 0.15)",
+                              borderColor: "#eab308",
+                              color: "#eab308",
+                            }}
+                            onClick={() => handleJudoPoint(teamKey as "A" | "B", "waza_ari")}
+                            disabled={selectedMatch.status === "finished"}
+                          >
+                            Waza-ari (+1)
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: "rgba(34, 197, 94, 0.15)",
+                              borderColor: "#22c55e",
+                              color: "#22c55e",
+                            }}
+                            onClick={() => handleJudoPoint(teamKey as "A" | "B", "ippon")}
+                            disabled={selectedMatch.status === "finished"}
+                          >
+                            Ippon (Vitória)
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn,
+                              background: osaekomiTeam === teamKey ? "rgba(59, 130, 246, 0.8)" : "rgba(59, 130, 246, 0.15)",
+                              borderColor: "#3b82f6",
+                              color: osaekomiTeam === teamKey ? "white" : "#3b82f6",
+                              marginTop: "8px",
+                              opacity: (osaekomiTeam && osaekomiTeam !== teamKey) ? 0.5 : 1,
+                            }}
+                            onClick={() => osaekomiTeam === teamKey ? handleToketa() : handleOsaekomi(teamKey as "A" | "B")}
+                            disabled={selectedMatch.status === "finished" || !!(osaekomiTeam && osaekomiTeam !== teamKey)}
+                          >
+                            {osaekomiTeam === teamKey ? "Toketa (Sair)" : "Finalização"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {osaekomiTeam && (
+                      <div style={{
+                        marginTop: "20px",
+                        padding: "15px",
+                        background: "rgba(59, 130, 246, 0.1)",
+                        borderRadius: "12px",
+                        border: "2px solid #3b82f6",
+                        textAlign: "center",
+                        animation: "pulse 2s infinite"
+                      }}>
+                        <div style={{ color: "#3b82f6", fontWeight: 800, fontSize: "14px", textTransform: "uppercase", marginBottom: "5px" }}>
+                          ⏲️ Finalização em Curso ({osaekomiTeam === "A" ? selectedMatchTeamAShortName : selectedMatchTeamBShortName})
+                        </div>
+                        <div style={{ fontSize: "36px", fontWeight: 900, color: "#3b82f6" }}>
+                          {osaekomiSeconds}s
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "5px" }}>
+                          10s = Waza-ari | 20s = Ippon
+                        </div>
+                      </div>
+                    )}
+
+                    <h3 style={{ ...styles.sectionTitle, color: "var(--danger-color, #ef4444)", marginTop: "20px" }}>
+                      ⚠️ Penalidades (Shido)
+                    </h3>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                        gap: "15px",
+                      }}
+                    >
+                      {[
+                        { teamKey: "A", teamName: selectedMatchTeamAShortName, teamId: selectedMatch.teamA.id },
+                        { teamKey: "B", teamName: selectedMatchTeamBShortName, teamId: selectedMatch.teamB.id }
+                      ].map(({ teamKey, teamName, teamId }) => {
+                        const isHansokuMake = selectedMatch.events?.some(e => e.type === "hansoku_make" && e.teamId === teamId);
+                        const shidoCount = selectedMatch.events?.filter(e => e.type === "shido" && e.teamId === teamId).length || 0;
+
+                        let btnLabel = "Adicionar Shido";
+                        if (isHansokuMake) btnLabel = "Hansoku-make (Desclassificado)";
+                        else if (shidoCount > 0) btnLabel = `Shido ${shidoCount} - Próx: ${shidoCount === 2 ? "Hansoku-make" : `Shido ${shidoCount + 1}`}`;
+
+                        return (
+                          <button
+                            key={teamKey}
+                            style={{
+                              ...styles.eventBtn,
+                              background: isHansokuMake ? "rgba(239, 68, 68, 0.8)" : "rgba(220, 38, 38, 0.15)",
+                              borderColor: "var(--danger-color, #ef4444)",
+                              color: isHansokuMake ? "white" : "#ef4444",
+                              padding: "16px",
+                              fontSize: "14px",
+                              fontWeight: 800,
+                              opacity: isHansokuMake ? 0.7 : 1,
+                              cursor: isHansokuMake ? "not-allowed" : "pointer"
+                            }}
+                            onClick={() => handleJudoShido(teamKey as "A" | "B")}
+                            disabled={isHansokuMake || selectedMatch.status === "finished"}
+                          >
+                            {btnLabel} ({teamName})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!isBeachTennis && !isSetSport && !isBasketball && !isSwimming && !isKarate && !isJudo && !isXadrez && !isTamboreu && (
+                  <>
+                    <div style={{
+                      ...styles.eventSection,
+                      ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
+                    }}>
+                      <h3 style={styles.sectionTitle}>🟨 Cartões Amarelos</h3>
+                      <div style={styles.eventButtons} className="match-timeline-event-grid">
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.yellowBtn }}
+                          onClick={() => handleCard("yellow_card", "A")}
+                        >
+                          🟨 {selectedMatchTeamAShortName}
+                        </button>
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.yellowBtn }}
+                          onClick={() => handleCard("yellow_card", "B")}
+                        >
+                          🟨 {selectedMatchTeamBShortName}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      ...styles.eventSection,
+                      ...(pendingShootout ? { opacity: 0.35, pointerEvents: 'none' } : {}),
+                    }}>
+                      <h3 style={styles.sectionTitle}>🟥 Cartões Vermelhos</h3>
+                      <div
+                        style={styles.eventButtons}
+                        className="match-timeline-event-grid"
+                      >
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.redBtn }}
+                          onClick={() => handleCard("red_card", "A")}
+                        >
+                          🟥 {selectedMatchTeamAShortName}
+                        </button>
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.redBtn }}
+                          onClick={() => handleCard("red_card", "B")}
+                        >
+                          🟥 {selectedMatchTeamBShortName}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isFutebolX1 && (
+                      <div style={{
+                        ...styles.eventSection,
+                        ...(pendingShootout ? {
+                          border: '2px solid #f59e0b',
+                          borderRadius: '10px',
+                          padding: '12px',
+                          background: 'rgba(245,158,11,0.06)',
+                        } : {}),
+                      }}>
+                        <h3 style={styles.sectionTitle}>🥅 Shoot-out</h3>
+
+                        {/* Banner de alerta quando há shoot-out pendente */}
+                        {pendingShootout && (
+                          <div style={{
+                            background: 'rgba(245,158,11,0.15)',
+                            border: '1px solid #f59e0b',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            marginBottom: '12px',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#f59e0b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}>
+                            ⚠️ {pendingShootout.reason}
+                          </div>
+                        )}
+
+                        <div style={styles.eventButtons} className="match-timeline-event-grid">
+                          <button
+                            style={{
+                              ...styles.eventBtn, ...styles.penaltyBtn,
+                              ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                              ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                            }}
+                            onClick={() => handleShootout("shootout_scored", "A")}
+                            disabled={!!pendingShootout && pendingShootout.team !== "A"}
+                          >
+                            🎯 Shoot-out Marcado{" "}{selectedMatchTeamAShortName}
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn, ...styles.penaltyBtn,
+                              ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                              ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                            }}
+                            onClick={() => handleShootout("shootout_scored", "B")}
+                            disabled={!!pendingShootout && pendingShootout.team !== "B"}
+                          >
+                            🎯 Shoot-out Marcado{" "}{selectedMatchTeamBShortName}
+                          </button>
+                        </div>
+                        <div style={{ ...styles.eventButtons, marginTop: "12px" }} className="match-timeline-event-grid">
+                          <button
+                            style={{
+                              ...styles.eventBtn, ...styles.penaltyMissedBtn,
+                              ...(pendingShootout && pendingShootout.team !== "A" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                              ...(pendingShootout && pendingShootout.team === "A" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                            }}
+                            onClick={() => handleShootout("shootout_missed", "A")}
+                            disabled={!!pendingShootout && pendingShootout.team !== "A"}
+                          >
+                            ❌ Shoot-out Perdido{" "}{selectedMatchTeamAShortName}
+                          </button>
+                          <button
+                            style={{
+                              ...styles.eventBtn, ...styles.penaltyMissedBtn,
+                              ...(pendingShootout && pendingShootout.team !== "B" ? { opacity: 0.25, cursor: 'not-allowed' } : {}),
+                              ...(pendingShootout && pendingShootout.team === "B" ? { boxShadow: '0 0 0 2px #f59e0b' } : {}),
+                            }}
+                            onClick={() => handleShootout("shootout_missed", "B")}
+                            disabled={!!pendingShootout && pendingShootout.team !== "B"}
+                          >
+                            ❌ Shoot-out Perdido{" "}{selectedMatchTeamBShortName}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={styles.eventSection}>
+                      <h3 style={styles.sectionTitle}>
+                        🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênaltis"}
+                      </h3>
+                      <div
+                        style={styles.eventButtons}
+                        className="match-timeline-event-grid"
+                      >
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                          onClick={() => handlePenalty("penalty_scored", "A")}
+                        >
+                          🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Marcado{" "}
+                          {selectedMatchTeamAShortName}
+                        </button>
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.penaltyBtn }}
+                          onClick={() => handlePenalty("penalty_scored", "B")}
+                        >
+                          🎯 {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Marcado{" "}
+                          {selectedMatchTeamBShortName}
+                        </button>
+                      </div>
+                      <div
+                        style={{ ...styles.eventButtons, marginTop: "12px" }}
+                        className="match-timeline-event-grid"
+                      >
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                          onClick={() => handlePenalty("penalty_missed", "A")}
+                        >
+                          ❌ {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido{" "}
+                          {selectedMatchTeamAShortName}
+                        </button>
+                        <button
+                          style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                          onClick={() => handlePenalty("penalty_missed", "B")}
+                        >
+                          ❌ {isHandebol ? "TIRO DE 7 METROS" : "Pênalti"} Perdido{" "}
+                          {selectedMatchTeamBShortName}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Painel de cobranças da disputa de pênaltis */}
+                    {isPenaltyShootoutSport && shootoutStarted && selectedMatch.status !== "finished" && (
+                      <div style={{ ...styles.eventSection, background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: "12px" }}>
+                        <h3 style={{ ...styles.sectionTitle, color: "#f59e0b", marginBottom: "12px" }}>
+                          🥅 Disputa de Pênaltis
+                        </h3>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", marginBottom: "16px", padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "10px" }}>
+                          {(["A", "B"] as const).map((team) => {
+                            const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+                            const scored = team === "A" ? shootoutStats.scoredA : shootoutStats.scoredB;
+                            const total = team === "A" ? shootoutStats.totalA : shootoutStats.totalB;
+                            const color = team === "A" ? "#3b82f6" : "#ef4444";
+                            return (
+                              <div key={team} style={{ textAlign: "center", flex: 1 }}>
+                                <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "2px" }}>{getTeamShortName(teamObj)}</div>
+                                <div style={{ fontSize: "40px", fontWeight: 900, color }}>{scored}</div>
+                                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{total} cobranças</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                          {(["A", "B"] as const).map((team) => {
+                            const color = team === "A" ? "#3b82f6" : "#ef4444";
+                            const bg = team === "A" ? "rgba(59,130,246,0.15)" : "rgba(239,68,68,0.15)";
+                            const name = getSelectedMatchTeamShortName(team);
+                            return (
+                              <div key={team} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                <div style={{ fontSize: "12px", fontWeight: 700, textAlign: "center", color }}>{name}</div>
+                                <button style={{ ...styles.eventBtn, background: bg, borderColor: color, color, fontWeight: 700 }}
+                                  onClick={() => handleShootoutPenalty("penalty_scored", team)}>
+                                  🎯 Pênalti Marcado
+                                </button>
+                                <button style={{ ...styles.eventBtn, ...styles.penaltyMissedBtn }}
+                                  onClick={() => handleShootoutPenalty("penalty_missed", team)}>
+                                  ❌ Pênalti Perdido
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Modal de Confirmação de Reset */}
+                {showResetConfirm && (
+                  <div style={styles.modal}>
+                    <div style={styles.modalContent}>
+                      <h3 style={styles.modalTitle}>⚠️ Confirmar Reset</h3>
+                      <p
+                        style={{
+                          textAlign: "center",
+                          marginBottom: "20px",
+                          color: "var(--text-secondary)",
                         }}
                       >
-                        {name}
-                      </button>
-                    );
-                  })
+                        Tem certeza que deseja resetar esta partida?
+                        <br />
+                        Todos os eventos e placar serão apagados.
+                      </p>
+                      <div style={styles.modalButtons}>
+                        <button
+                          style={{ ...styles.modalBtn, ...styles.confirmBtn }}
+                          onClick={handleResetMatch}
+                        >
+                          Sim, Resetar
+                        </button>
+                        <button
+                          style={{ ...styles.modalBtn, ...styles.cancelBtn }}
+                          onClick={() => setShowResetConfirm(false)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <button
-                  style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "10px 14px", color: "var(--text-secondary)", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}
-                  onClick={() => {
-                    setBeachPointPicker(null);
-                    handleVolleyPointWithPlayer(team, null);
-                  }}
-                >
-                  Registrar sem jogador
-                </button>
+
+                {/* Modal de Classificação de Natação */}
+                {isRankingModalOpen && selectedMatch && (
+                  <div style={styles.modal}>
+                    <div
+                      style={{
+                        ...styles.modalContentLarge,
+                        maxWidth: "900px",
+                        width: "95%",
+                        maxHeight: "90vh",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <h3 style={styles.modalTitle}>🏁 Classificação da Prova</h3>
+                      <div style={{ ...styles.modalSubtitle, marginBottom: "20px" }}>
+                        Preencha o atleta de cada equipe, a posição e o tempo
+                      </div>
+
+                      <div
+                        style={{
+                          overflowY: "auto",
+                          padding: "10px",
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                          gap: "12px",
+                          flex: 1,
+                        }}
+                        className="custom-scrollbar"
+                      >
+                        {swimmingEntries.length === 0 && (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "var(--text-secondary)",
+                            }}
+                          >
+                            Nenhuma equipe encontrada para esta prova.
+                          </div>
+                        )}
+                        {swimmingEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            style={{
+                              background: "rgba(255,255,255,0.05)",
+                              padding: "12px",
+                              borderRadius: "10px",
+                              border: "1px solid var(--border-color)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "12px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
+                              {entry.participant.logo && (
+                                <img
+                                  src={entry.participant.logo}
+                                  alt=""
+                                  style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    objectFit: "contain",
+                                  }}
+                                />
+                              )}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: "13px", fontWeight: 700 }}>
+                                  {entry.participant.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "var(--text-secondary)",
+                                  }}
+                                >
+                                  {entry.participant.faculty}
+                                </div>
+                              </div>
+                              <select
+                                value={swimmingRankings[entry.id] || ""}
+                                disabled={hasSwimmingTime(swimmingTimes[entry.id] || "")}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setSwimmingRankings((prev) => {
+                                    if (!value) {
+                                      const { [entry.id]: _removed, ...rest } = prev; // eslint-disable-line @typescript-eslint/no-unused-vars
+                                      return rest;
+                                    }
+                                    return { ...prev, [entry.id]: parseInt(value, 10) };
+                                  });
+                                }}
+                                style={{
+                                  background: "#222",
+                                  color: "white",
+                                  border: "1px solid #444",
+                                  borderRadius: "6px",
+                                  padding: "5px",
+                                  fontSize: "12px",
+                                  fontWeight: 800,
+                                  opacity: hasSwimmingTime(swimmingTimes[entry.id] || "") ? 0.6 : 1,
+                                  cursor: hasSwimmingTime(swimmingTimes[entry.id] || "") ? "not-allowed" : "pointer"
+                                }}
+                              >
+                                <option value="">Posição</option>
+                                {Array.from(
+                                  { length: maxSwimmingRank },
+                                  (_, i) => i + 1,
+                                ).map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}º Lugar
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <select
+                              value={
+                                athleteNames[entry.id] !== undefined
+                                  ? athleteNames[entry.id]
+                                  : entry.defaultName || ""
+                              }
+                              onChange={(e) =>
+                                setAthleteNames((prev) => ({
+                                  ...prev,
+                                  [entry.id]: e.target.value,
+                                }))
+                              }
+                              style={{
+                                background: "rgba(0,0,0,0.2)",
+                                border: "1px solid #333",
+                                borderRadius: "6px",
+                                padding: "8px",
+                                color: "white",
+                                fontSize: "13px",
+                                width: "100%",
+                              }}
+                            >
+                              <option value="">Selecione o atleta...</option>
+                              {athletes
+                                .filter((a) => athleteMatchesTeamAndMatch(a, entry.participant, selectedMatch))
+                                .map((a, idx) => {
+                                  const fullName = `${a.firstName} ${a.lastName}`;
+                                  return (
+                                    <option key={idx} value={fullName}>
+                                      {fullName}
+                                    </option>
+                                  );
+                                })}
+                            </select>
+                            {/* 3 campos separados: MM : SS . CC — versão corrigida */}
+                            {(() => {
+                              const parts = parseSwimmingTimeParts(swimmingTimes[entry.id] || "");
+
+                              const inputBase: React.CSSProperties = {
+                                width: "38px",
+                                textAlign: "center",
+                                background: "#121212",
+                                border: "1.5px solid #333",
+                                borderRadius: "8px",
+                                padding: "9px 4px",
+                                color: "#ffffff",
+                                fontSize: "16px",
+                                fontWeight: 700,
+                                fontFamily: "'Courier New', monospace",
+                                outline: "none",
+                                transition: "border-color 0.15s, box-shadow 0.15s",
+                                boxSizing: "border-box" as const,
+                              };
+                              const sep: React.CSSProperties = {
+                                color: "#555",
+                                fontSize: "20px",
+                                fontWeight: 700,
+                                userSelect: "none" as const,
+                                lineHeight: 1,
+                              };
+
+                              // Lê o estado mais recente via updater funcional (evita stale closure)
+                              const handleBlur = () => {
+                                setSwimmingTimes(prev => {
+                                  const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                  if (!p.mm && !p.ss && !p.cc) return prev;
+                                  // Valida overflow de segundos
+                                  const ssNum = parseInt(p.ss || "0", 10);
+                                  if (p.ss && ssNum > 59) {
+                                    const s = sanitizeSwimmingTime(p.mm, p.ss, p.cc);
+                                    return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
+                                  }
+                                  // Zero-pad apenas campos que já foram digitados (não preenche vazios)
+                                  const mm = p.mm ? p.mm.padStart(2, "0") : "";
+                                  const ss = p.ss ? p.ss.padStart(2, "0") : "";
+                                  const cc = p.cc ? p.cc.padStart(2, "0") : "";
+                                  const val = mm || ss || cc ? `${mm}:${ss}.${cc}` : "";
+                                  return { ...prev, [entry.id]: val };
+                                });
+                              };
+
+                              // Reseta estilo ao perder foco (fix: onBlur resets border)
+                              const handleBlurStyle = (e: React.FocusEvent<HTMLInputElement>) => {
+                                e.target.style.borderColor = "#333";
+                                e.target.style.boxShadow = "none";
+                              };
+                              const handleFocusStyle = (e: React.FocusEvent<HTMLInputElement>) => {
+                                e.target.style.borderColor = "#3b82f6";
+                                e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.2)";
+                              };
+
+                              return (
+                                <div style={{
+                                  display: "flex", alignItems: "center", gap: "3px",
+                                  background: "rgba(255,255,255,0.03)", borderRadius: "10px",
+                                  padding: "6px 10px", border: "1px solid rgba(255,255,255,0.06)",
+                                  width: "fit-content",
+                                }}>
+                                  {/* Minutos */}
+                                  <input
+                                    id={`swim-mm-${entry.id}`}
+                                    maxLength={2}
+                                    inputMode="numeric"
+                                    placeholder="MM"
+                                    value={parts.mm}
+                                    onChange={(e) => {
+                                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                      // Lê parts.ss e parts.cc do estado atual (via closure do render)
+                                      setSwimmingTimes(prev => {
+                                        const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                        const val = v || p.ss || p.cc ? `${v}:${p.ss}.${p.cc}` : "";
+                                        return { ...prev, [entry.id]: val };
+                                      });
+                                      if (v.length === 2) document.getElementById(`swim-ss-${entry.id}`)?.focus();
+                                    }}
+                                    onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                    onFocus={handleFocusStyle}
+                                    style={inputBase}
+                                  />
+                                  <span style={sep}>:</span>
+                                  {/* Segundos */}
+                                  <input
+                                    id={`swim-ss-${entry.id}`}
+                                    maxLength={2}
+                                    inputMode="numeric"
+                                    placeholder="SS"
+                                    value={parts.ss}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Backspace" && parts.ss === "")
+                                        document.getElementById(`swim-mm-${entry.id}`)?.focus();
+                                    }}
+                                    onChange={(e) => {
+                                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                      setSwimmingTimes(prev => {
+                                        const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                        if (v.length === 2 && parseInt(v, 10) > 59) {
+                                          // Auto-conversão imediata: 90s → +1min 30s
+                                          const s = sanitizeSwimmingTime(p.mm, v, p.cc);
+                                          return { ...prev, [entry.id]: `${s.mm}:${s.ss}.${s.cc}` };
+                                        }
+                                        const val = p.mm || v || p.cc ? `${p.mm}:${v}.${p.cc}` : "";
+                                        return { ...prev, [entry.id]: val };
+                                      });
+                                      if (v.length === 2) document.getElementById(`swim-cc-${entry.id}`)?.focus();
+                                    }}
+                                    onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                    onFocus={handleFocusStyle}
+                                    style={inputBase}
+                                  />
+                                  <span style={sep}>.</span>
+                                  {/* Centésimos */}
+                                  <input
+                                    id={`swim-cc-${entry.id}`}
+                                    maxLength={2}
+                                    inputMode="numeric"
+                                    placeholder="CC"
+                                    value={parts.cc}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Backspace" && parts.cc === "")
+                                        document.getElementById(`swim-ss-${entry.id}`)?.focus();
+                                    }}
+                                    onChange={(e) => {
+                                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                      setSwimmingTimes(prev => {
+                                        const p = parseSwimmingTimeParts(prev[entry.id] || "");
+                                        const val = p.mm || p.ss || v ? `${p.mm}:${p.ss}.${v}` : "";
+                                        return { ...prev, [entry.id]: val };
+                                      });
+                                    }}
+                                    onBlur={(e) => { handleBlur(); handleBlurStyle(e); }}
+                                    onFocus={handleFocusStyle}
+                                    style={inputBase}
+                                  />
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+                        <button
+                          onClick={() => {
+                            if (storedSwimmingParticipants.length === 0) {
+                              showNotification(
+                                "Nenhuma equipe registrada na prova. Edite a partida e selecione as equipes antes de classificar.",
+                              );
+                              return;
+                            }
+
+                            const totalEntries = swimmingEntries.length;
+                            const preparedEntries = swimmingEntries
+                              .map((entry) => {
+                                const nameValue =
+                                  athleteNames[entry.id] !== undefined
+                                    ? athleteNames[entry.id]
+                                    : entry.defaultName;
+                                return {
+                                  entry,
+                                  rank: swimmingRankings[entry.id],
+                                  name: nameValue.trim(),
+                                  time: (swimmingTimes[entry.id] || "").trim(),
+                                };
+                              })
+                              .filter((item) => item.rank && item.name);
+
+                            const ranks = preparedEntries.map(
+                              (item) => item.rank as number,
+                            );
+                            const hasDuplicateRanks =
+                              new Set(ranks).size !== ranks.length;
+                            if (hasDuplicateRanks) {
+                              showNotification(
+                                "Existem posições duplicadas. Ajuste para continuar.",
+                              );
+                              return;
+                            }
+
+                            if (preparedEntries.length === 0) {
+                              showNotification(
+                                "Informe ao menos uma posição e nome para finalizar.",
+                              );
+                              return;
+                            }
+
+                            if (preparedEntries.length < totalEntries) {
+                              if (
+                                !confirm(
+                                  `Apenas ${preparedEntries.length} de ${totalEntries} equipes foram ranqueadas. Deseja finalizar assim mesmo?`,
+                                )
+                              )
+                                return;
+                            }
+
+                            const sortedResults = [...preparedEntries].sort(
+                              (a, b) => (a.rank as number) - (b.rank as number),
+                            );
+
+                            const baseTimestamp = Date.now();
+                            const resultEvents: MatchEvent[] = sortedResults.map(
+                              (item, index) => {
+                                const timeLabel = item.time ? ` (${item.time})` : "";
+                                return {
+                                  id: `evt_${baseTimestamp + index}_swim`,
+                                  type: "swimming_result",
+                                  minute: getCurrentEventMinute(),
+                                  description: `${item.rank}º - ${item.name}${timeLabel} - ${item.entry.participant.name}`,
+                                };
+                              },
+                            );
+
+                            const endEvent: MatchEvent = {
+                              id: `evt_${baseTimestamp + resultEvents.length + 1}_end`,
+                              type: "end",
+                              minute: getCurrentEventMinute(),
+                              description: "Fim da prova",
+                            };
+
+                            const filteredEvents = (selectedMatch.events || []).filter(
+                              (event) =>
+                                event.type !== "swimming_result" &&
+                                event.type !== "end",
+                            );
+
+                            const updatedMatch = {
+                              ...selectedMatch,
+                              participants: storedSwimmingParticipants,
+                              teamA:
+                                storedSwimmingParticipants[0] || selectedMatch.teamA,
+                              teamB:
+                                storedSwimmingParticipants[1] || selectedMatch.teamB,
+                              status: "finished" as const,
+                              events: [...filteredEvents, ...resultEvents, endEvent],
+                            } as Match;
+
+                            updateMatch(updatedMatch);
+                            setIsRunning(false);
+                            setIsRankingModalOpen(false);
+                            showNotification("Resultado salvo e prova finalizada!");
+                          }}
+                          style={{
+                            flex: 2,
+                            background: "var(--success-color)",
+                            color: "white",
+                            padding: "16px",
+                            borderRadius: "12px",
+                            border: "none",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            fontSize: "16px",
+                            boxShadow: "0 4px 15px rgba(16, 185, 129, 0.3)",
+                          }}
+                        >
+                          Confirmar e Finalizar
+                        </button>
+                        <button
+                          onClick={() => setIsRankingModalOpen(false)}
+                          style={{
+                            flex: 1,
+                            background: "#333",
+                            color: "white",
+                            padding: "16px",
+                            borderRadius: "12px",
+                            border: "none",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            fontSize: "16px",
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cronologia de Eventos */}
+                <div style={styles.timeline}>
+                  <h3 style={styles.sectionTitle}>📋 Cronologia</h3>
+                  <div style={styles.timelineList} className="timeline-list-beauty">
+                    {!selectedMatch.events || selectedMatch.events.length === 0 ? (
+                      <p style={styles.noEvents}>Nenhum evento registrado ainda.</p>
+                    ) : (
+                      timelineEvents.map((event) => {
+                        const isTeamA = event.teamId === selectedMatch.teamA.id;
+                        const isTeamB = event.teamId === selectedMatch.teamB.id;
+                        const isGeneral = !event.teamId;
+                        const rowJustify = isGeneral
+                          ? "center"
+                          : isTeamA
+                            ? "flex-start"
+                            : "flex-end";
+                        const cardWidth = isGeneral ? "46%" : "48%";
+                        const shortTeamName = isTeamA
+                          ? selectedMatchTeamAShortName
+                          : isTeamB
+                            ? selectedMatchTeamBShortName
+                            : "Jogo";
+
+                        return (
+                          <div
+                            key={event.id}
+                            className="timeline-row-beauty"
+                            style={{
+                              display: "flex",
+                              justifyContent: rowJustify,
+                              marginBottom: "6px",
+                            }}
+                          >
+                            <div
+                              className={`timeline-item-beauty ${isTeamA ? "timeline-team-a" : ""} ${isTeamB ? "timeline-team-b" : ""} ${isGeneral ? "timeline-neutral" : ""}`}
+                              style={{ ...styles.timelineItem, width: cardWidth }}
+                            >
+                              {isBasketball && event.type === "goal" ? (
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                                    width: "100%",
+                                    gap: "6px",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {(() => {
+                                    const data = getBasketballEventData(event, selectedMatch);
+                                    return (
+                                      <>
+                                        {isTeamA ? (
+                                          <>
+                                            <span
+                                              style={{
+                                                fontSize: "13px",
+                                                fontWeight: 700,
+                                                color: "var(--text-primary)",
+                                              }}
+                                            >
+                                              {data.tempo}
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: "12px",
+                                                fontWeight: 800,
+                                                color: "var(--accent-color)",
+                                                textAlign: "center",
+                                              }}
+                                            >
+                                              {data.pontuacaoLabel}
+                                            </span>
+                                            <span
+                                              style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                justifyContent: "flex-end",
+                                                gap: "6px",
+                                                fontSize: "13px",
+                                                fontWeight: 800,
+                                                color: "var(--text-primary)",
+                                                textAlign: "right",
+                                              }}
+                                            >
+                                              <span>{data.placar}</span>
+                                              <span
+                                                style={{
+                                                  width: "3px",
+                                                  height: "14px",
+                                                  borderRadius: "999px",
+                                                  background: "#3b82f6",
+                                                }}
+                                              />
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span
+                                              style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: "6px",
+                                                fontSize: "13px",
+                                                fontWeight: 800,
+                                                color: "var(--text-primary)",
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  width: "3px",
+                                                  height: "14px",
+                                                  borderRadius: "999px",
+                                                  background: "#ef4444",
+                                                }}
+                                              />
+                                              <span>{data.placar}</span>
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: "12px",
+                                                fontWeight: 800,
+                                                color: "var(--accent-color)",
+                                                textAlign: "center",
+                                              }}
+                                            >
+                                              {data.pontuacaoLabel}
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: "13px",
+                                                fontWeight: 700,
+                                                color: "var(--text-primary)",
+                                                textAlign: "right",
+                                              }}
+                                            >
+                                              {data.tempo}
+                                            </span>
+                                          </>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              ) : (
+                                <>
+                                  {!isSetSport && !isNoTimerSport && !isSwimming && (
+                                    <span style={styles.eventTimePill}>
+                                      {formatClock(event.minute)}
+                                    </span>
+                                  )}
+                                  <span style={styles.eventIconBubble}>
+                                    {getEventIcon(event.type, {
+                                      isBasketball,
+                                      isBeachTennis,
+                                      isVolleyball,
+                                      isTamboreu,
+                                      isKarate,
+                                      isJudo,
+                                    })}
+                                  </span>
+                                  <div
+                                    style={{
+                                      ...styles.eventContentWrap,
+                                      textAlign: isTeamB
+                                        ? "right"
+                                        : isGeneral
+                                          ? "center"
+                                          : "left",
+                                    }}
+                                  >
+                                    <span style={styles.eventText}>
+                                      {getEventLabel(event, {
+                                        selectedMatch,
+                                        isBasketball,
+                                        isHandebol,
+                                        isFutebolX1,
+                                        isFutsal,
+                                        isFutebolSociety,
+                                        isBeachTennis,
+                                        isVolleyball,
+                                        isTamboreu,
+                                        isKarate,
+                                        isJudo,
+                                        isSwimming,
+                                      })}
+                                    </span>
+                                    {event.timelineScore && !isBasketball && (
+                                      <span
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "var(--accent-color)",
+                                          marginLeft: "8px",
+                                          fontWeight: 700,
+                                          background: "rgba(227, 6, 19, 0.1)",
+                                          padding: "2px 6px",
+                                          borderRadius: "4px",
+                                        }}
+                                      >
+                                        {event.timelineScore}
+                                      </span>
+                                    )}
+                                    {event.teamId && !isBasketball && (
+                                      <span style={styles.eventMetaTag}>
+                                        {shortTeamName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Modal de Seleção de Jogador — fora do wrapper para funcionar durante a disputa */}
+            {showPlayerInput && selectedMatch && (
+              <div style={styles.modal}>
+                <div style={styles.modalContentLarge}>
+                  <h3 style={styles.modalTitle}>
+                    {showPlayerInput.type === "goal" && (
+                      isBasketball
+                        ? `🏀 +${showPlayerInput.points} Ponto${(showPlayerInput.points ?? 1) > 1 ? "s" : ""} — Quem converteu?`
+                        : isKarate || isJudo ? "🥋 Quem pontuou?" : "⚽ Quem fez o gol?"
+                    )}
+                    {showPlayerInput.type === "yellow_card" && "🟨 Cartão Amarelo"}
+                    {showPlayerInput.type === "red_card" && "🟥 Cartão Vermelho"}
+                    {showPlayerInput.type === "penalty_scored" && (
+                      showPlayerInput.isShootout ? "🎯 Quem cobrou o pênalti?" : "🎯 Pênalti Marcado"
+                    )}
+                    {showPlayerInput.type === "penalty_missed" && showPlayerInput.isShootout && "❌ Quem cobrou (e perdeu)?"}
+                  </h3>
+                  <div style={styles.modalSubtitle}>
+                    {showPlayerInput.team === "A"
+                      ? selectedMatch.teamA.name
+                      : selectedMatch.teamB.name}
+                  </div>
+                  {(() => {
+                    const team =
+                      showPlayerInput.team === "A"
+                        ? selectedMatch.teamA
+                        : selectedMatch.teamB;
+                    const availableAthletes = athletes.filter((a) =>
+                      athleteMatchesTeamAndMatch(a, team),
+                    );
+                    const isShootoutModal = showPlayerInput.isShootout;
+                    // Jogadores já utilizados nesta disputa para este time
+                    const usedPlayers = showPlayerInput.team === "A"
+                      ? shootoutStats.usedPlayersA
+                      : shootoutStats.usedPlayersB;
+                    // Ordena: disponíveis primeiro, já utilizados por último
+                    const sortedAthletes = isShootoutModal
+                      ? [...availableAthletes].sort((a, b) => {
+                        const nameA = `${a.firstName} ${a.lastName}`;
+                        const nameB = `${b.firstName} ${b.lastName}`;
+                        const usedA = usedPlayers.includes(nameA);
+                        const usedB = usedPlayers.includes(nameB);
+                        if (usedA === usedB) return 0;
+                        return usedA ? 1 : -1;
+                      })
+                      : availableAthletes;
+                    return (
+                      <div style={styles.playerList} className="player-list">
+                        {sortedAthletes.map((athlete) => {
+                          const playerName = `${athlete.firstName} ${athlete.lastName}`;
+                          const stats = getPlayerStats(playerName);
+                          const alreadyUsed = isShootoutModal && usedPlayers.includes(playerName);
+                          // Pode cobrar se: não expulso. Se já usou, pode repetir só se todos já cobram
+                          const allUsed = isShootoutModal && availableAthletes.every(a => usedPlayers.includes(`${a.firstName} ${a.lastName}`));
+                          const canAct = isShootoutModal
+                            ? !stats.redCards && (!alreadyUsed || allUsed)
+                            : stats.canPlay;
+                          return (
+                            <button
+                              key={athlete.id}
+                              className={canAct ? "player-item-hover" : ""}
+                              style={{
+                                ...styles.playerItem,
+                                ...(canAct ? {} : styles.playerItemDisabled),
+                              }}
+                              onClick={() => canAct && confirmPlayerEvent(playerName)}
+                              disabled={!canAct}
+                            >
+                              <span style={styles.playerName}>{playerName}</span>
+                              <div style={styles.playerStats}>
+                                {isShootoutModal && alreadyUsed && !allUsed && (
+                                  <span style={{ ...styles.statBadge, color: '#f59e0b' }}>já cobrou</span>
+                                )}
+                                {stats.redCards > 0 && (
+                                  <span style={styles.statBadgeRed}>🟥 EXPULSO</span>
+                                )}
+                                {!isShootoutModal && stats.yellowCards > 0 && (
+                                  <span style={styles.statBadge}>🟨 {stats.yellowCards}</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {sortedAthletes.length === 0 && (
+                          <div style={{ textAlign: "center", padding: "20px", color: "var(--text-secondary)" }}>
+                            Nenhum atleta encontrado para esta modalidade e sexo nesta equipe.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <button
+                    style={{ ...styles.modalBtn, ...styles.cancelBtn, marginTop: "16px" }}
+                    onClick={cancelPlayerInput}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal seletor de jogador para ponto no Vôlei de Praia */}
+        {beachPointPicker && selectedMatch && (() => {
+          const team = beachPointPicker.team;
+          const teamObj = team === "A" ? selectedMatch.teamA : selectedMatch.teamB;
+          const teamColor = team === "A" ? "#3b82f6" : "#ef4444";
+          const availableAthletes = athletes.filter((a) => athleteMatchesTeamAndMatch(a, teamObj, selectedMatch));
+          return (
+            <div
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 }}
+              onClick={() => setBeachPointPicker(null)}
+            >
+              <div
+                style={{ background: "var(--bg-card)", borderRadius: "14px", padding: "24px", minWidth: "280px", maxWidth: "360px", width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: teamColor, marginBottom: "4px" }}>
+                    🏐 Ponto — {getTeamShortName(teamObj)}
+                  </div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>
+                    Quem fez o ponto?
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto" }}>
+                  {availableAthletes.length === 0 ? (
+                    <div style={{ color: "var(--text-secondary)", fontSize: "13px", textAlign: "center", padding: "12px 0" }}>
+                      Nenhum atleta cadastrado para este time.
+                    </div>
+                  ) : (
+                    availableAthletes.map((athlete) => {
+                      const name = `${athlete.firstName} ${athlete.lastName}`;
+                      return (
+                        <button
+                          key={athlete.id}
+                          style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${teamColor}44`, borderRadius: "8px", padding: "10px 14px", color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}
+                          onMouseOver={(e) => (e.currentTarget.style.background = `${teamColor}22`)}
+                          onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                          onClick={() => {
+                            setBeachPointPicker(null);
+                            handleVolleyPointWithPlayer(team, name);
+                          }}
+                        >
+                          {name}
+                        </button>
+                      );
+                    })
+                  )}
+                  <button
+                    style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "10px 14px", color: "var(--text-secondary)", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}
+                    onClick={() => {
+                      setBeachPointPicker(null);
+                      handleVolleyPointWithPlayer(team, null);
+                    }}
+                  >
+                    Registrar sem jogador
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
-    </div >
+          );
+        })()}
+      </div>
+    </div>
   );
 };
 
