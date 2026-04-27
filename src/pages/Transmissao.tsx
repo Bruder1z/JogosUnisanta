@@ -2,7 +2,6 @@ import { type FC, useState } from 'react';
 import Header from '../components/Navigation/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
-import LiveChat from '../components/Chat/LiveChat';
 
 const Transmissao: FC = () => {
     const [showRanking, setShowRanking] = useState(false);
@@ -15,7 +14,7 @@ const Transmissao: FC = () => {
                     <div style={{ marginBottom: '40px' }}>
                         <h1 style={{ fontSize: '36px', fontWeight: 800, marginBottom: '20px', color: 'var(--text-primary)' }}>Transmissão</h1>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '20px', alignItems: 'start' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', alignItems: 'start' }}>
                             {/* Vídeo */}
                             <div className="premium-card hover-glow" style={{ padding: '40px', lineHeight: 1.8, color: 'var(--text-secondary)', fontSize: '16px' }}>
                                 <p style={{ marginBottom: '20px', fontSize: '18px', fontWeight: 500 }}>
@@ -46,11 +45,6 @@ const Transmissao: FC = () => {
                                         allowFullScreen>
                                     </iframe>
                                 </div>
-                            </div>
-
-                            {/* Chat */}
-                            <div style={{ height: '500px' }}>
-                                <LiveChat matchId="transmissao-geral" />
                             </div>
                         </div>
                     </div>

@@ -18,7 +18,7 @@ import {
 import { type MatchMvpCandidateInput, useData } from "../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import PlayerStats from "./PlayerStats";
-import LiveChat from "../Chat/LiveChat";
+
 
 interface MatchModalProps {
   match: Match;
@@ -35,7 +35,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   } = useData();
   const { user, openLoginModal } = useAuth();
   const [currentMatch, setCurrentMatch] = useState<Match>(initialMatch);
-  const [showChat, setShowChat] = useState(false);
   const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [isSavingMvpCandidates, setIsSavingMvpCandidates] = useState(false);
   const [mvpCandidatesLoadError, setMvpCandidatesLoadError] = useState<string | null>(null);
@@ -44,6 +43,9 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const [isMvpVotingActive, setIsMvpVotingActive] = useState(false);
   const [mvpVotingSecondsRemaining, setMvpVotingSecondsRemaining] = useState(60);
   const attemptedMvpSeedMatchIdsRef = useRef<Set<string>>(new Set());
+  
+  // Estado para animação de gol/ponto
+  const [scoreFlashTeam, setScoreFlashTeam] = useState<'A' | 'B' | null>(null);
 
   // ── Timer ao vivo sincronizado com o admin ───────────────────────────────
   // Estratégia:
@@ -117,6 +119,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     const eventTs = getEventTs(lastControlEvent.id);
     if (eventTs > 0) {
       const elapsedSinceEvent = Math.floor((Date.now() - eventTs) / 1000);
+      
+      // Proteção: se elapsed for negativo ou muito grande (>2h), algo está errado
+      if (elapsedSinceEvent < 0 || elapsedSinceEvent > 7200) {
+        console.warn('Timer dessincroni zado: elapsed =', elapsedSinceEvent, 'eventTs =', eventTs);
+        return { seconds: savedMinute, paused: false };
+      }
+      
       const current = isTimerCountdown
         ? Math.max(0, savedMinute - elapsedSinceEvent)
         : savedMinute + elapsedSinceEvent;
@@ -135,9 +144,13 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   }, [
     currentMatch.id,
     currentMatch.status,
-    currentMatch.events?.length,
-    // Re-sincroniza quando o último evento muda (pausa/retomada)
-    currentMatch.events?.[currentMatch.events.length - 1]?.id,
+    // Re-sincroniza apenas quando eventos de controle de timer mudam
+    (() => {
+      const controlEvents = currentMatch.events?.filter(e => 
+        e.type === "pause" || e.type === "resume" || e.type === "start" || e.type === "halftime"
+      ) || [];
+      return controlEvents.length > 0 ? controlEvents[controlEvents.length - 1]?.id : null;
+    })(),
   ]);
 
   // Tick local de 1 segundo — só corre quando não está pausado
@@ -153,6 +166,40 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatch.status, isTimerCountdown, timerPaused, liveTimerSeconds !== null]);
+
+  // Re-sincronização periódica a cada 10 segundos para corrigir desvios
+  useEffect(() => {
+    if (liveTimerSeconds === null || currentMatch.status !== "live" || timerPaused) return;
+    
+    const syncInterval = window.setInterval(() => {
+      const { seconds } = calcSyncedTimer(currentMatch);
+      if (seconds !== null && Math.abs(seconds - liveTimerSeconds) > 2) {
+        // Se a diferença for maior que 2 segundos, re-sincroniza
+        console.log('Re-sincronizando timer: esperado =', seconds, 'atual =', liveTimerSeconds);
+        setLiveTimerSeconds(seconds);
+      }
+    }, 10000); // A cada 10 segundos
+    
+    return () => clearInterval(syncInterval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMatch.status, timerPaused, liveTimerSeconds]);
+
+  // Detectar mudança no placar e ativar animação
+  const prevScoreRef = useRef({ scoreA: currentMatch.scoreA, scoreB: currentMatch.scoreB });
+  useEffect(() => {
+    const prevScoreA = prevScoreRef.current.scoreA;
+    const prevScoreB = prevScoreRef.current.scoreB;
+    
+    if (currentMatch.scoreA > prevScoreA) {
+      setScoreFlashTeam('A');
+      setTimeout(() => setScoreFlashTeam(null), 4000);
+    } else if (currentMatch.scoreB > prevScoreB) {
+      setScoreFlashTeam('B');
+      setTimeout(() => setScoreFlashTeam(null), 4000);
+    }
+    
+    prevScoreRef.current = { scoreA: currentMatch.scoreA, scoreB: currentMatch.scoreB };
+  }, [currentMatch.scoreA, currentMatch.scoreB]);
 
   const formatLiveTimer = (totalSeconds: number): string => {
     const m = Math.floor(totalSeconds / 60);
@@ -1331,7 +1378,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
           alignItems: "stretch",
           justifyContent: "center",
           width: "100%",
-          maxWidth: showChat ? "960px" : "600px",
+          maxWidth: "600px",
           height: "fit-content",
           maxHeight: "80vh",
           gap: "16px",
@@ -1449,7 +1496,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                           color: "var(--text-primary)",
                         }}
                       >
-                        <span>
+                        <span className={scoreFlashTeam === 'A' ? 'score-flash-red' : ''}>
                           {isBeachTennis
                             ? beachLiveState.setsA
                             : currentMatch.scoreA}
@@ -1463,7 +1510,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                         >
                           X
                         </span>
-                        <span>
+                        <span className={scoreFlashTeam === 'B' ? 'score-flash-red' : ''}>
                           {isBeachTennis
                             ? beachLiveState.setsB
                             : currentMatch.scoreB}
@@ -1678,25 +1725,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 </button>
               )}
 
-              <button
-                onClick={() => setShowChat((v) => !v)}
-                style={{
-                  background: showChat ? "var(--accent-color)" : "var(--bg-hover)",
-                  border: "none",
-                  color: showChat ? "#fff" : "var(--text-secondary)",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "background 0.2s, color 0.2s",
-                }}
-                title={showChat ? "Fechar chat" : "Abrir chat da partida"}
-              >
-                <span role="img" aria-label="Chat">💬</span>
-              </button>
             </div>
           </div>
 
@@ -2709,26 +2737,6 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             )}
           </div>
         </div>
-
-        {/* Chat lateral */}
-        {showChat && (
-          <div
-            style={{
-              width: "340px",
-              minWidth: "340px",
-              background: "var(--bg-card)",
-              borderRadius: "12px",
-              boxShadow: "0 2px 16px rgba(0,0,0,0.15)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              animation: "modalSlideUp 0.3s ease-out",
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <LiveChat matchId={currentMatch.id} />
-          </div>
-        )}
       </div>
 
       {/* Player Stats Modal */}
@@ -2744,6 +2752,17 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+        
+        @keyframes scoreFlashRed {
+            0%, 100% { color: var(--text-primary); }
+            25%, 75% { color: #ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+            50% { color: #dc2626; text-shadow: 0 0 30px rgba(220, 38, 38, 1); }
+        }
+        
+        .score-flash-red {
+            animation: scoreFlashRed 0.5s ease-in-out 8;
+        }
+        
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }

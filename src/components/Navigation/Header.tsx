@@ -97,12 +97,7 @@ const Header: FC = () => {
                             color: isActive('/bolao') ? 'var(--text-primary)' : 'var(--text-secondary)',
                             textDecoration: 'none',
                             transition: 'color 0.2s'
-                        }}>Bolão</Link>
-                        <Link to="/torcida" style={{
-                            color: isActive('/torcida') ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            textDecoration: 'none',
-                            transition: 'color 0.2s'
-                        }}>Comunidade</Link>
+                        }}>Palpitômetro</Link>
                         {user?.role === 'superadmin' && (
                             <Link to="/controle-partida" style={{
                                 color: isActive('/controle-partida') ? 'var(--text-primary)' : 'var(--text-secondary)',

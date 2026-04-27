@@ -414,7 +414,7 @@ const Estatisticas: FC = () => {
             });
         });
 
-        const topScorers = Object.values(goalMap)
+        let topScorers = Object.values(goalMap)
             .map(p => {
                 const games = Math.max(p.gamesSet.size, 1);
                 return {
@@ -425,7 +425,11 @@ const Estatisticas: FC = () => {
                     games,
                     ppg: p.goals / games,
                 };
-            })
+            });
+        
+        if (courseFilter) topScorers = topScorers.filter(p => p.course === courseFilter);
+        
+        topScorers = topScorers
             .sort((a, b) => isBasqueteMemo ? (b.ppg - a.ppg) || (b.goals - a.goals) : b.goals - a.goals)
             .slice(0, 20);
 
@@ -568,7 +572,7 @@ const Estatisticas: FC = () => {
             });
         }
         const swimTopTimes = Object.values(swimTimesMap)
-            .filter(t => t.timeMs !== Infinity)
+            .filter(t => t.timeMs !== Infinity && (!courseFilter || t.course === courseFilter))
             .sort((a, b) => a.timeMs - b.timeMs)
             .slice(0, 20);
 
@@ -599,6 +603,7 @@ const Estatisticas: FC = () => {
                 }
             });
             const medalTable = Object.values(medalMap)
+                .filter(e => !courseFilter || e.course === courseFilter)
                 .map(e => ({ ...e, total: e.gold * 3 + e.silver * 2 + e.bronze }))
                 .sort((a, b) => b.gold - a.gold || b.silver - a.silver || b.bronze - a.bronze)
                 .slice(0, 20);
@@ -622,6 +627,7 @@ const Estatisticas: FC = () => {
                 });
             });
             const topKarateScorers = Object.values(scorerMap)
+                .filter(s => !courseFilter || s.course === courseFilter)
                 .map(s => ({ ...s, total: s.yuko + s.wazaAri * 2 + s.ippon * 3 }))
                 .sort((a, b) => b.total - a.total)
                 .slice(0, 20);
@@ -642,7 +648,10 @@ const Estatisticas: FC = () => {
                     }
                 });
             });
-            const topIppons = Object.values(ipponMap).sort((a, b) => b.ippons - a.ippons).slice(0, 20);
+            const topIppons = Object.values(ipponMap)
+                .filter(i => !courseFilter || i.course === courseFilter)
+                .sort((a, b) => b.ippons - a.ippons)
+                .slice(0, 20);
 
             // Vantagem Senshu por curso
             const senshuMap: Record<string, { course: string; faculty: string; senshu: number }> = {};
@@ -656,7 +665,10 @@ const Estatisticas: FC = () => {
                     senshuMap[course].senshu++;
                 });
             });
-            const topSenshu = Object.values(senshuMap).sort((a, b) => b.senshu - a.senshu).slice(0, 20);
+            const topSenshu = Object.values(senshuMap)
+                .filter(s => !courseFilter || s.course === courseFilter)
+                .sort((a, b) => b.senshu - a.senshu)
+                .slice(0, 20);
 
             karateStats = { medalTable, topScorers: topKarateScorers, topIppons, topSenshu };
         }
@@ -697,6 +709,7 @@ const Estatisticas: FC = () => {
                 }
             });
             const topFinishers = Object.values(ipponPlayerMap)
+                .filter(p => !courseFilter || p.course === courseFilter)
                 .sort((a, b) => b.ippons - a.ippons || b.wazaAri - a.wazaAri)
                 .slice(0, 20);
 
@@ -721,7 +734,10 @@ const Estatisticas: FC = () => {
                     }
                 });
             });
-            const topTech = Object.values(techMap).sort((a, b) => b.score - a.score).slice(0, 20);
+            const topTech = Object.values(techMap)
+                .filter(t => !courseFilter || t.course === courseFilter)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 20);
 
             // Card 3 — Índice de Disciplina (menos Shidos)
             const shidoMap: Record<string, { course: string; faculty: string; shidos: number }> = {};
@@ -739,7 +755,10 @@ const Estatisticas: FC = () => {
                     shidoMap[course].shidos += evt.type === 'hansoku_make' ? 3 : 1;
                 });
             });
-            const topDiscipline = Object.values(shidoMap).sort((a, b) => a.shidos - b.shidos).slice(0, 20);
+            const topDiscipline = Object.values(shidoMap)
+                .filter(s => !courseFilter || s.course === courseFilter)
+                .sort((a, b) => a.shidos - b.shidos)
+                .slice(0, 20);
 
             judoStats = { topFinishers, topTech, topDiscipline };
         }

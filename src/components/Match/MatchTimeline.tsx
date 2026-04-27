@@ -10,12 +10,14 @@ import {
   Filter,
   PlusCircle,
   Trophy,
-  MessageCircle,
   ChevronLeft,
   Trash2,
+  Edit,
+  Check,
+  X,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import LiveChat from "../Chat/LiveChat";
+
 import {
   type Match,
   type MatchEvent,
@@ -278,7 +280,11 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
   } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [isNewMatchOpen, setIsNewMatchOpen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  
+  // Estados para edição de eventos
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingPlayerName, setEditingPlayerName] = useState<string>("");
+  
   // Shoot-out obrigatório pendente (Futebol X1 — 2º amarelo)
   const [pendingShootout, setPendingShootout] = useState<{
     teamId: string;
@@ -1086,6 +1092,86 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
     };
     updateMatch(updatedMatch);
     return updatedMatch;
+  };
+
+  // ─── Deletar Evento ───────────────────────────────────────────────────────
+  const deleteEvent = async (eventId: string) => {
+    if (!selectedMatch || !selectedMatch.events) return;
+    
+    const eventToDelete = selectedMatch.events.find(e => e.id === eventId);
+    if (!eventToDelete) return;
+
+    const updatedEvents = selectedMatch.events.filter(e => e.id !== eventId);
+    
+    // Recalcular pontuação baseado no tipo de esporte
+    let newScoreA = 0;
+    let newScoreB = 0;
+    
+    const isSetSport = ["Vôlei", "Vôlei de Praia", "Beach Tennis"].includes(selectedMatch.sport);
+    
+    if (isSetSport) {
+      // Para esportes com sets, contar eventos set_win
+      updatedEvents.forEach(event => {
+        if (event.type === "set_win") {
+          if (event.teamId === selectedMatch.teamA.id) {
+            newScoreA += 1;
+          } else if (event.teamId === selectedMatch.teamB.id) {
+            newScoreB += 1;
+          }
+        }
+      });
+    } else {
+      // Para esportes com gols/pontos diretos
+      updatedEvents.forEach(event => {
+        if (event.type === "goal" || event.type === "penalty_scored" || event.type === "shootout_scored") {
+          if (event.teamId === selectedMatch.teamA.id) {
+            newScoreA += 1;
+          } else if (event.teamId === selectedMatch.teamB.id) {
+            newScoreB += 1;
+          }
+        }
+      });
+    }
+
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      events: updatedEvents,
+      scoreA: newScoreA,
+      scoreB: newScoreB,
+    };
+
+    await updateMatch(updatedMatch);
+    showNotification("✓ Evento deletado com sucesso!", "success");
+  };
+
+  // ─── Editar Jogador do Evento ───────────────────────────────────────────────
+  const editEventPlayer = async (eventId: string, newPlayerName: string) => {
+    if (!selectedMatch || !selectedMatch.events) return;
+    
+    const updatedEvents = selectedMatch.events.map(event => {
+      if (event.id === eventId) {
+        // Atualizar o nome do jogador na descrição também
+        let newDescription = event.description;
+        if (event.player && newDescription) {
+          newDescription = newDescription.replace(event.player, newPlayerName);
+        }
+        
+        return {
+          ...event,
+          player: newPlayerName,
+          description: newDescription,
+        };
+      }
+      return event;
+    });
+
+    const updatedMatch: Match = {
+      ...selectedMatch,
+      events: updatedEvents,
+    };
+
+    await updateMatch(updatedMatch);
+    showNotification("✓ Jogador atualizado com sucesso!", "success");
   };
 
   // ─── Beach Tennis — lógica automática ───────────────────────────────────────
@@ -4442,7 +4528,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
 
   return (
     <div style={{ display: "flex", alignItems: "stretch", width: "100%", background: "var(--bg-main)" }}>
-      <div style={{ ...styles.container, flex: 1, minWidth: 0, paddingRight: showChat && activeMatchId ? "0" : "20px" }} className="match-timeline-root">
+      <div style={{ ...styles.container, flex: 1, minWidth: 0, paddingRight: "20px" }} className="match-timeline-root">
         <div style={{ ...styles.header, marginBottom: "20px" }}>
           <div
             className="match-timeline-header-row"
@@ -4465,26 +4551,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </button>
             </div>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              <button
-                onClick={() => setShowChat((v) => !v)}
-                style={{
-                  ...styles.resetBtn,
-                  background: showChat ? "var(--accent-color)" : "rgba(255,255,255,0.05)",
-                  color: showChat ? "#fff" : "var(--text-secondary)",
-                  borderColor: showChat ? "var(--accent-color)" : "var(--border-color)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  borderRadius: "8px",
-                  transition: "all 0.2s"
-                }}
-              >
-                <MessageCircle size={16} />
-                {showChat ? "Fechar Chat" : "Abrir Chat"}
-              </button>
-
               <button
                 style={styles.resetBtn}
                 className="reset-btn-hover"
@@ -6947,6 +7013,168 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                               </div>
                             </>
                           )}
+                          
+                          {/* Botões de Editar/Deletar para eventos com jogador */}
+                          {event.player && (event.type === "goal" || event.type === "penalty_scored" || event.type === "yellow_card" || event.type === "red_card") && (
+                            <div style={{
+                              display: "flex",
+                              gap: "6px",
+                              marginLeft: isTeamB ? "0" : "auto",
+                              marginRight: isTeamB ? "auto" : "0",
+                              marginTop: "8px",
+                            }}>
+                              {editingEventId === event.id ? (
+                                <>
+                                  <select
+                                    value={editingPlayerName}
+                                    onChange={(e) => setEditingPlayerName(e.target.value)}
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      border: "1px solid var(--border-color)",
+                                      background: "var(--bg-main)",
+                                      color: "var(--text-primary)",
+                                      fontSize: "12px",
+                                      flex: 1,
+                                      cursor: "pointer",
+                                    }}
+                                    autoFocus
+                                  >
+                                    <option value="">Selecione um atleta</option>
+                                    {(() => {
+                                      const teamObj = event.teamId === selectedMatch.teamA.id 
+                                        ? selectedMatch.teamA 
+                                        : selectedMatch.teamB;
+                                      
+                                      return athletes
+                                        .filter(athlete => athleteMatchesTeamAndMatch(athlete, teamObj))
+                                        .map(athlete => {
+                                          const fullName = `${athlete.firstName} ${athlete.lastName}`;
+                                          return (
+                                            <option key={athlete.id} value={fullName}>
+                                              {fullName}
+                                            </option>
+                                          );
+                                        });
+                                    })()}
+                                  </select>
+                                  <button
+                                    onClick={() => {
+                                      if (editingPlayerName.trim()) {
+                                        editEventPlayer(event.id, editingPlayerName.trim());
+                                        setEditingEventId(null);
+                                        setEditingPlayerName("");
+                                      }
+                                    }}
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      border: "none",
+                                      background: "#22c55e",
+                                      color: "white",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      fontSize: "12px",
+                                    }}
+                                    title="Salvar"
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingEventId(null);
+                                      setEditingPlayerName("");
+                                    }}
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      border: "none",
+                                      background: "var(--bg-hover)",
+                                      color: "var(--text-secondary)",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      fontSize: "12px",
+                                    }}
+                                    title="Cancelar"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingEventId(event.id);
+                                      setEditingPlayerName(event.player || "");
+                                    }}
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      border: "1px solid var(--border-color)",
+                                      background: "var(--bg-hover)",
+                                      color: "var(--text-secondary)",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      fontSize: "11px",
+                                      transition: "all 0.2s",
+                                    }}
+                                    title="Editar jogador"
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)";
+                                      e.currentTarget.style.borderColor = "#3b82f6";
+                                      e.currentTarget.style.color = "#3b82f6";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = "var(--bg-hover)";
+                                      e.currentTarget.style.borderColor = "var(--border-color)";
+                                      e.currentTarget.style.color = "var(--text-secondary)";
+                                    }}
+                                  >
+                                    <Edit size={12} />
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Deletar evento: ${event.description}?`)) {
+                                        deleteEvent(event.id);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: "4px",
+                                      border: "1px solid var(--border-color)",
+                                      background: "var(--bg-hover)",
+                                      color: "var(--text-secondary)",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      fontSize: "11px",
+                                      transition: "all 0.2s",
+                                    }}
+                                    title="Deletar evento"
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
+                                      e.currentTarget.style.borderColor = "#ef4444";
+                                      e.currentTarget.style.color = "#ef4444";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = "var(--bg-hover)";
+                                      e.currentTarget.style.borderColor = "var(--border-color)";
+                                      e.currentTarget.style.color = "var(--text-secondary)";
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                    Deletar
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -7351,27 +7579,6 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
           )}
         </div>
       </div>
-
-      {
-        showChat && activeMatchId && (
-          <div
-            style={{
-              width: "360px",
-              minWidth: "360px",
-              background: "var(--bg-card)",
-              borderLeft: "1px solid var(--border-color)",
-              display: "flex",
-              flexDirection: "column",
-              height: "100vh",
-              position: "sticky",
-              top: 0,
-              overflow: "hidden"
-            }}
-          >
-            <LiveChat matchId={activeMatchId} />
-          </div>
-        )
-      }
 
       {/* Modal seletor de jogador para ponto no Vôlei de Praia */}
       {beachPointPicker && selectedMatch && (() => {
