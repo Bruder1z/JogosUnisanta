@@ -144,49 +144,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     const fetchData = async () => {
       if (isSavingRef.current) return; // Não sobrescreve o estado local enquanto uma gravação está em curso
       try {
-        // Fetch Matches
-        const { data: matchesData, error: matchesError } = await supabase
-          .from("matches")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (matchesData && !matchesError && !isSavingRef.current) {
-          const fetchedMatches = matchesData.map((m: any) => ({
-            id: m.id,
-            teamA: {
-              id: m.team_a_id,
-              name: m.team_a_name,
-              course: m.team_a_course,
-              faculty: m.team_a_faculty,
-            },
-            teamB: {
-              id: m.team_b_id,
-              name: m.team_b_name,
-              course: m.team_b_course,
-              faculty: m.team_b_faculty,
-            },
-            scoreA: m.score_a,
-            scoreB: m.score_b,
-            sport: m.sport,
-            category: m.category,
-            stage: m.stage,
-            status: m.status,
-            date: m.date,
-            time: m.time,
-            location: m.location,
-            events: m.events || [],
-            participants: m.participants || [],
-            mvpVotingStartedAt: m.mvp_voting_started_at || undefined,
-          }));
-          const fetchedIds = new Set(fetchedMatches.map((m: Match) => m.id));
-
-          setMatches((prev) => {
-            const pending = prev.filter(
-              (m) =>
-                pendingMatchIdsRef.current.has(m.id) && !fetchedIds.has(m.id),
-            );
-            return [...pending, ...fetchedMatches];
-          });
+        // Fetch Matches — via backend .NET (cache em memória, polling rápido)
+        if (!isSavingRef.current) {
+          const matchesRes = await fetch(`${import.meta.env.VITE_API_URL}/api/matches`);
+          if (matchesRes.ok) {
+            const matchesData: any[] = await matchesRes.json();
+            const fetchedMatches = matchesData.map((m: any) => ({
+              id: m.id,
+              teamA: {
+                id: m.teamAId,
+                name: m.teamAName,
+                course: m.teamACourse,
+                faculty: m.teamAFaculty,
+              },
+              teamB: {
+                id: m.teamBId,
+                name: m.teamBName,
+                course: m.teamBCourse,
+                faculty: m.teamBFaculty,
+              },
+              scoreA: m.scoreA,
+              scoreB: m.scoreB,
+              sport: m.sport,
+              category: m.category,
+              stage: m.stage,
+              status: m.status,
+              date: m.date,
+              time: m.time,
+              location: m.location,
+              events: m.events || [],
+              participants: m.participants || [],
+              mvpVotingStartedAt: m.mvpVotingStartedAt || undefined,
+            }));
+            const fetchedIds = new Set(fetchedMatches.map((m: Match) => m.id));
+            setMatches((prev) => {
+              const pending = prev.filter(
+                (m) => pendingMatchIdsRef.current.has(m.id) && !fetchedIds.has(m.id),
+              );
+              return [...pending, ...fetchedMatches];
+            });
+          }
         }
 
         // Fetch Courses — substitui completamente pelo banco (fonte da verdade)
@@ -607,42 +604,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     setCustomEmblems((prev) => ({ ...prev, [course]: base64 }));
   };
 
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const matchToPayload = (match: Match) => ({
+    id: match.id,
+    teamAId: match.teamA.id,
+    teamAName: match.teamA.name,
+    teamACourse: match.teamA.course,
+    teamAFaculty: match.teamA.faculty,
+    teamBId: match.teamB.id,
+    teamBName: match.teamB.name,
+    teamBCourse: match.teamB.course,
+    teamBFaculty: match.teamB.faculty,
+    scoreA: match.scoreA,
+    scoreB: match.scoreB,
+    sport: match.sport,
+    category: match.category,
+    stage: match.stage,
+    status: match.status,
+    date: match.date,
+    time: match.time,
+    location: match.location,
+    events: match.events || [],
+    participants: match.participants || [],
+    mvpVotingStartedAt: match.mvpVotingStartedAt || null,
+  });
+
   const addMatch = async (match: Match) => {
     pendingMatchIdsRef.current.add(match.id);
     setMatches((prev) => [match, ...prev]);
     setIsSaving(true);
 
     try {
-      const { error } = await supabase.from("matches").insert([
-        {
-          id: match.id,
-          team_a_id: match.teamA.id,
-          team_a_name: match.teamA.name,
-          team_a_course: match.teamA.course,
-          team_a_faculty: match.teamA.faculty,
-          team_b_id: match.teamB.id,
-          team_b_name: match.teamB.name,
-          team_b_course: match.teamB.course,
-          team_b_faculty: match.teamB.faculty,
-          score_a: match.scoreA,
-          score_b: match.scoreB,
-          sport: match.sport,
-          category: match.category,
-          stage: match.stage, // <-- Adicionado para salvar a fase
-          status: match.status,
-          date: match.date,
-          time: match.time,
-          location: match.location,
-          events: match.events || [],
-          participants: match.participants || [],
-        },
-      ]);
+      const res = await fetch(`${apiUrl}/api/matches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(matchToPayload(match)),
+      });
 
-      if (error) {
-        console.error("Error inserting match in Supabase:", error);
-        // Notifique o usuário no componente de tela, se necessário
-        // Exemplo: set um erro no estado e exiba no componente
-        // Aqui apenas loga o erro
+      if (!res.ok) {
+        console.error("Erro ao criar partida no backend:", await res.text());
         return;
       }
 
@@ -659,39 +660,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("matches")
-        .update({
-          score_a: updatedMatch.scoreA,
-          score_b: updatedMatch.scoreB,
-          status: updatedMatch.status,
-          date: updatedMatch.date,
-          time: updatedMatch.time,
-          location: updatedMatch.location,
-          events: updatedMatch.events || [],
-          participants: updatedMatch.participants || [],
-          stage: updatedMatch.stage,
-          mvp_voting_started_at: updatedMatch.mvpVotingStartedAt || null,
-        })
-        .match({ id: updatedMatch.id });
+      const res = await fetch(`${apiUrl}/api/matches/${updatedMatch.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(matchToPayload(updatedMatch)),
+      });
 
-      if (error) {
-        console.error("Error updating match in Supabase:", error);
+      if (!res.ok) {
+        console.error("Erro ao atualizar partida no backend:", await res.text());
       }
     } finally {
-      // Pequeno delay para garantir que o próximo fetch pegue os dados novos
       setTimeout(() => setIsSaving(false), 2000);
     }
   };
 
   const deleteMatch = async (id: string) => {
     setMatches((prev) => prev.filter((m) => m.id !== id));
-    await supabase.from("matches").delete().match({ id });
+    await fetch(`${apiUrl}/api/matches/${id}`, { method: "DELETE" });
   };
 
   const deleteScheduledMatches = async () => {
     setMatches((prev) => prev.filter((m) => m.status !== "scheduled"));
-    await supabase.from("matches").delete().eq("status", "scheduled");
+    await fetch(`${apiUrl}/api/matches/scheduled`, { method: "DELETE" });
   };
 
   const updateRankingPoints = useCallback(

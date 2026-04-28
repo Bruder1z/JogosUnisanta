@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"supabase\\\\\\\\.from\" /c/Users/unisanta/Desktop/JogosUnisanta/src --include=\"*.ts\" --include=\"*.tsx\")",
+      "Bash(dotnet new *)",
+      "Bash(dotnet add *)",
+      "Bash(rm \"c:\\\\Users\\\\unisanta\\\\Desktop\\\\JogosUnisanta\\\\backend\\\\WeatherForecast.cs\" \"c:\\\\Users\\\\unisanta\\\\Desktop\\\\JogosUnisanta\\\\backend\\\\Controllers\\\\WeatherForecastController.cs\")",
+      "Bash(dotnet build *)"
+    ]
+  }
+}
