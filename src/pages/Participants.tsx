@@ -73,22 +73,26 @@ const Participants: FC = () => {
     }, [searchTerm, courses]);
 
     const uniqueCourses = useMemo(() => {
-        const unique = new Set<string>(athletes.map(a => a.course));
+        const unique = new Set<string>();
+        courses.forEach(c => {
+            const parts = c.split(' - ');
+            if (parts.length > 0) unique.add(parts[0]);
+        });
         return Array.from(unique).sort((a, b) => a.localeCompare(b));
-    }, [athletes]);
+    }, [courses]);
 
     const uniqueInstitutions = useMemo(() => {
         const institutions = new Set<string>();
-        athletes.forEach(a => {
+        courses.forEach(c => {
             // Extract core institution name (e.g., Unisanta, Unisantos)
-            const parts = a.institution.split(' - ');
+            const parts = c.split(' - ');
             const core = parts.length > 1 ? parts[parts.length - 1] : parts[0];
             // Normalize variation (case-insensitive ESAMC -> Esamc)
             const normalizedCore = core.replace(/ESAMC/gi, 'Esamc');
             institutions.add(normalizedCore);
         });
         return Array.from(institutions).sort((a, b) => a.localeCompare(b));
-    }, [athletes]);
+    }, [courses]);
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>

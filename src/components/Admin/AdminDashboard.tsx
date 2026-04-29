@@ -23,6 +23,7 @@ const NORMALIZE_COURSE_MAP: Record<string, string> = {
   "ODONTO": "Odontologia",
   "ED. FIS.": "Educação Física",
   "ED. FÍSICA": "Educação Física",
+  "ED FISICA": "Educação Física",
   "SIST. INF.": "Sistemas de Informação",
   "SIST INF": "Sistemas de Informação",
   "SIST INFO": "Sistemas de Informação",
@@ -43,18 +44,30 @@ const NORMALIZE_COURSE_MAP: Record<string, string> = {
   "ENG": "Engenharia",
   "COMUNIC.": "Comunicação",
   "COMUNIC": "Comunicação",
+  "COMUNICAÇÃO": "Comunicação",
+  "COMMEX": "Comex",
+  "COMEX": "Comex",
+  "ANALI SIST": "Análise de Sistemas",
   "PSICO.": "Psicologia",
   "PSICO": "Psicologia",
   "ENFERM.": "Enfermagem",
   "BIOMED": "Biomedicina",
   "BIOLOG": "Biologia",
+  "BIOL": "Biologia",
   "CIEN. EDUC.": "Ciên. Educ.",
   "CIEN EDUC": "Ciên. Educ.",
   "CIEN. EDU.": "Ciên. Educ.",
   "CIEN. ED.": "Ciên. Educ.",
   "TEC. INF.": "Tec. Inf.",
   "TEC INF": "Tec. Inf.",
+  "TEC INFO": "Tec. Inf.",
   "ANAL. SIST.": "Análise de Sistemas",
+  "ANALIS. SIST.": "Análise de Sistemas",
+  "ANALIS SIST": "Análise de Sistemas",
+  "ANALISE SIST": "Análise de Sistemas",
+  "ANALIS": "Análise de Sistemas",
+  "CIEN. DADOS": "Ciência de Dados",
+  "CIEN DADOS": "Ciência de Dados",
   "FARMÁCIA": "Farmácia",
   "FARMACIA": "Farmácia",
   "FAAC": "FAAC",
@@ -63,10 +76,17 @@ const NORMALIZE_COURSE_MAP: Record<string, string> = {
   "FEFIS": "FEFIS",
   "REL.INT.": "Rel. Internacionais",
   "REL. INT.": "Rel. Internacionais",
+  "REL INT": "Rel. Internacionais",
+  "REL. INTERNACIONAIS": "Rel. Internacionais",
+  "TERAPIA OCUP": "Terapia Ocupacional",
+  "TERAPIA OCUP.": "Terapia Ocupacional",
+  "TERAP. OCUP.": "Terapia Ocupacional",
+  "TERAP OCUP": "Terapia Ocupacional",
   "NEG.": "Negócios",
   "NEGÓCIOS": "Negócios",
   "NEGOCIOS": "Negócios",
   "SAUDE": "Saúde",
+  "SAÚDDE": "Saúde",
   "SAÚDE": "Saúde",
   "BIOLOGIA": "Biologia"
 };
@@ -82,6 +102,7 @@ const NORMALIZE_INST_MAP: Record<string, string> = {
   "FPG": "FPG",
   "UNILUS": "Unilus",
   "UNOESTE": "Unoeste",
+  "FATEC": "Fatec",
   // São Judas — variantes
   "SÃO JUDAS": "São Judas",
   "SAO JUDAS": "São Judas",
@@ -2320,8 +2341,20 @@ const AdminDashboard: React.FC = () => {
                                         gap: '15px' 
                                     }}>
                                         {previewMatches.map((m, idx) => {
-                                            const emblemA = customEmblems[m.teamA.name] || (m.teamA.name in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[m.teamA.name]}` : null);
-                                            const emblemB = customEmblems[m.teamB.name] || (m.teamB.name in COURSE_EMBLEMS ? `/emblemas/${COURSE_EMBLEMS[m.teamB.name]}` : null);
+                                            // Fuzzy emblem lookup: exact key first, then partial match
+                                            const resolveEmblem = (teamName: string) => {
+                                                const custom = customEmblems[teamName];
+                                                if (custom) return custom;
+                                                if (teamName in COURSE_EMBLEMS) return `/emblemas/${COURSE_EMBLEMS[teamName]}`;
+                                                const nameUpper = teamName.toUpperCase();
+                                                const fuzzyKey = Object.keys(COURSE_EMBLEMS).find(k => {
+                                                    const ku = k.toUpperCase();
+                                                    return ku === nameUpper || nameUpper.includes(ku) || ku.includes(nameUpper);
+                                                });
+                                                return fuzzyKey ? `/emblemas/${COURSE_EMBLEMS[fuzzyKey]}` : null;
+                                            };
+                                            const emblemA = resolveEmblem(m.teamA.name);
+                                            const emblemB = resolveEmblem(m.teamB.name);
                                             
                                             return (
                                                 <div key={m.id || idx} className="premium-card" style={{ 

@@ -709,15 +709,26 @@ const Simulator: FC = () => {
                     <div style={{ marginBottom: '0', display: 'flex', flexDirection: 'column' }}>
                         {/* Title row */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <h1 style={{
-                                fontSize: '38px',
-                                fontWeight: 900,
-                                margin: 0,
-                                letterSpacing: '2px',
-                                color: 'white',
-                                textTransform: 'uppercase',
-                                lineHeight: 1,
-                            }}>PALPITÔMETRO</h1>
+                            <div>
+                                <h1 style={{
+                                    fontSize: '38px',
+                                    fontWeight: 900,
+                                    margin: 0,
+                                    letterSpacing: '2px',
+                                    color: 'white',
+                                    textTransform: 'uppercase',
+                                    lineHeight: 1,
+                                }}>PALPITÔMETRO</h1>
+                                <p style={{
+                                    fontSize: '14px',
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    marginTop: '8px',
+                                    fontWeight: 500,
+                                    margin: '8px 0 0 0'
+                                }}>
+                                    Dê seus palpites e divirta-se com os amigos — só pela diversão.
+                                </p>
+                            </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button
                                     onClick={() => setShowBolaoRanking(true)}
