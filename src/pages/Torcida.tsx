@@ -108,7 +108,7 @@ const CommentSection: FC<CommentSectionProps> = ({ postId, postAuthorId, onOpenL
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const isAdmin = user?.role === 'superadmin';
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const displayName = user ? [user.name, user.surname].filter(Boolean).join(' ') : undefined;
 
   const fetchComments = useCallback(async () => {
@@ -454,7 +454,7 @@ const Torcida: FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isAdmin = user?.role === 'superadmin';
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const displayName = user ? [user.name, user.surname].filter(Boolean).join(' ') : undefined;
 
   const fetchPosts = useCallback(async () => {

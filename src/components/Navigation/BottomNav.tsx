@@ -12,7 +12,7 @@ const BottomNav: FC = () => {
     const isActive = (path: string) => location.pathname === path;
 
     // Navegação diferente para Super Admin
-    const navItems = user?.role === 'superadmin' 
+    const navItems = (user?.role === 'superadmin' || user?.role === 'admin') 
         ? [
             { path: '/', icon: Home, label: 'Home' },
             { path: '/controle-partida', emoji: '⚙️', label: 'Controle' },

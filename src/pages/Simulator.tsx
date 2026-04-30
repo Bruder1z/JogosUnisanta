@@ -618,7 +618,7 @@ const Simulator: FC = () => {
                     {
                         league_id: leagueId,
                         user_email: user.email,
-                        user_name: user.role === 'superadmin' ? "Mestre" : (user.name || user.email.split('@')[0]),
+                        user_name: (user.role === 'superadmin' || user.role === 'admin') ? "Mestre" : (user.name || user.email.split('@')[0]),
                         status: 'pending'
                     }
                 ]);
@@ -1062,7 +1062,7 @@ const Simulator: FC = () => {
                                         name={league.name}
                                         description={league.description}
                                         participantsCount={league.participants?.length || 0}
-                                        isAdmin={league.owner_email === user?.email || user?.role === 'superadmin'}
+                                        isAdmin={league.owner_email === user?.email || user?.role === 'superadmin' || user?.role === 'admin'}
                                         onClick={() => setSelectedLeague(league)}
                                     />
                                 ))}

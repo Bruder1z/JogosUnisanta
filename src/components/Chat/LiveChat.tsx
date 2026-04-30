@@ -27,7 +27,7 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
     const storageKey = `chat_messages_${matchId}`;
 
     // Detecta se é super admin com segurança
-    const isAdmin = user && user.role === 'superadmin';
+    const isAdmin = user && (user.role === 'superadmin' || user.role === 'admin');
 
     const scrollToBottom = () => {
         if (chatContainerRef.current) {
@@ -141,7 +141,7 @@ const LiveChat: FC<LiveChatProps> = ({ matchId = 'live-geral' }) => {
 
         const senderName = user?.name || 'Torcedor(a)';
         const role = user?.role || 'user';
-        const isMsgAdmin = role === 'superadmin';
+        const isMsgAdmin = role === 'superadmin' || role === 'admin';
 
         const newMessage: ChatMessage = {
             id: Math.random().toString(36).substring(7),

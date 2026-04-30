@@ -42,7 +42,7 @@ const Home: React.FC = () => {
         const modalitiesParam = params.get('modalities');
         const viewParam = params.get('view');
 
-        if (viewParam === 'admin' && user?.role === 'superadmin') {
+        if (viewParam === 'admin' && (user?.role === 'superadmin' || user?.role === 'admin')) {
             setActiveView('admin');
             navigate(location.pathname, { replace: true });
             return;
@@ -131,7 +131,7 @@ const Home: React.FC = () => {
                 marginTop: 'var(--header-height)',
                 padding: 'var(--main-padding)',
             }}>
-                {user?.role === 'superadmin' && (
+                {(user?.role === 'superadmin' || user?.role === 'admin') && (
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
                         <button
                             onClick={() => setActiveView('admin')}
@@ -164,7 +164,7 @@ const Home: React.FC = () => {
                     </div>
                 )}
 
-                {activeView === 'admin' && user?.role === 'superadmin' ? (
+                {activeView === 'admin' && (user?.role === 'superadmin' || user?.role === 'admin') ? (
                     <AdminDashboard />
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'var(--home-grid-cols)', gap: '30px' }}>
@@ -349,7 +349,7 @@ const Home: React.FC = () => {
 
                         {/* Right Column: Mini Tables / Stats */}
                         <aside>
-                            {user?.role === 'superadmin' && (
+                            {(user?.role === 'superadmin' || user?.role === 'admin') && (
                                 <div className="premium-card" style={{ padding: '20px', marginBottom: '20px', border: '1px solid var(--accent-color)', background: 'rgba(227, 6, 19, 0.05)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontWeight: 800, fontSize: '14px', marginBottom: '15px' }}>
                                         <Trophy size={18} />

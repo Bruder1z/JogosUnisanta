@@ -14,7 +14,7 @@ const Header: FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [showProfile, setShowProfile] = useState(false);
-    const showAdminShortcut = user?.role === 'superadmin' && location.pathname !== '/';
+    const showAdminShortcut = (user?.role === 'superadmin' || user?.role === 'admin') && location.pathname !== '/';
 
     const isActive = (path: string) => location.pathname === path;
 
@@ -98,7 +98,7 @@ const Header: FC = () => {
                             textDecoration: 'none',
                             transition: 'color 0.2s'
                         }}>Palpitômetro</Link>
-                        {user?.role === 'superadmin' && (
+                        {(user?.role === 'superadmin' || user?.role === 'admin') && (
                             <Link to="/controle-partida" style={{
                                 color: isActive('/controle-partida') ? 'var(--text-primary)' : 'var(--text-secondary)',
                                 textDecoration: 'none',

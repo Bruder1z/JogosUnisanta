@@ -65,7 +65,7 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                 const userScores: Record<string, BolaoUserRanking> = {};
 
                 validUsers.forEach(u => {
-                    const isSuperAdmin = u.role === 'superadmin' || u.email === 'superadmin@gmail.com';
+                    const isSuperAdmin = u.role === 'superadmin' || u.role === 'admin' || u.email === 'superadmin@gmail.com';
                     userScores[u.email] = {
                         email: u.email,
                         name: isSuperAdmin ? "Mestre" : (u.name || u.email),

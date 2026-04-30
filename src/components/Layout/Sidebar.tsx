@@ -87,7 +87,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                             <span style={{ fontSize: '16px' }}>⚡</span>
                             <span className="sidebar-mobile-nav-label">Palpitômetro</span>
                         </Link>
-                        {user?.role === 'superadmin' && (
+                        {(user?.role === 'superadmin' || user?.role === 'admin') && (
                             <Link to="/controle-partida" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--accent-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s', fontWeight: 700 }}>
                                 <span className="sidebar-mobile-nav-label">Controle de Partida</span>
                             </Link>

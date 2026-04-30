@@ -18,9 +18,9 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ranking' | 'manage'>('ranking');
 
-    const isAdmin = league.owner_email === currentUser?.email || currentUser?.role === 'superadmin';
+    const isAdmin = league.owner_email === currentUser?.email || currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
     const isSpecialLeague = league.type === 'global' || league.type === 'course';
-    const canManage = currentUser?.role === 'superadmin' || league.owner_email === currentUser?.email;
+    const canManage = currentUser?.role === 'superadmin' || currentUser?.role === 'admin' || league.owner_email === currentUser?.email;
     const [leagueRequests, setLeagueRequests] = useState<any[]>([]);
 
     // States for editing
@@ -56,7 +56,7 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
 
                 const scores: Record<string, any> = {};
                 usersData.forEach(u => {
-                    const isSuperAdmin = u.role === 'superadmin' || u.email === 'superadmin@gmail.com';
+                    const isSuperAdmin = u.role === 'superadmin' || u.role === 'admin' || u.email === 'superadmin@gmail.com';
                     scores[u.email] = {
                         email: u.email,
                         name: isSuperAdmin ? "Mestre" : `${u.name} ${u.surname || ''}`.trim(),
