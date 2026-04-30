@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Trophy, Medal, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { X, Trophy, Medal } from 'lucide-react';
 import { COURSE_EMBLEMS, mockRanking } from '../../data/mockData';
 import { useData } from '../context/DataContext';
 
@@ -29,13 +29,7 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
         return foundCourse ? `/emblemas/${COURSE_EMBLEMS[foundCourse]}` : null;
     };
 
-    const getTrendIcon = (points: number, index: number) => {
-        // Mock trend logic based on points or random for visual
-        if (points > 100) return <span title="Subiu"><TrendingUp size={14} color="#10b981" /></span>;
-        if (points === 0) return <span title="Estável"><Minus size={14} color="var(--text-secondary)" /></span>;
-        if (index % 3 === 0) return <span title="Caiu"><TrendingDown size={14} color="#ef4444" /></span>;
-        return <span title="Subiu"><TrendingUp size={14} color="#10b981" /></span>;
-    };
+
 
     return (
         <div style={{

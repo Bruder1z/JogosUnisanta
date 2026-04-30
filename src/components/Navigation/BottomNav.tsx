@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Trophy, Grid, Users, Calendar, Zap, Settings } from 'lucide-react';
+import { Home, Grid, Users, Calendar, Zap, Settings } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -68,9 +68,7 @@ const BottomNav: FC = () => {
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        {item.emoji ? (
-                            <span style={{ fontSize: '22px', lineHeight: 1 }}>{item.emoji}</span>
-                        ) : item.icon && (
+                        {item.icon && (
                             <item.icon 
                                 size={22} 
                                 strokeWidth={isActive(item.path) ? 2.5 : 2}
