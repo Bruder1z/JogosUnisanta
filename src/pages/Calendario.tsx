@@ -43,35 +43,64 @@ const Calendario: FC = () => {
                     </div>
 
                     <section className="premium-card" style={{ padding: '30px', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '20px' }} className="calendar-page-head">
-                            <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }} className="calendar-page-head">
+                            <div style={{ flex: 1 }}>
                                 <h1 style={{ margin: 0, fontSize: '34px', lineHeight: 1.1, fontWeight: 900 }}>
                                     Calendario Oficial
                                 </h1>
                                 <p style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '15px' }}>
-                                    Jogos Unisanta 2025
+                                    Jogos Unisanta 2026
                                 </p>
+                                <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 12px',
+                                    borderRadius: '999px',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    marginTop: '12px'
+                                }}>
+                                    <CalendarDays size={14} /> 04 a 22 de maio de 2026
+                                </span>
                             </div>
-                            <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 12px',
-                                borderRadius: '999px',
-                                border: '1px solid var(--border-color)',
-                                color: 'var(--text-secondary)',
-                                fontSize: '13px',
-                                fontWeight: 700
-                            }}>
-                                <CalendarDays size={14} /> 04 a 22 de maio de 2026
-                            </span>
+                            <a
+                                href="/pdf/tabela-jogos-2026.pdf"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download="tabela-jogos-2026.pdf"
+                                onClick={() => {
+                                    console.log('Iniciando download da tabela oficial...');
+                                    console.log('Caminho tentado: /pdf/tabela-jogos-2026.pdf');
+                                }}
+                                className="calendar-download-btn"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    background: 'var(--accent-color)',
+                                    color: '#fff',
+                                    textDecoration: 'none',
+                                    padding: '12px 20px',
+                                    borderRadius: '10px',
+                                    fontWeight: 800,
+                                    fontSize: '14px',
+                                    boxShadow: '0 8px 20px rgba(227,6,19,0.28)',
+                                    whiteSpace: 'nowrap',
+                                    height: 'fit-content'
+                                }}
+                            >
+                                <Download size={18} /> Baixar tabela oficial (PDF)
+                            </a>
                         </div>
 
                         <div className="calendar-venues-grid" style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                            gap: '14px',
-                            marginBottom: '24px'
+                            gap: '14px'
                         }}>
                             {MAIN_VENUES.map((venue) => (
                                 <div key={venue} style={{
@@ -88,33 +117,6 @@ const Calendario: FC = () => {
                                 </div>
                             ))}
                         </div>
-
-                        <a
-                            href="/pdf/tabela-jogos-2026.pdf"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download="tabela-jogos-2026.pdf"
-                            onClick={() => {
-                                console.log('Iniciando download da tabela oficial...');
-                                console.log('Caminho tentado: /pdf/tabela-jogos-2026.pdf');
-                            }}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '10px',
-                                background: 'var(--accent-color)',
-                                color: '#fff',
-                                textDecoration: 'none',
-                                padding: '12px 20px',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '14px',
-                                boxShadow: '0 8px 20px rgba(227,6,19,0.28)'
-                            }}
-                        >
-                            <Download size={18} /> Baixar tabela oficial (PDF)
-                        </a>
                     </section>
                 </div>
             </main>
@@ -127,7 +129,12 @@ const Calendario: FC = () => {
 
                     .calendar-page-head {
                         flex-direction: column;
-                        align-items: flex-start !important;
+                        align-items: stretch !important;
+                    }
+
+                    .calendar-download-btn {
+                        width: 100%;
+                        justify-content: center !important;
                     }
 
                     .calendar-page-head h1 {
@@ -146,6 +153,11 @@ const Calendario: FC = () => {
 
                     .calendar-page-head h1 {
                         font-size: 24px !important;
+                    }
+
+                    .calendar-download-btn {
+                        font-size: 13px !important;
+                        padding: 10px 16px !important;
                     }
                 }
             `}</style>

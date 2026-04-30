@@ -5,6 +5,17 @@
   text-align: center;
 }
 
+/* Mobile bottom navigation spacing */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 70px;
+  }
+  
+  main, .main-content, .app-content {
+    padding-bottom: 70px;
+  }
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

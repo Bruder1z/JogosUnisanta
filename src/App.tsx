@@ -16,6 +16,7 @@ import { DataProvider } from './components/context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { NotificationProvider } from './components/NotificationContext';
 import Login from './pages/Login';
+import BottomNav from './components/Navigation/BottomNav';
 
 type ProtectedRouteProps = {
   children: ReactNode;
@@ -70,6 +71,7 @@ const AppContent = () => {
         <Route path="/torcida" element={<Torcida />} />
       </Routes>
       {isLoginModalOpen && <Login onClose={closeLoginModal} />}
+      <BottomNav />
     </>
   );
 };

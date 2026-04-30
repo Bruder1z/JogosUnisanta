@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { COURSE_EMBLEMS, COURSE_ICONS, AVAILABLE_SPORTS } from '../../data/mockData';
 import { useData } from '../context/DataContext';
+import Toast from './Toast';
 
 const NORMALIZE_COURSE_MAP: Record<string, string> = {
   "ODONTO": "Odontologia",
@@ -305,7 +306,7 @@ const AdminDashboard: React.FC = () => {
         teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino' as 'Masculino' | 'Feminino', stage: 'Fase de Classificação' as 'Fase de Classificação' | 'Fase Final', date: '', time: '', location: ''
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
-    const [notification, setNotification] = useState('');
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
     const [adminUsers, _setAdminUsers] = useState<any[]>([]);
     const [isPromoting, _setIsPromoting] = useState(false);
     const [promoteEmail, setPromoteEmail] = useState('');
@@ -327,19 +328,18 @@ const AdminDashboard: React.FC = () => {
         'Modalidades (separadas por "/")'
     ];
 
-    const showNotification = (msg: string) => {
-        setNotification(msg);
-        setTimeout(() => setNotification(''), 3000);
+    const showNotification = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+        setNotification({ message: msg, type });
     };
 
     const handleSaveNewMatch = () => {
         if (!newMatchForm.teamA || !newMatchForm.teamB || !newMatchForm.sport || !newMatchForm.time || !newMatchForm.location || !newMatchForm.date) {
-            showNotification('Preencha todos os campos!');
+            showNotification('Preencha todos os campos!', 'error');
             return;
         }
 
         if (newMatchForm.teamA === newMatchForm.teamB) {
-            showNotification('Uma equipe não pode enfrentar ela mesma!');
+            showNotification('Uma equipe não pode enfrentar ela mesma!', 'error');
             return;
         }
 
@@ -363,7 +363,7 @@ const AdminDashboard: React.FC = () => {
         addMatch(newMatch);
         setIsNewMatchOpen(false);
         setNewMatchForm({ teamA: '', facultyA: '', teamB: '', facultyB: '', sport: '', category: 'Masculino', stage: 'Fase de Classificação', date: '', time: '', location: '' });
-        showNotification("Partida criada com sucesso!");
+        showNotification("Partida criada com sucesso!", 'success');
     };
 
     const handleToggleStatus = (matchId: string) => {
@@ -390,13 +390,13 @@ const AdminDashboard: React.FC = () => {
             status: newStatus
         });
         setIsScoreOpen(false);
-        showNotification("Placar atualizado e finalizado!");
+        showNotification("Placar atualizado e finalizado!", 'success');
     };
 
     const handleDeleteMatch = (matchId: string) => {
         if (window.confirm('Tem certeza que deseja excluir esta partida?')) {
             deleteMatch(matchId);
-            showNotification("Partida excluída com sucesso!");
+            showNotification("Partida excluída com sucesso!", 'success');
         }
     };
 
@@ -900,9 +900,25 @@ const AdminDashboard: React.FC = () => {
 
     return (
         <div className="admin-dashboard-root" style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '30px' }}>
-                <h1 className="admin-page-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px' }}>Painel de Controle Super Admin</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Gerencie os Jogos Unisanta, equipes e resultados.</p>
+            <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 className="admin-page-title" style={{ fontSize: '32px', fontWeight: 900, marginBottom: '8px', background: 'linear-gradient(135deg, #fff 0%, var(--accent-color) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                        Painel Super Admin
+                    </h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Gerencie os Jogos Unisanta, equipes e resultados em tempo real.</p>
+                </div>
+                <div style={{
+                    padding: '12px 20px',
+                    background: 'rgba(227, 6, 19, 0.1)',
+                    border: '1px solid var(--accent-color)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                }}>
+                    <Shield size={20} color="var(--accent-color)" />
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-color)' }}>SUPER ADMIN</span>
+                </div>
             </div>
 
             {/* Stats Grid */}
@@ -911,23 +927,51 @@ const AdminDashboard: React.FC = () => {
                     <div
                         key={stat.label}
                         className="premium-card admin-stat-card"
-                        style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}
+                        style={{ 
+                            padding: '24px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '20px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = `0 12px 24px ${stat.color}30`;
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
                     >
                         <div style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '12px',
-                            background: `${stat.color}20`,
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            width: '100px',
+                            height: '100px',
+                            background: `radial-gradient(circle, ${stat.color}15 0%, transparent 70%)`,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '14px',
+                            background: `linear-gradient(135deg, ${stat.color}25 0%, ${stat.color}10 100%)`,
                             color: stat.color,
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            position: 'relative',
+                            zIndex: 1
                         }}>
                             {stat.icon}
                         </div>
-                        <div>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>{stat.label}</div>
-                            <div style={{ fontSize: '24px', fontWeight: 800 }}>{stat.value}</div>
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>{stat.label}</div>
+                            <div style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)' }}>{stat.value}</div>
                         </div>
                     </div>
                 ))}
@@ -955,30 +999,47 @@ const AdminDashboard: React.FC = () => {
                                 alignItems: 'center',
                                 gap: '12px',
                                 padding: '14px 18px',
-                                borderRadius: '8px',
+                                borderRadius: '10px',
                                 fontSize: '15px',
                                 fontWeight: activeTab === tab.id ? 700 : 500,
-                                background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
+                                background: activeTab === tab.id ? 'linear-gradient(135deg, var(--accent-color) 0%, #c10510 100%)' : 'transparent',
                                 color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)',
-                                transition: 'all 0.2s',
+                                transition: 'all 0.3s ease',
                                 textAlign: 'left',
-                                border: 'none',
+                                border: activeTab === tab.id ? 'none' : '1px solid transparent',
                                 cursor: 'pointer',
-                                outline: 'none'
+                                outline: 'none',
+                                position: 'relative',
+                                overflow: 'hidden'
                             }}
                             onMouseEnter={(e) => {
                                 if (activeTab !== tab.id) {
                                     e.currentTarget.style.background = 'var(--bg-hover)';
                                     e.currentTarget.style.color = 'var(--text-primary)';
+                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                    e.currentTarget.style.transform = 'translateX(4px)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 if (activeTab !== tab.id) {
                                     e.currentTarget.style.background = 'transparent';
                                     e.currentTarget.style.color = 'var(--text-secondary)';
+                                    e.currentTarget.style.borderColor = 'transparent';
+                                    e.currentTarget.style.transform = 'translateX(0)';
                                 }
                             }}
                         >
+                            {activeTab === tab.id && (
+                                <div style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: '4px',
+                                    background: '#fff',
+                                    borderRadius: '0 4px 4px 0'
+                                }} />
+                            )}
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -2007,20 +2068,11 @@ const AdminDashboard: React.FC = () => {
 
             {/* Notification Toast */}
             {notification && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '20px',
-                    right: '20px',
-                    background: '#0bb34c',
-                    color: 'white',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    zIndex: 9999,
-                    animation: 'slideInRight 0.3s ease-out'
-                }}>
-                    {notification}
-                </div>
+                <Toast
+                    message={notification.message}
+                    type={notification.type}
+                    onClose={() => setNotification(null)}
+                />
             )}
 
             {importStatus && (
