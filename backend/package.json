@@ -1,0 +1,28 @@
+{
+  "name": "jogosunisanta-backend",
+  "version": "1.0.0",
+  "description": "Backend Node.js com RabbitMQ para Jogos Unisanta",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "worker": "node src/workers/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.2",
+    "amqplib": "^0.10.4",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../services/supabaseClient';
+import { adminApi, coursesApi } from '../../services/api';
 import {
     Users,
     PlusCircle,
@@ -312,15 +312,11 @@ const AdminDashboard: React.FC = () => {
     const [promoteEmail, setPromoteEmail] = useState('');
 
     const fetchAdmins = async () => {
-        const { data, error } = await supabase
-            .from('users')
-            .select('id, name, surname, email, role')
-            .in('role', ['admin', 'superadmin']);
-        
-        if (error) {
-            console.error("Erro ao buscar admins:", error);
-        } else if (data) {
-            setAdminUsers(data);
+        try {
+            const data = await adminApi.getAdmins() as any[];
+            setAdminUsers(data ?? []);
+        } catch (err) {
+            console.error("Erro ao buscar admins:", err);
         }
     };
 
@@ -333,36 +329,15 @@ const AdminDashboard: React.FC = () => {
     const handlePromoteUser = async () => {
         if (!promoteEmail.trim()) return;
         setIsPromoting(true);
-        
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id, role')
-            .eq('email', promoteEmail.trim().toLowerCase())
-            .single();
-
-        if (userError || !userData) {
-            showNotification("Usuário não encontrado no sistema.");
-            setIsPromoting(false);
-            return;
-        }
-
-        if (userData.role === 'admin' || userData.role === 'superadmin') {
-            showNotification("Usuário já é um administrador.");
-            setIsPromoting(false);
-            return;
-        }
-
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ role: 'admin' })
-            .eq('id', userData.id);
-
-        if (updateError) {
-            showNotification("Erro ao promover usuário.");
-        } else {
-            showNotification("Usuário promovido com sucesso!");
+        try {
+            await adminApi.promote(promoteEmail.trim().toLowerCase());
+            showNotification("Usuário promovido com sucesso!", 'success');
             setPromoteEmail('');
             fetchAdmins();
+        } catch (err: any) {
+            if (err?.status === 404) showNotification("Usuário não encontrado no sistema.");
+            else if (err?.status === 409) showNotification("Usuário já é um administrador.");
+            else showNotification("Erro ao promover usuário.");
         }
         setIsPromoting(false);
     };
@@ -372,18 +347,13 @@ const AdminDashboard: React.FC = () => {
             showNotification("Não é possível remover um superadmin.");
             return;
         }
-        
         if (window.confirm("Tem certeza que deseja remover permissões deste administrador?")) {
-            const { error } = await supabase
-                .from('users')
-                .update({ role: 'cliente' })
-                .eq('id', id);
-                
-            if (error) {
-                showNotification("Erro ao remover permissões.");
-            } else {
-                showNotification("Permissões removidas com sucesso!");
+            try {
+                await adminApi.demote(id);
+                showNotification("Permissões removidas com sucesso!", 'success');
                 fetchAdmins();
+            } catch {
+                showNotification("Erro ao remover permissões.");
             }
         }
     };

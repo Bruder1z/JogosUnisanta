@@ -4,7 +4,7 @@ import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../components/NotificationContext';
-import { supabase } from '../services/supabaseClient';
+import { torcidaApi } from '../services/api';
 import { Heart, MessageCircle, Trash2, Send, Users, Lock, Megaphone, ImagePlus, X } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,48 +49,6 @@ const getInitial = (name: string) => name.charAt(0).toUpperCase();
 const sameId = (a: string | number | undefined, b: string | number | undefined) =>
   a !== undefined && b !== undefined && String(a) === String(b);
 
-// ── Helpers de notificação ────────────────────────────────────────────────────
-
-const insertNotification = async (
-  recipientId: string | number,
-  actorId: string | number,
-  actorName: string,
-  postId: string,
-  type: 'like' | 'comment' | 'new_post',
-) => {
-  // Não notifica a si mesmo
-  if (String(recipientId) === String(actorId)) return;
-  await supabase.from('torcida_notifications').insert([{
-    user_id: String(recipientId),
-    actor_name: actorName,
-    post_id: postId,
-    type,
-  }]);
-};
-
-const notifyAdmins = async (
-  actorId: string | number,
-  actorName: string,
-  postId: string,
-) => {
-  const { data: admins } = await supabase
-    .from('users')
-    .select('id')
-    .eq('role', 'superadmin');
-  if (!admins) return;
-  const inserts = admins
-    .filter((a: { id: string | number }) => String(a.id) !== String(actorId))
-    .map((a: { id: string | number }) => ({
-      user_id: String(a.id),
-      actor_name: actorName,
-      post_id: postId,
-      type: 'new_post',
-    }));
-  if (inserts.length > 0) {
-    await supabase.from('torcida_notifications').insert(inserts);
-  }
-};
-
 // ── CommentSection ────────────────────────────────────────────────────────────
 
 interface CommentSectionProps {
@@ -99,7 +57,7 @@ interface CommentSectionProps {
   onOpenLogin: () => void;
 }
 
-const CommentSection: FC<CommentSectionProps> = ({ postId, postAuthorId, onOpenLogin }) => {
+const CommentSection: FC<CommentSectionProps> = ({ postId, onOpenLogin }) => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
 
@@ -109,47 +67,39 @@ const CommentSection: FC<CommentSectionProps> = ({ postId, postAuthorId, onOpenL
   const [submitting, setSubmitting] = useState(false);
 
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
-  const displayName = user ? [user.name, user.surname].filter(Boolean).join(' ') : undefined;
 
   const fetchComments = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('torcida_comments')
-      .select('*')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
-    if (!error && data) setComments(data);
+    try {
+      const data = await torcidaApi.getComments(postId) as Comment[];
+      setComments(data);
+    } catch (err) {
+      console.error('Erro ao buscar comentários:', err);
+    }
     setLoadingComments(false);
   }, [postId]);
 
   useEffect(() => { fetchComments(); }, [fetchComments]);
 
   const handleAddComment = async () => {
-    if (!user?.id || !displayName || !newComment.trim()) return;
+    if (!user?.id || !newComment.trim()) return;
     setSubmitting(true);
-    const { error } = await supabase.from('torcida_comments').insert([{
-      post_id: postId,
-      user_id: user.id,
-      user_name: displayName,
-      content: newComment.trim(),
-    }]);
-    if (error) {
-      showNotification('Erro ao comentar. Tente novamente.', 'error');
-    } else {
+    try {
+      const comment = await torcidaApi.createComment(postId, newComment.trim()) as Comment;
+      setComments(prev => [...prev, comment]);
       setNewComment('');
-      fetchComments();
-      insertNotification(postAuthorId, user.id, displayName, postId, 'comment');
+    } catch {
+      showNotification('Erro ao comentar. Tente novamente.', 'error');
     }
     setSubmitting(false);
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    const { error } = await supabase.from('torcida_comments').delete().eq('id', commentId);
-    if (error) {
-      console.error('Erro ao excluir comentário:', error);
-      showNotification(`Erro ao excluir: ${error.message}`, 'error');
-    } else {
+    try {
+      await torcidaApi.deleteComment(commentId);
       setComments(prev => prev.filter(c => c.id !== commentId));
       showNotification('Comentário excluído.', 'success');
+    } catch (err: any) {
+      showNotification(`Erro ao excluir: ${err?.error || 'tente novamente'}`, 'error');
     }
   };
 
@@ -278,7 +228,6 @@ const PostCard: FC<PostCardProps> = ({
   post,
   isLiked: initialLiked,
   currentUserId,
-  currentUserName,
   isAdmin,
   onOpenLogin,
   onLikeChange,
@@ -296,48 +245,34 @@ const PostCard: FC<PostCardProps> = ({
     if (!currentUserId) { onOpenLogin(); return; }
     if (likeLoading) return;
     setLikeLoading(true);
-
-    if (liked) {
-      const { error } = await supabase.from('torcida_likes').delete()
-        .eq('post_id', post.id).eq('user_id', currentUserId);
-      if (!error) {
-        await supabase.rpc('decrement_likes', { post_id: post.id });
-        setLiked(false);
-        setLikesCount(c => Math.max(0, c - 1));
-        onLikeChange(post.id, false);
-      } else {
-        showNotification('Erro ao descurtir.', 'error');
-      }
-    } else {
-      const { error } = await supabase.from('torcida_likes').insert([{ post_id: post.id, user_id: currentUserId }]);
-      if (!error) {
-        await supabase.rpc('increment_likes', { post_id: post.id });
+    try {
+      const res = await torcidaApi.toggleLike(post.id);
+      if (res.liked) {
         setLiked(true);
         setLikesCount(c => c + 1);
         onLikeChange(post.id, true);
-        if (currentUserName) {
-          insertNotification(post.user_id, currentUserId, currentUserName, post.id, 'like');
-        }
       } else {
-        showNotification('Erro ao curtir.', 'error');
+        setLiked(false);
+        setLikesCount(c => Math.max(0, c - 1));
+        onLikeChange(post.id, false);
       }
+    } catch {
+      showNotification('Erro ao curtir.', 'error');
     }
     setLikeLoading(false);
   };
 
   const handleDelete = async () => {
     if (!window.confirm('Tem certeza que deseja excluir esta publicação?')) return;
-    const { error } = await supabase.from('torcida_posts').delete().eq('id', post.id);
-    if (error) {
-      console.error('Erro ao excluir post:', error);
-      showNotification(`Erro ao excluir: ${error.message}`, 'error');
-    } else {
+    try {
+      await torcidaApi.deletePost(post.id);
       showNotification('Publicação excluída.', 'success');
       onDelete(post.id);
+    } catch (err: any) {
+      showNotification(`Erro ao excluir: ${err?.error || 'tente novamente'}`, 'error');
     }
   };
 
-  // Usa sameId para evitar falha por diferença de tipo (string vs number)
   const canDelete = isAdmin || sameId(post.user_id, currentUserId);
 
   return (
@@ -459,23 +394,23 @@ const Torcida: FC = () => {
 
   const fetchPosts = useCallback(async () => {
     setLoadError('');
-    const { data, error } = await supabase
-      .from('torcida_posts')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      setLoadError('Erro ao carregar o feed. Tente novamente mais tarde.');
-    } else {
+    try {
+      const data = await torcidaApi.getPosts() as Post[];
       setPosts(data ?? []);
+    } catch {
+      setLoadError('Erro ao carregar o feed. Tente novamente mais tarde.');
     }
     setLoading(false);
   }, []);
 
   const fetchLikedPosts = useCallback(async () => {
     if (!user) { setLikedPostIds(new Set()); return; }
-    const { data } = await supabase
-      .from('torcida_likes').select('post_id').eq('user_id', user.id);
-    if (data) setLikedPostIds(new Set(data.map((l: { post_id: string }) => String(l.post_id))));
+    try {
+      const data = await torcidaApi.getLikes();
+      setLikedPostIds(new Set(data.map(String)));
+    } catch {
+      setLikedPostIds(new Set());
+    }
   }, [user?.id]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
@@ -502,52 +437,14 @@ const Torcida: FC = () => {
     if (!user) return;
     if (!newPostContent.trim() && !imageFile) return;
     setSubmitting(true);
-
-    let imageUrl: string | null = null;
-
-    if (imageFile) {
-      const ext = imageFile.name.split('.').pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('torcida-images')
-        .upload(path, imageFile, { upsert: false });
-
-      if (uploadError) {
-        showNotification(`Erro ao enviar imagem: ${uploadError.message}`, 'error');
-        setSubmitting(false);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage.from('torcida-images').getPublicUrl(path);
-      imageUrl = urlData.publicUrl;
-    }
-
-    const { error } = await supabase.from('torcida_posts').insert([{
-      user_id: user.id,
-      user_name: displayName || user.name,
-      content: newPostContent.trim(),
-      likes_count: 0,
-      ...(imageUrl ? { image_url: imageUrl } : {}),
-    }]);
-
-    if (error) {
-      showNotification('Erro ao publicar. Tente novamente.', 'error');
-    } else {
+    try {
+      const post = await torcidaApi.createPost(newPostContent.trim(), imageFile || undefined) as Post;
+      setPosts(prev => [post, ...prev]);
       setNewPostContent('');
       removeImage();
       showNotification('Publicação criada!', 'success');
-      fetchPosts();
-      // Notifica admins sobre novo post (o ID vem do post inserido — buscamos o mais recente)
-      const { data: newPost } = await supabase
-        .from('torcida_posts')
-        .select('id')
-        .eq('user_id', String(user.id))
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (newPost) {
-        notifyAdmins(user.id, displayName || user.name, newPost.id);
-      }
+    } catch {
+      showNotification('Erro ao publicar. Tente novamente.', 'error');
     }
     setSubmitting(false);
   };
@@ -613,7 +510,6 @@ const Torcida: FC = () => {
                     onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; }}
                   />
 
-                  {/* Preview da imagem selecionada */}
                   {imagePreview && (
                     <div style={{ position: 'relative', display: 'inline-block' }}>
                       <img
@@ -637,7 +533,6 @@ const Torcida: FC = () => {
                     </div>
                   )}
 
-                  {/* Rodapé do formulário */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <input

@@ -1,8 +1,33 @@
 import { type FC, useState, useEffect, useCallback, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabaseClient';
+import { torcidaApi, getToken } from '../services/api';
 import { Link } from 'react-router-dom';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const markAllRead = async (userId: string) => {
+  const token = getToken();
+  await fetch(`${BASE_URL}/torcida/notifications/read-all`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ userId }),
+  }).catch(() => {});
+};
+
+const clearAllNotifications = async () => {
+  const token = getToken();
+  await fetch(`${BASE_URL}/torcida/notifications`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  }).catch(() => {});
+};
 
 interface Notification {
   id: string;
@@ -37,13 +62,12 @@ const TorcidaNotificationBell: FC = () => {
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await supabase
-      .from('torcida_notifications')
-      .select('*')
-      .eq('user_id', String(user.id))
-      .order('created_at', { ascending: false })
-      .limit(30);
-    if (data) setNotifications(data);
+    try {
+      const data = await torcidaApi.getNotifications() as Notification[];
+      setNotifications(data ?? []);
+    } catch {
+      // silencia erros de rede
+    }
   }, [user?.id]);
 
   // Polling a cada 30s
@@ -68,12 +92,7 @@ const TorcidaNotificationBell: FC = () => {
   const handleOpen = async () => {
     setOpen(prev => !prev);
     if (!open && unreadCount > 0) {
-      // Marca todas como lidas
-      await supabase
-        .from('torcida_notifications')
-        .update({ read: true })
-        .eq('user_id', String(user?.id))
-        .eq('read', false);
+      await markAllRead(String(user?.id));
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     }
   };
@@ -148,10 +167,7 @@ const TorcidaNotificationBell: FC = () => {
             {notifications.length > 0 && (
               <button
                 onClick={async () => {
-                  await supabase
-                    .from('torcida_notifications')
-                    .delete()
-                    .eq('user_id', String(user.id));
+                  await clearAllNotifications();
                   setNotifications([]);
                 }}
                 style={{

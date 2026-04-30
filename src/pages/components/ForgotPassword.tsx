@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import emailjs from "@emailjs/browser";
-import bcrypt from "bcryptjs";
-import { supabase } from "../../services/supabaseClient";
+import { forgotPasswordApi } from "../../services/api";
 
 const inputStyle = {
   background: "var(--bg-hover)",
@@ -37,96 +35,44 @@ const ForgotPassword: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) => 
 
   const handleSendCode = async () => {
     setError("");
-    if (!email) {
-      setError("Informe seu e-mail.");
-      return;
-    }
+    if (!email) { setError("Informe seu e-mail."); return; }
     setLoading(true);
-
-    const { data: user, error: fetchError } = await supabase.from("users").select("id").eq("email", email).single();
-
-    if (fetchError || !user) {
-      setError("E-mail não encontrado.");
-      setLoading(false);
-      return;
-    }
-
-    const resetToken = String(Math.floor(10000 + Math.random() * 90000));
-
-    const { error: updateError } = await supabase.from("users").update({ resettoken: resetToken }).eq("email", email);
-
-    if (updateError) {
-      setError("Erro ao gerar código. Tente novamente.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      await emailjs.send("service_ii1iyfx", "template_lg0yza4", { email, code: resetToken }, "XvjwBC5uhPLAPa70n");
+      await forgotPasswordApi.sendCode(email);
       setStep(2);
-    } catch {
-      setError("Código gerado, mas não foi possível enviar o e-mail. Tente novamente.");
+    } catch (err: any) {
+      if (err?.status === 404) setError("E-mail não encontrado.");
+      else setError("Erro ao gerar código. Tente novamente.");
     }
-
     setLoading(false);
   };
 
   const handleVerifyCode = async () => {
     setError("");
-    if (!code) {
-      setError("Digite o código recebido.");
-      return;
-    }
+    if (!code) { setError("Digite o código recebido."); return; }
     setLoading(true);
-
-    const { data: user, error: fetchError } = await supabase
-      .from("users")
-      .select("resettoken")
-      .eq("email", email)
-      .single();
-
+    try {
+      await forgotPasswordApi.verifyCode(email, code);
+      setStep(3);
+    } catch (err: any) {
+      if (err?.status === 400) setError("Código inválido. Verifique seu e-mail.");
+      else setError("Erro ao verificar código.");
+    }
     setLoading(false);
-
-    if (fetchError || !user) {
-      setError("Erro ao verificar código.");
-      return;
-    }
-
-    if (user.resettoken !== code) {
-      setError("Código inválido. Verifique seu e-mail.");
-      return;
-    }
-
-    setStep(3);
   };
 
   const handleChangePassword = async () => {
     setError("");
-    if (!newPassword || !confirmPassword) {
-      setError("Preencha todos os campos.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("As senhas não coincidem.");
-      return;
-    }
+    if (!newPassword || !confirmPassword) { setError("Preencha todos os campos."); return; }
+    if (newPassword !== confirmPassword) { setError("As senhas não coincidem."); return; }
     setLoading(true);
-
-    const hashedPassword = bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10));
-
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ password: hashedPassword, resettoken: null })
-      .eq("email", email);
-
-    setLoading(false);
-
-    if (updateError) {
+    try {
+      await forgotPasswordApi.resetPassword(email, code, newPassword);
+      if (onSuccess) onSuccess();
+    } catch {
       setError("Erro ao redefinir senha. Tente novamente.");
-      return;
     }
-
-    if (onSuccess) onSuccess();
+    setLoading(false);
   };
 
   return (
@@ -187,7 +133,6 @@ const ForgotPassword: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) => 
         </>
       )}
 
-      {/* Step 2 */}
       {step === 2 && (
         <>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
