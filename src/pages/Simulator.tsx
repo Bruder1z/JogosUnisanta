@@ -268,12 +268,14 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
             </div>
 
             {/* Central Area */}
-            <div style={{ padding: '32px 18px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '16px' }}>
+            <div className="central-area" style={{ padding: '32px 18px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '16px' }}>
                 {/* Team A */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <TeamEmblem team={match.teamA} size={80} />
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                        <div className="team-emblem">
+                            <TeamEmblem team={match.teamA} size={80} />
+                        </div>
+                        <div className="team-name" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
                             {renderTeamText(match.teamA)}
                         </div>
                     </div>
@@ -392,8 +394,10 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                 {/* Team B */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', opacity: isCardDisabled ? (isPreviouslySaved || match.status === 'finished' ? 1 : 0.5) : 1 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <TeamEmblem team={match.teamB} size={80} />
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
+                        <div className="team-emblem">
+                            <TeamEmblem team={match.teamB} size={80} />
+                        </div>
+                        <div className="team-name" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textAlign: 'center', maxWidth: '120px' }}>
                             {renderTeamText(match.teamB)}
                         </div>
                     </div>
@@ -702,13 +706,13 @@ const Simulator: FC = () => {
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} className="simulator-root">
             <Header />
             <Sidebar onShowRanking={() => setShowRanking(true)} />
-            <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
+            <main className="simulator-main-content" style={{ marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
                     {/* Page header */}
                     <div style={{ marginBottom: '0', display: 'flex', flexDirection: 'column' }}>
                         {/* Title row */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <div className="simulator-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                             <div>
                                 <h1 style={{
                                     fontSize: '38px',
@@ -775,24 +779,12 @@ const Simulator: FC = () => {
                         </div>
 
                         {/* Tab bar */}
-                        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
+                        <div className="simulator-tabs-wrapper" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 4px' }}>
                             {(['palpitar', 'historico', 'competicoes', 'sugeridas'] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    style={{
-                                        padding: '12px 20px',
-                                        background: 'none',
-                                        border: 'none',
-                                        borderBottom: activeTab === tab ? '2px solid var(--accent-color)' : '2px solid transparent',
-                                        color: activeTab === tab ? 'white' : 'var(--text-secondary)',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        letterSpacing: '1px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        marginBottom: '-1px',
-                                    }}
+                                    className={`simulator-tab-btn ${activeTab === tab ? 'active' : ''}`}
                                 >
                                     {tab === 'palpitar' ? 'PALPITAR' : tab === 'historico' ? 'HISTÓRICO' : tab === 'competicoes' ? 'COMPETIÇÕES' : 'LIGAS SUGERIDAS'}
                                 </button>
@@ -833,7 +825,7 @@ const Simulator: FC = () => {
 
                     {/* Action buttons */}
                     {activeTab === 'palpitar' && (
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                        <div className="simulator-actions-row" style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
                             <button
                                 onClick={resetPredictions}
                                 style={{
@@ -1299,30 +1291,104 @@ const Simulator: FC = () => {
                     )}
                 </div>
                 <style>{`
+                    .simulator-main-content {
+                        margin-left: var(--sidebar-width);
+                        transition: margin-left 0.3s;
+                    }
+
+                    .simulator-tabs-wrapper::-webkit-scrollbar {
+                        display: none;
+                    }
+                    .simulator-tabs-wrapper {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+
+                    .simulator-tab-btn {
+                        padding: 12px 20px;
+                        background: none;
+                        border: none;
+                        color: var(--text-secondary);
+                        font-size: 13px;
+                        font-weight: 700;
+                        letter-spacing: 1px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        margin-bottom: -1px;
+                        white-space: nowrap;
+                        border-bottom: 2px solid transparent;
+                        flex-shrink: 0;
+                        margin-right: 12px;
+                    }
+
+                    .simulator-tab-btn:last-child {
+                        margin-right: 0;
+                    }
+
+                    .simulator-tab-btn.active {
+                        color: white;
+                        border-bottom: 2px solid var(--accent-color);
+                    }
+
                     @media (max-width: 768px) {
-                        .simulator-root main {
-                            padding: 14px !important;
+                        .simulator-main-content {
+                            margin-left: 0;
+                            padding: 16px 16px 90px 16px !important;
                         }
 
-                        .simulator-stats-bar {
-                            flex-direction: column;
+                        .simulator-header-row {
+                            flex-direction: column !important;
                             align-items: stretch !important;
-                            gap: 12px;
-                            padding: 14px !important;
+                            gap: 16px;
                         }
 
-                        .simulator-stats-metrics {
-                            justify-content: space-between;
-                            gap: 12px !important;
+                        .simulator-header-row h1 {
+                            font-size: 28px !important;
                         }
 
-                        .simulator-stats-actions {
+                        .simulator-header-row p {
+                            font-size: 13px !important;
+                        }
+
+                        .simulator-header-row > div:last-child {
+                            flex-direction: column;
                             width: 100%;
                         }
 
-                        .simulator-stats-actions button {
-                            flex: 1;
+                        .simulator-header-row button {
+                            width: 100%;
                             justify-content: center;
+                        }
+
+                        .simulator-tabs-wrapper {
+                            margin-bottom: 24px !important;
+                            padding: 0 16px !important;
+                        }
+
+                        .simulator-tab-btn {
+                            padding: 10px 16px;
+                            font-size: 12px;
+                            margin-right: 100px;
+                        }
+
+                        .simulator-tab-btn:last-child {
+                            margin-right: 0;
+                        }
+
+                        .simulator-actions-row {
+                            gap: 8px !important;
+                        }
+
+                        .simulator-actions-row button {
+                            flex: 1;
+                            padding: 10px !important;
+                            font-size: 11px !important;
+                            justify-content: center;
+                        }
+
+                        .simulator-tab-btn {
+                            padding: 10px 16px;
+                            font-size: 12px;
                         }
 
                         .simulator-grid {
@@ -1330,89 +1396,28 @@ const Simulator: FC = () => {
                         }
 
                         .sim-match-card {
-                            padding: 18px 12px !important;
-                        }
-
-                        .sim-matchup-row {
-                            gap: 8px !important;
-                        }
-
-                        .sim-score-inputs-row {
-                            gap: 8px !important;
-                        }
-
-                        .sim-score-input {
-                            width: 52px !important;
-                            height: 52px !important;
-                            line-height: 52px !important;
-                            font-size: 20px !important;
-                        }
-
-                        .sim-match-card {
-                            overflow: hidden;
+                            border-radius: 12px !important;
                         }
                     }
 
                     @media (max-width: 480px) {
-                        .simulator-stats-metrics {
-                            flex-wrap: wrap;
+                        .sim-match-card .central-area {
+                            padding: 24px 12px !important;
+                            gap: 12px !important;
                         }
 
-                        .simulator-stats-actions {
-                            flex-direction: row;
+                        .sim-match-card .team-name span {
+                            font-size: 11px !important;
                         }
 
-                        .sim-matchup-row {
-                            display: grid !important;
-                            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-                            align-items: center;
+                        .sim-match-card .team-emblem img, 
+                        .sim-match-card .team-emblem div {
+                            width: 60px !important;
+                            height: 60px !important;
                         }
 
-                        .sim-match-card span {
-                            word-break: break-word;
-                        }
-                    }
-
-                    @media (max-width: 390px) {
-                        .simulator-root main {
-                            padding: 10px !important;
-                        }
-
-                        .simulator-root h1 {
-                            font-size: 2rem !important;
-                            letter-spacing: -0.02em !important;
-                        }
-
-                        .simulator-root p {
-                            font-size: 0.95rem !important;
-                        }
-
-                        .simulator-stats-actions {
-                            flex-direction: column !important;
-                        }
-
-                        .simulator-stats-actions button {
-                            width: 100%;
-                        }
-
-                        .sim-matchup-row {
-                            grid-template-columns: minmax(0, 1fr) 108px minmax(0, 1fr) !important;
-                        }
-
-                        .sim-score-input {
-                            width: 44px !important;
-                            height: 44px !important;
-                            line-height: 44px !important;
-                            font-size: 17px !important;
-                            border-radius: 12px !important;
-                        }
-
-                        .sim-score-inputs-row {
-                            gap: 5px !important;
-                        }
-
-                        .simulator-grid {
-                            gap: 14px !important;
+                        .sim-score-display {
+                            font-size: 24px !important;
                         }
                     }
 

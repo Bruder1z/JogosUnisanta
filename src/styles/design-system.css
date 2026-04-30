@@ -199,7 +199,7 @@ button {
   :root {
     --sidebar-width: 0px;
     --header-height: 56px;
-    --main-padding: 16px;
+    --main-padding: 16px 16px calc(80px + env(safe-area-inset-bottom)) 16px;
     --home-grid-cols: 1fr;
     --news-grid-cols: repeat(auto-fill, minmax(280px, 1fr));
     --header-padding: 0 14px;
