@@ -12,24 +12,25 @@ const History: FC = () => {
             <main style={{ marginLeft: 'var(--sidebar-width)', marginTop: 'var(--header-height)', padding: 'var(--main-padding)' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                     <div style={{ marginBottom: '40px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h1 style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>História dos Jogos</h1>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', textAlign: 'center', alignItems: 'center', marginBottom: '30px' }}>
+                            <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', fontWeight: 800, color: 'var(--text-primary)', margin: 0, width: '100%' }}>História dos Jogos</h1>
                             <button 
                                 onClick={() => setShowRanking(true)}
                                 style={{
                                     background: '#10b981',
                                     color: 'white',
                                     border: 'none',
-                                    padding: '12px 24px',
-                                    borderRadius: '8px',
+                                    padding: '8px 16px',
+                                    borderRadius: '6px',
                                     fontWeight: 700,
-                                    fontSize: '15px',
+                                    fontSize: '13px',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '8px',
+                                    gap: '6px',
                                     transition: 'all 0.2s ease',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                                    whiteSpace: 'nowrap'
                                 }}
                                 onMouseOver={(e) => {
                                     e.currentTarget.style.transform = 'translateY(-2px)';
@@ -59,7 +60,7 @@ const History: FC = () => {
                             }} />
 
                             <div className="premium-card hover-glow history-scrollbar" style={{
-                                padding: '30px',
+                                padding: 'clamp(16px, 4vw, 30px)',
                                 border: '1px solid #333',
                                 maxHeight: '80vh',
                                 overflowY: 'auto'
