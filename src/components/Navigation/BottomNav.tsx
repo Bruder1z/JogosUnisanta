@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Trophy, Grid } from 'lucide-react';
+import { Home, Trophy, Grid, Users, Calendar, Zap, Settings } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -15,14 +15,14 @@ const BottomNav: FC = () => {
     const navItems = (user?.role === 'superadmin' || user?.role === 'admin') 
         ? [
             { path: '/', icon: Home, label: 'Home' },
-            { path: '/controle-partida', emoji: '⚙️', label: 'Controle' },
-            { path: '/', icon: Trophy, label: 'Resultados' },
+            { path: '/controle-partida', icon: Settings, label: 'Controle' },
+            { path: '/participantes', icon: Users, label: 'Participantes' },
         ]
         : [
             { path: '/', icon: Home, label: 'Home' },
-            { path: '/calendario', emoji: '📅', label: 'Calendário' },
-            { path: '/', icon: Trophy, label: 'Resultados' },
-            { path: '/bolao', emoji: '⚡', label: 'Palpitômetro' },
+            { path: '/calendario', icon: Calendar, label: 'Calendário' },
+            { path: '/participantes', icon: Users, label: 'Participantes' },
+            { path: '/bolao', icon: Zap, label: 'Palpitômetro' },
         ];
 
     return (
@@ -62,15 +62,22 @@ const BottomNav: FC = () => {
                         position: 'relative'
                     }}
                 >
-                    {item.emoji ? (
-                        <span style={{ fontSize: '22px' }}>{item.emoji}</span>
-                    ) : item.icon && (
-                        <item.icon 
-                            size={22} 
-                            strokeWidth={isActive(item.path) ? 2.5 : 2}
-                        />
-                    )}
-                    <span style={{ fontSize: '10px' }}>{item.label}</span>
+                    <div style={{
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        {item.emoji ? (
+                            <span style={{ fontSize: '22px', lineHeight: 1 }}>{item.emoji}</span>
+                        ) : item.icon && (
+                            <item.icon 
+                                size={22} 
+                                strokeWidth={isActive(item.path) ? 2.5 : 2}
+                            />
+                        )}
+                    </div>
+                    <span style={{ fontSize: '11px', lineHeight: 1.2, textAlign: 'center' }}>{item.label}</span>
                     {isActive(item.path) && (
                         <div style={{
                             position: 'absolute',
@@ -106,8 +113,15 @@ const BottomNav: FC = () => {
                     padding: 0
                 }}
             >
-                <Grid size={22} strokeWidth={2} />
-                <span style={{ fontSize: '10px' }}>Mais</span>
+                <div style={{
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
+                    <Grid size={22} strokeWidth={2} />
+                </div>
+                <span style={{ fontSize: '11px', lineHeight: 1.2, textAlign: 'center' }}>Mais</span>
             </button>
 
             <style>{`

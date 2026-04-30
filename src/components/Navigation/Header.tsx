@@ -82,7 +82,7 @@ const Header: FC = () => {
                             color: isActive('/') ? 'var(--text-primary)' : 'var(--text-secondary)',
                             textDecoration: 'none',
                             transition: 'color 0.2s'
-                        }}>Resultados</Link>
+                        }}>Home</Link>
                         <Link to="/participantes" style={{
                             color: isActive('/participantes') ? 'var(--text-primary)' : 'var(--text-secondary)',
                             textDecoration: 'none',

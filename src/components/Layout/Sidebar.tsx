@@ -73,7 +73,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <Link to="/" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
                             <span style={{ fontSize: '16px' }}>🏠</span>
-                            <span className="sidebar-mobile-nav-label">Resultados</span>
+                            <span className="sidebar-mobile-nav-label">Home</span>
                         </Link>
                         <Link to="/participantes" onClick={close} className="sidebar-link sidebar-mobile-nav-link" style={{ padding: '10px 0', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}>
                             <span style={{ fontSize: '16px' }}>👥</span>
