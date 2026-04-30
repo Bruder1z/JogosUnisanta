@@ -5,7 +5,7 @@ export interface User {
   surname?: string;
   preferredCourse?: string;
   favoriteTeam?: string;
-  role: "superadmin" | "cliente";
+  role: "superadmin" | "admin" | "cliente";
   avatar?: string;
 }
 
