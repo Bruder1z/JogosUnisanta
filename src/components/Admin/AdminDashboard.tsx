@@ -306,16 +306,85 @@ const AdminDashboard: React.FC = () => {
     });
     const [scoreForm, setScoreForm] = useState({ scoreA: 0, scoreB: 0 });
     const [notification, setNotification] = useState('');
-    const [adminUsers, _setAdminUsers] = useState<any[]>([]);
-    const [isPromoting, _setIsPromoting] = useState(false);
+    const [adminUsers, setAdminUsers] = useState<any[]>([]);
+    const [isPromoting, setIsPromoting] = useState(false);
     const [promoteEmail, setPromoteEmail] = useState('');
 
-    const handlePromoteUser = () => {
-        showNotification("Função para promover usuário (stub)");
+    const fetchAdmins = async () => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, name, surname, email, role')
+            .in('role', ['admin', 'superadmin']);
+        
+        if (error) {
+            console.error("Erro ao buscar admins:", error);
+        } else if (data) {
+            setAdminUsers(data);
+        }
     };
 
-    const handleDemoteUser = (id: string, _role: string) => {
-        showNotification(`Função para remover acesso de ${id} (stub)`);
+    useEffect(() => {
+        if (activeTab === 'equipe') {
+            fetchAdmins();
+        }
+    }, [activeTab]);
+
+    const handlePromoteUser = async () => {
+        if (!promoteEmail.trim()) return;
+        setIsPromoting(true);
+        
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, role')
+            .eq('email', promoteEmail.trim().toLowerCase())
+            .single();
+
+        if (userError || !userData) {
+            showNotification("Usuário não encontrado no sistema.");
+            setIsPromoting(false);
+            return;
+        }
+
+        if (userData.role === 'admin' || userData.role === 'superadmin') {
+            showNotification("Usuário já é um administrador.");
+            setIsPromoting(false);
+            return;
+        }
+
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ role: 'admin' })
+            .eq('id', userData.id);
+
+        if (updateError) {
+            showNotification("Erro ao promover usuário.");
+        } else {
+            showNotification("Usuário promovido com sucesso!");
+            setPromoteEmail('');
+            fetchAdmins();
+        }
+        setIsPromoting(false);
+    };
+
+    const handleDemoteUser = async (id: string, role: string) => {
+        if (role === 'superadmin') {
+            showNotification("Não é possível remover um superadmin.");
+            return;
+        }
+        
+        if (window.confirm("Tem certeza que deseja remover permissões deste administrador?")) {
+            const { error } = await supabase
+                .from('users')
+                .update({ role: 'cliente' })
+                .eq('id', id);
+                
+            if (error) {
+                showNotification("Erro ao remover permissões.");
+            } else {
+                showNotification("Permissões removidas com sucesso!");
+                fetchAdmins();
+            }
+        }
     };
 
     const importCsvColumns = [
