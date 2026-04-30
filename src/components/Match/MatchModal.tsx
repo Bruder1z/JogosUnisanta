@@ -1681,8 +1681,8 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   background: "var(--bg-hover)",
                   border: "none",
                   color: "var(--text-secondary)",
-                  width: "32px",
-                  height: "32px",
+                  width: "28px",
+                  height: "28px",
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
@@ -1691,7 +1691,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                 }}
                 title="Fechar"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
 
               {/* Player Stats Button - Only for Basketball */}

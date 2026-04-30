@@ -182,17 +182,18 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                         style={{
                             background: 'var(--bg-hover)',
                             border: 'none',
-                            color: 'white',
-                            width: '36px',
-                            height: '36px',
+                            color: 'var(--text-secondary)',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '50%',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                         }}
+                        title="Fechar"
                     >
-                        <X size={20} />
+                        <X size={16} />
                     </button>
                 </div>
 
@@ -207,12 +208,17 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                     {loading ? (
                         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Carregando ranking...</div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <table style={{ 
+                            width: '100%', 
+                            borderCollapse: 'collapse', 
+                            textAlign: 'left',
+                            tableLayout: 'fixed'
+                        }}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10 }}>
-                                <tr style={{ color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                    <th style={{ padding: '15px 20px', width: '60px', textAlign: 'center' }}>Pos</th>
-                                    <th style={{ padding: '15px 20px' }}>Usuário</th>
-                                    <th style={{ padding: '15px 20px', textAlign: 'center' }}>Pontos</th>
+                                <tr style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                    <th style={{ padding: '12px 8px', width: '45px', textAlign: 'center' }}>Pos</th>
+                                    <th style={{ padding: '12px 8px' }}>Usuário</th>
+                                    <th style={{ padding: '12px 8px', width: '65px', textAlign: 'center' }}>Pontos</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -231,64 +237,85 @@ const BolaoRankingModal: React.FC<BolaoRankingModalProps> = ({ onClose }) => {
                                             }}
                                             className="hover-glow-subtle"
                                         >
-                                            <td style={{ padding: '15px 20px', textAlign: 'center' }}>
+                                            <td style={{ padding: '10px 5px', textAlign: 'center', width: '45px' }}>
                                                 <div style={{
-                                                    width: isTop3 ? '32px' : '28px',
-                                                    height: isTop3 ? '32px' : '28px',
-                                                    borderRadius: '8px',
+                                                    width: isTop3 ? '30px' : '26px',
+                                                    height: isTop3 ? '30px' : '26px',
+                                                    borderRadius: '6px',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    fontSize: isTop3 ? '15px' : '13px',
+                                                    fontSize: isTop3 ? '14px' : '12px',
                                                     fontWeight: 800,
                                                     background: highlightColor || 'var(--bg-hover)',
                                                     color: isTop3 ? '#000' : 'var(--text-secondary)',
-                                                    boxShadow: isTop3 ? `0 0 15px ${highlightColor}40` : 'none',
+                                                    boxShadow: isTop3 ? `0 0 10px ${highlightColor}40` : 'none',
                                                     border: isTop3 ? `1px solid ${highlightColor}` : 'none',
                                                     margin: '0 auto'
                                                 }}>
                                                     {index + 1}º
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '15px 20px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                    <div style={{
-                                                        width: '36px',
-                                                        height: '36px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        background: 'rgba(255,255,255,0.08)',
-                                                        borderRadius: '50%',
-                                                        fontSize: '14px',
-                                                        fontWeight: 800,
-                                                        color: '#fff',
-                                                        overflow: 'hidden'
-                                                    }}>
-                                                        {user.avatar ? (
-                                                            <img src={user.avatar} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            user.name.charAt(0).toUpperCase()
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>
-                                                            {user.name} {user.surname ? user.surname : ''}
-
+                                            <td style={{ padding: '10px 5px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', minWidth: 0 }}>
+                                                        <div style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: 'rgba(255,255,255,0.08)',
+                                                            borderRadius: '50%',
+                                                            fontSize: '12px',
+                                                            fontWeight: 800,
+                                                            color: '#fff',
+                                                            overflow: 'hidden',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            {user.avatar ? (
+                                                                <img src={user.avatar} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                user.name.charAt(0).toUpperCase()
+                                                            )}
                                                         </div>
-                                                        {user.preferredCourse ? <span style={{ color: '#dc2626', fontWeight: 500, fontSize: '13px' }}>({user.preferredCourse})</span> : null}
-
+                                                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                                            <div style={{ 
+                                                                fontSize: '14px', 
+                                                                fontWeight: 700, 
+                                                                color: isTop3 ? 'white' : 'var(--text-primary)',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                lineHeight: '1.2'
+                                                            }}>
+                                                                {user.name} {user.surname ? user.surname : ''}
+                                                            </div>
+                                                            {user.preferredCourse ? (
+                                                                <div style={{ 
+                                                                    color: '#dc2626', 
+                                                                    fontWeight: 500, 
+                                                                    fontSize: '11px',
+                                                                    whiteSpace: 'nowrap',
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    marginTop: '1px'
+                                                                }}>
+                                                                    {user.preferredCourse}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
-                                                </div>
                                             </td>
-                                            <td style={{ padding: '15px 20px', textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                                    <span style={{
-                                                        fontSize: '18px',
+                                            <td style={{ padding: '10px 5px', textAlign: 'center', width: '65px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                                    <div style={{
+                                                        fontSize: '16px',
                                                         fontWeight: 900,
                                                         color: isTop3 ? (highlightColor as string) : 'white',
                                                         fontVariantNumeric: 'tabular-nums'
-                                                    }}>{user.points}</span>
+                                                    }}>
+                                                        {user.points}
+                                                    </div>
                                                     {currentUser?.email === user.email && (
                                                         <button
                                                             style={{

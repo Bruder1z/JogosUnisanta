@@ -91,17 +91,18 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                         style={{
                             background: 'var(--bg-hover)',
                             border: 'none',
-                            color: 'white',
-                            width: '36px',
-                            height: '36px',
+                            color: 'var(--text-secondary)',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '50%',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                         }}
+                        title="Fechar"
                     >
-                        <X size={20} />
+                        <X size={16} />
                     </button>
                 </div>
 
@@ -113,21 +114,23 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                     scrollbarWidth: 'thin',
                     scrollbarColor: 'var(--accent-color) transparent'
                 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <table style={{ 
+                        width: '100%', 
+                        borderCollapse: 'collapse', 
+                        textAlign: 'left',
+                        tableLayout: 'fixed' // Force columns to respect widths
+                    }}>
                         <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10 }}>
-                            <tr style={{ color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                <th style={{ padding: '15px 20px' }}>Pos</th>
-                                <th style={{ padding: '15px 20px' }}>Atlética / Faculdade</th>
-                                <th style={{ padding: '15px 20px', textAlign: 'center' }}>Pontos</th>
-                                <th style={{ padding: '15px 20px', textAlign: 'center' }}>Tendência</th>
+                            <tr style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                <th style={{ padding: '12px 8px', width: '45px', textAlign: 'center' }}>Pos</th>
+                                <th style={{ padding: '12px 8px' }}>Curso</th>
+                                <th style={{ padding: '12px 8px', width: '65px', textAlign: 'center' }}>Pontos</th>
                             </tr>
                         </thead>
                         <tbody>
                             {ranking.map((item, index) => {
                                 const courseName = item.course.split(' - ')[0];
-                                const institution = item.course.split(' - ')[1];
-                                // const icon = COURSE_ICONS[courseName] || '🏆';
-
+                                const institution = item.course.split(' - ')[1] || '';
                                 const isTop3 = index < 3;
                                 const highlightColor = index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : null;
 
@@ -142,35 +145,37 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                                         }}
                                         className="hover-glow-subtle"
                                     >
-                                        <td style={{ padding: '15px 20px' }}>
+                                        <td style={{ padding: '10px 5px', width: '45px', textAlign: 'center' }}>
                                             <div style={{
-                                                width: isTop3 ? '32px' : '28px',
-                                                height: isTop3 ? '32px' : '28px',
-                                                borderRadius: '8px',
+                                                width: isTop3 ? '30px' : '26px',
+                                                height: isTop3 ? '30px' : '26px',
+                                                borderRadius: '6px',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontSize: isTop3 ? '15px' : '13px',
+                                                fontSize: isTop3 ? '14px' : '12px',
                                                 fontWeight: 800,
                                                 background: highlightColor || 'var(--bg-hover)',
                                                 color: isTop3 ? '#000' : 'var(--text-secondary)',
-                                                boxShadow: isTop3 ? `0 0 15px ${highlightColor}40` : 'none',
-                                                border: isTop3 ? `1px solid ${highlightColor}` : 'none'
+                                                boxShadow: isTop3 ? `0 0 10px ${highlightColor}40` : 'none',
+                                                border: isTop3 ? `1px solid ${highlightColor}` : 'none',
+                                                margin: '0 auto'
                                             }}>
                                                 {index + 1}º
                                             </div>
                                         </td>
-                                        <td style={{ padding: '15px 20px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <td style={{ padding: '10px 5px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', minWidth: 0 }}>
                                                 <div style={{
-                                                    width: '36px',
-                                                    height: '36px',
+                                                    width: '32px',
+                                                    height: '32px',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
                                                     background: 'rgba(255,255,255,0.03)',
-                                                    borderRadius: '8px',
-                                                    padding: '4px'
+                                                    borderRadius: '6px',
+                                                    padding: '4px',
+                                                    flexShrink: 0
                                                 }}>
                                                 {(() => {
                                                         const emblemUrl = getTeamEmblem(item.course);
@@ -189,15 +194,15 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                                                                     />
                                                                     <span style={{
                                                                         display: 'none',
-                                                                        width: '28px',
-                                                                        height: '28px',
-                                                                        borderRadius: '8px',
+                                                                        width: '24px',
+                                                                        height: '24px',
+                                                                        borderRadius: '6px',
                                                                         background: 'rgba(255,255,255,0.08)',
                                                                         backdropFilter: 'blur(8px)',
                                                                         border: '1px solid rgba(255,255,255,0.12)',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        fontSize: '13px',
+                                                                        fontSize: '11px',
                                                                         fontWeight: 800,
                                                                         color: 'var(--accent-color)'
                                                                     }}>
@@ -208,16 +213,16 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                                                         }
                                                         return (
                                                             <span style={{
-                                                                width: '28px',
-                                                                height: '28px',
-                                                                borderRadius: '8px',
+                                                                width: '24px',
+                                                                height: '24px',
+                                                                borderRadius: '6px',
                                                                 background: 'rgba(255,255,255,0.08)',
                                                                 backdropFilter: 'blur(8px)',
                                                                 border: '1px solid rgba(255,255,255,0.12)',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                fontSize: '13px',
+                                                                fontSize: '11px',
                                                                 fontWeight: 800,
                                                                 color: 'var(--accent-color)'
                                                             }}>
@@ -226,30 +231,35 @@ const RankingModal: React.FC<RankingModalProps> = ({ onClose, useOfficialRanking
                                                         );
                                                     })()}
                                                 </div>
-                                                <div>
-                                                    <div style={{ fontSize: '15px', fontWeight: 700, color: isTop3 ? 'white' : 'var(--text-primary)' }}>{courseName}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{institution}</div>
+                                                <div style={{ minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                    <div style={{ 
+                                                        fontSize: '14px', 
+                                                        fontWeight: 700, 
+                                                        color: isTop3 ? 'white' : 'var(--text-primary)',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        lineHeight: '1.2'
+                                                    }}>{courseName}</div>
+                                                    <div style={{ 
+                                                        fontSize: '11px', 
+                                                        color: 'var(--text-secondary)',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        marginTop: '1px'
+                                                    }}>{institution}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '15px 20px', textAlign: 'center' }}>
+                                        <td style={{ padding: '10px 5px', textAlign: 'center', width: '65px' }}>
                                             <div style={{
-                                                fontSize: '18px',
+                                                fontSize: '16px',
                                                 fontWeight: 900,
                                                 color: isTop3 ? (highlightColor as string) : 'white',
                                                 fontVariantNumeric: 'tabular-nums'
                                             }}>
                                                 {item.points}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '15px 20px', textAlign: 'center' }}>
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '5px'
-                                            }}>
-                                                {getTrendIcon(item.points, index)}
                                             </div>
                                         </td>
                                     </tr>

@@ -483,12 +483,16 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                             {loading ? (
                                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Carregando ranking...</div>
                             ) : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <table style={{ 
+                                    width: '100%', 
+                                    borderCollapse: 'collapse',
+                                    tableLayout: 'fixed'
+                                }}>
                                     <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10 }}>
                                         <tr style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                            <th style={{ padding: '15px 20px', textAlign: 'left', width: '60px' }}>Pos</th>
-                                            <th style={{ padding: '15px 20px', textAlign: 'left' }}>Membro</th>
-                                            <th style={{ padding: '15px 20px', textAlign: 'center', width: '80px' }}>Pontos</th>
+                                            <th style={{ padding: '12px 8px', textAlign: 'center', width: '45px' }}>Pos</th>
+                                            <th style={{ padding: '12px 8px', textAlign: 'left' }}>Membro</th>
+                                            <th style={{ padding: '12px 8px', textAlign: 'center', width: '65px' }}>Pontos</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -498,23 +502,28 @@ const LeagueDetailsModal: React.FC<LeagueDetailsModalProps> = ({ league, onClose
                                                 background: row.email === currentUser?.email ? 'rgba(220, 38, 38, 0.05)' : 'transparent'
                                             }}>
                                                 <td style={{
-                                                    padding: '15px 20px', fontWeight: 800,
+                                                    padding: '10px 5px', fontWeight: 800,
                                                     color: index === 0 ? '#fbbf24' : index === 1 ? '#e5e7eb' : index === 2 ? '#cd7f32' : 'var(--text-secondary)',
-                                                    background:
-                                                        index === 0
-                                                            ? 'rgba(255,215,0,0.1)'
-                                                            : index === 1
-                                                                ? 'rgba(192,192,192,0.1)'
-                                                                : index === 2
-                                                                    ? 'rgba(205,127,50,0.1)'
-                                                                    : 'transparent',
-                                                    textAlign: 'center'
+                                                    textAlign: 'center',
+                                                    width: '45px'
                                                 }}>{index + 1}º</td>
-                                                <td style={{ padding: '15px 20px' }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '14px' }}>{row.name}</div>
-                                                    <div style={{ fontSize: '11px', color: '#dc2626' }}>{row.course}</div>
+                                                <td style={{ padding: '10px 5px', minWidth: 0, overflow: 'hidden' }}>
+                                                    <div style={{ 
+                                                        fontWeight: 700, 
+                                                        fontSize: '14px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }}>{row.name}</div>
+                                                    <div style={{ 
+                                                        fontSize: '11px', 
+                                                        color: '#dc2626',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }}>{row.course}</div>
                                                 </td>
-                                                <td style={{ padding: '15px 20px', textAlign: 'center', fontSize: '16px', fontWeight: 900 }}>{row.points}</td>
+                                                <td style={{ padding: '10px 5px', textAlign: 'center', fontSize: '16px', fontWeight: 900, width: '65px' }}>{row.points}</td>
                                             </tr>
                                         ))}
                                     </tbody>
