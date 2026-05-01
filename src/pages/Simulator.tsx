@@ -104,10 +104,22 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
 
     // Sync from external changes (arrows, initial load) only when not focused
     useEffect(() => {
-        if (focusedField.current !== 'A') setLocalA(toStr(pred?.scoreA));
+        if (focusedField.current !== 'A') {
+            const newValue = toStr(pred?.scoreA);
+            if (localA !== newValue) {
+                setLocalA(newValue);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pred?.scoreA]);
     useEffect(() => {
-        if (focusedField.current !== 'B') setLocalB(toStr(pred?.scoreB));
+        if (focusedField.current !== 'B') {
+            const newValue = toStr(pred?.scoreB);
+            if (localB !== newValue) {
+                setLocalB(newValue);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pred?.scoreB]);
 
     const isPreviouslySaved = userPrediction && userPrediction.scoreA !== '' && userPrediction.scoreB !== '';
@@ -116,7 +128,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
     const hours = Math.max(0, Math.floor(timeLeftMs / 3_600_000));
     const isCardDisabled = disabled || isTimeout || !!isPreviouslySaved || match.status === 'finished';
 
-    const renderTeamText = (team: any) => {
+    const renderTeamText = (team: { name: string; course?: string; faculty?: string }) => {
         let courseName = team.course || team.name;
         const institution = team.faculty;
         if (institution && courseName.toLowerCase().includes(institution.toLowerCase())) {
@@ -282,7 +294,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0) - 1)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
+                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreA === '' ? 0 : Number(pred?.scoreA || 0)) - 1)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&lt;</button>
@@ -307,7 +319,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                         </div>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreA === '' ? 0 : Number(pred?.scoreA) ?? 0; const n = String(Math.min(curr + 1, maxAllowedA)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
+                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreA === '' ? 0 : Number(pred?.scoreA || 0); const n = String(Math.min(curr + 1, maxAllowedA)); updatePrediction(match.id, 'scoreA', n); setLocalA(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&gt;</button>
@@ -404,7 +416,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0) - 1)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
+                                onClick={() => { if (isCardDisabled) return; const n = String(Math.max(0, (pred?.scoreB === '' ? 0 : Number(pred?.scoreB || 0)) - 1)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&lt;</button>
@@ -429,7 +441,7 @@ const MatchSimCard = ({ match, disabled, pred, userPrediction, updatePrediction,
                         </div>
                         {match.status !== 'finished' && (
                             <button disabled={isCardDisabled} style={{ background: 'none', border: 'none', color: isCardDisabled ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '16px', cursor: isCardDisabled ? 'not-allowed' : 'pointer', padding: '4px', transition: 'color 0.2s', visibility: isCardDisabled && (isPreviouslySaved || isTimeout) ? 'hidden' : 'visible' }}
-                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreB === '' ? 0 : Number(pred?.scoreB) ?? 0; const n = String(Math.min(curr + 1, maxAllowedB)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
+                                onClick={() => { if (isCardDisabled) return; const curr = pred?.scoreB === '' ? 0 : Number(pred?.scoreB || 0); const n = String(Math.min(curr + 1, maxAllowedB)); updatePrediction(match.id, 'scoreB', n); setLocalB(n); }}
                                 onMouseEnter={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
                                 onMouseLeave={(e) => { if (!isCardDisabled) e.currentTarget.style.color = 'white'; }}
                             >&gt;</button>
@@ -496,12 +508,50 @@ const Simulator: FC = () => {
     const [activeTab, setActiveTab] = useState<'palpitar' | 'historico' | 'competicoes' | 'sugeridas'>('palpitar');
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [predictionsFinalized, setPredictionsFinalized] = useState(false);
-    const [leagues, setLeagues] = useState<any[]>([]);
-    const [allLeagues, setAllLeagues] = useState<any[]>([]);
+    const [leagues, setLeagues] = useState<Array<{
+        id: string;
+        name: string;
+        description?: string;
+        is_private: boolean;
+        created_by: string;
+        member_count?: number;
+        participants?: Array<{ user_email: string }>;
+        owner_email?: string;
+        type?: string;
+        course?: string;
+    }>>([]);
+    const [allLeagues, setAllLeagues] = useState<Array<{
+        id: string;
+        name: string;
+        description?: string;
+        is_private: boolean;
+        created_by: string;
+        member_count?: number;
+        participants?: Array<{ user_email: string }>;
+        owner_email?: string;
+        type?: string;
+        course?: string;
+    }>>([]);
     const [isLeagueFormOpen, setIsLeagueFormOpen] = useState(false);
-    const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
+    const [selectedLeague, setSelectedLeague] = useState<{
+        id?: string;
+        name: string;
+        description?: string;
+        is_private?: boolean;
+        created_by?: string;
+        member_count?: number;
+        participants?: Array<{ user_email: string }>;
+        owner_email?: string;
+        type?: string;
+        course?: string;
+    } | null>(null);
     const [joiningLeagueId, setJoiningLeagueId] = useState<string | null>(null);
-    const [userRequests, setUserRequests] = useState<any[]>([]);
+    const [userRequests, setUserRequests] = useState<Array<{
+        id: string;
+        league_id: string;
+        user_email: string;
+        status: string;
+    }>>([]);
     const [userPrivateLeaguesCount, setUserPrivateLeaguesCount] = useState(0);
 
     // Historico filters
@@ -629,8 +679,8 @@ const Simulator: FC = () => {
 
             if (error) throw error;
             fetchLeagues();
-        } catch (err: any) {
-            console.error("Erro ao solicitar entrada:", err);
+        } catch (err) {
+            console.error("Erro ao solicitar entrada:", err instanceof Error ? err.message : String(err));
         }
     };
 
@@ -638,6 +688,7 @@ const Simulator: FC = () => {
         if (activeTab === 'competicoes' || activeTab === 'sugeridas') {
             fetchLeagues();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, user?.email]);
 
     useEffect(() => {
@@ -712,10 +763,10 @@ const Simulator: FC = () => {
                     {/* Page header */}
                     <div style={{ marginBottom: '0', display: 'flex', flexDirection: 'column' }}>
                         {/* Title row */}
-                        <div className="simulator-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <div>
+                        <div className="simulator-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
                                 <h1 style={{
-                                    fontSize: '38px',
+                                    fontSize: 'clamp(24px, 6vw, 38px)',
                                     fontWeight: 900,
                                     margin: 0,
                                     letterSpacing: '2px',
@@ -724,16 +775,16 @@ const Simulator: FC = () => {
                                     lineHeight: 1,
                                 }}>PALPITÔMETRO</h1>
                                 <p style={{
-                                    fontSize: '14px',
+                                    fontSize: 'clamp(11px, 2.5vw, 14px)',
                                     color: 'rgba(255, 255, 255, 0.7)',
-                                    marginTop: '8px',
+                                    marginTop: '4px',
                                     fontWeight: 500,
-                                    margin: '8px 0 0 0'
+                                    margin: '4px 0 0 0'
                                 }}>
-                                    Dê seus palpites e divirta-se com os amigos — só pela diversão.
+                                    Dê seus palpites e divirta-se com os amigos.
                                 </p>
                             </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <button
                                     onClick={() => setShowBolaoRanking(true)}
                                     style={{
@@ -750,6 +801,7 @@ const Simulator: FC = () => {
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '6px',
+                                        whiteSpace: 'nowrap'
                                     }}
                                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#dc2626'; e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'; e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; e.currentTarget.style.color = '#ff6b6b'; }}
@@ -769,6 +821,7 @@ const Simulator: FC = () => {
                                         letterSpacing: '1px',
                                         cursor: 'pointer',
                                         transition: 'all 0.2s',
+                                        whiteSpace: 'nowrap'
                                     }}
                                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; e.currentTarget.style.background = 'transparent'; }}
@@ -779,16 +832,38 @@ const Simulator: FC = () => {
                         </div>
 
                         {/* Tab bar */}
-                        <div className="simulator-tabs-wrapper" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '32px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 4px' }}>
+                        <div className="simulator-tabs-wrapper" style={{ 
+                            display: 'flex', 
+                            borderBottom: '1px solid var(--border-color)', 
+                            marginBottom: '32px', 
+                            overflowX: 'auto', 
+                            WebkitOverflowScrolling: 'touch', 
+                            padding: '0 4px',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                            position: 'relative'
+                        }}>
                             {(['palpitar', 'historico', 'competicoes', 'sugeridas'] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
                                     className={`simulator-tab-btn ${activeTab === tab ? 'active' : ''}`}
+                                    style={{ whiteSpace: 'nowrap' }}
                                 >
                                     {tab === 'palpitar' ? 'PALPITAR' : tab === 'historico' ? 'HISTÓRICO' : tab === 'competicoes' ? 'COMPETIÇÕES' : 'LIGAS SUGERIDAS'}
                                 </button>
                             ))}
+                            {/* Fade indicator */}
+                            <div style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '40px',
+                                background: 'linear-gradient(to left, var(--bg-primary), transparent)',
+                                pointerEvents: 'none',
+                                zIndex: 1
+                            }} />
                         </div>
                     </div>
 
@@ -797,7 +872,7 @@ const Simulator: FC = () => {
                         <div style={{
                             display: 'flex',
                             gap: '8px',
-                            marginBottom: '20px',
+                            marginBottom: '16px',
                         }}>
                             {[{ label: 'HOJE', offset: 0 }, { label: 'AMANHÃ', offset: 1 }].map(day => (
                                 <button
@@ -805,12 +880,12 @@ const Simulator: FC = () => {
                                     onClick={() => setSelectedDayOffset(day.offset)}
                                     style={{
                                         flex: 1,
-                                        padding: '12px 16px',
+                                        padding: '10px 14px',
                                         borderRadius: '10px',
                                         border: selectedDayOffset === day.offset ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.08)',
                                         background: selectedDayOffset === day.offset ? 'rgba(255,46,46,0.12)' : 'rgba(255,255,255,0.03)',
                                         color: selectedDayOffset === day.offset ? 'white' : 'var(--text-secondary)',
-                                        fontSize: '12px',
+                                        fontSize: '11px',
                                         fontWeight: 700,
                                         letterSpacing: '0.5px',
                                         cursor: 'pointer',
@@ -825,43 +900,43 @@ const Simulator: FC = () => {
 
                     {/* Action buttons */}
                     {activeTab === 'palpitar' && (
-                        <div className="simulator-actions-row" style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                        <div className="simulator-actions-row" style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                             <button
                                 onClick={resetPredictions}
                                 style={{
-                                    padding: '8px 16px',
+                                    padding: '6px 12px',
                                     borderRadius: '8px',
                                     border: '1px solid var(--border-color)',
                                     background: 'transparent',
                                     color: predictionsFinalized ? 'rgba(255,255,255,0.4)' : 'var(--text-secondary)',
-                                    fontSize: '12px',
+                                    fontSize: '11px',
                                     fontWeight: 600,
                                     cursor: predictionsFinalized ? 'not-allowed' : 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
+                                    gap: '4px',
                                     transition: 'all 0.2s',
                                 }}
                                 disabled={predictionsFinalized}
                             >
-                                <RotateCcw size={14} />
+                                <RotateCcw size={12} />
                                 Limpar
                             </button>
                             <button
                                 onClick={savePredictions}
                                 className="hover-glow"
                                 style={{
-                                    padding: '8px 20px',
+                                    padding: '6px 14px',
                                     borderRadius: '8px',
                                     border: 'none',
                                     background: predictionsFinalized ? '#1a7a3a' : 'var(--accent-color)',
                                     color: 'white',
-                                    fontSize: '12px',
+                                    fontSize: '11px',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
+                                    gap: '4px',
                                     transition: 'all 0.3s',
                                     boxShadow: predictionsFinalized
                                         ? '0 2px 12px rgba(34,197,94,0.3)'
@@ -869,9 +944,9 @@ const Simulator: FC = () => {
                                 }}
                             >
                                 {predictionsFinalized ? (
-                                    <><CheckCircle size={14} /> PALPITES FECHADOS</>
+                                    <><CheckCircle size={12} /> FECHADOS</>
                                 ) : (
-                                    <><CheckCircle size={14} /> Salvar Todos</>
+                                    <><CheckCircle size={12} /> Salvar</>
                                 )}
                             </button>
                         </div>

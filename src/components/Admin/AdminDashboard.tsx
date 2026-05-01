@@ -1315,7 +1315,7 @@ const AdminDashboard: React.FC = () => {
                                                         background: match.status === 'live' ? 'rgba(227, 6, 19, 0.1)' : 'rgba(255, 255, 255, 0.05)',
                                                         color: match.status === 'live' ? 'var(--accent-color)' : 'var(--text-secondary)'
                                                     }}>
-                                                        {match.status.toUpperCase()}
+                                                        {match.status === 'scheduled' ? 'AGENDADO' : match.status === 'finished' ? 'ENCERRADO' : match.status === 'live' ? 'AO VIVO' : String(match.status).toUpperCase()}
                                                     </span>
                                                 </td>
                                                 <td className="admin-actions-cell" style={{ padding: '16px 20px' }}>
@@ -2306,7 +2306,7 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {isImportMatchesOpen && (
-                <ModalOverlay onClose={() => { 
+                <ModalOverlay wide onClose={() => { 
                     setIsImportMatchesOpen(false); 
                     setPreviewMatches([]); 
                     setMatchImportStatus(null);
@@ -2444,7 +2444,7 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                             </>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '60vh' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
                                     {previewMatches.length} partidas encontradas:
                                 </div>
@@ -2453,8 +2453,8 @@ const AdminDashboard: React.FC = () => {
                                     background: 'rgba(255,255,255,0.02)', 
                                     borderRadius: '12px', 
                                     border: '1px solid var(--border-color)', 
-                                    padding: '15px', 
-                                    maxHeight: '50vh' 
+                                    padding: '15px',
+                                    maxHeight: '55vh'
                                 }}>
                                     <div style={{ 
                                         display: 'grid', 
@@ -2570,11 +2570,18 @@ const AdminDashboard: React.FC = () => {
                                         })}
                                     </div>
                                 </div>
-                                <div className="admin-modal-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button onClick={handleConfirmImport} style={{ ...modalButtonStyle, background: 'var(--accent-color)' }}>
+                                <div className="admin-modal-actions" style={{ 
+                                    display: 'flex', 
+                                    gap: '10px', 
+                                    marginTop: '10px',
+                                    paddingTop: '10px',
+                                    borderTop: '1px solid var(--border-color)',
+                                    flexShrink: 0
+                                }}>
+                                    <button onClick={handleConfirmImport} style={{ ...modalButtonStyle, background: 'var(--accent-color)', flex: 1 }}>
                                         Confirmar e Criar Partidas
                                     </button>
-                                    <button onClick={() => setPreviewMatches([])} style={modalButtonStyle}>
+                                    <button onClick={() => setPreviewMatches([])} style={{ ...modalButtonStyle, flex: 1 }}>
                                         Voltar
                                     </button>
                                 </div>
@@ -2839,10 +2846,18 @@ const AdminDashboard: React.FC = () => {
     );
 };
 
-const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, backdropFilter: 'blur(5px)' }}>
+const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void, wide?: boolean }> = ({ children, onClose, wide = false }) => (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, backdropFilter: 'blur(5px)', padding: '20px' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={onClose} />
-        <div className="premium-card modal-content-wide" style={{ padding: '30px', width: '100%', maxWidth: '400px', position: 'relative', zIndex: 3001 }}>
+        <div className="premium-card modal-content-wide" style={{ 
+            padding: '30px', 
+            width: '100%', 
+            maxWidth: wide ? '900px' : '400px', 
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            position: 'relative', 
+            zIndex: 3001 
+        }}>
             {children}
         </div>
     </div>

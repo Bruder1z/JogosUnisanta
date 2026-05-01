@@ -416,6 +416,7 @@ const Home: React.FC = () => {
             {showLogin && <Login onClose={() => setShowLogin(false)} />}
             {showModalities && (
                 <ModalitiesModal
+                    isOpen={showModalities}
                     onClose={() => setShowModalities(false)}
                     onSelectSport={(sport: string) => {
                         setSelectedSport(sport);

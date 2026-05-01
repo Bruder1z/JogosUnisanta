@@ -1,6 +1,6 @@
 import React, { useState, type FC } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { AVAILABLE_COURSES, AVAILABLE_SPORTS } from '../data/mockData';
+import { AVAILABLE_COURSES } from '../data/mockData';
 import ForgotPassword from './components/ForgotPassword';
 
 const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -18,7 +18,7 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
         name: '',
         surname: '',
         preferredCourse: '',
-        preferredSport: ''
+        acceptTerms: false
     });
     const [error, setError] = useState('');
     const { login, register, confirmEmail, resendConfirmation } = useAuth();
@@ -32,8 +32,12 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                 setError('As senhas não coincidem.');
                 return;
             }
-            if (!formData.preferredCourse || !formData.preferredSport) {
-                setError('Por favor, selecione seu curso e esporte de preferência.');
+            if (!formData.preferredCourse) {
+                setError('Por favor, selecione seu curso.');
+                return;
+            }
+            if (!formData.acceptTerms) {
+                setError('Você precisa aceitar os termos de tratamento de dados para continuar.');
                 return;
             }
             const registerData = {
@@ -90,7 +94,12 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setFormData({ 
+            ...formData, 
+            [name]: type === 'checkbox' ? checked : value 
+        });
     };
 
     return (
@@ -105,12 +114,13 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            backdropFilter: 'blur(5px)'
+            backdropFilter: 'blur(5px)',
+            padding: '10px'
         }}>
             <div className="premium-card" style={{
                 width: '100%',
                 maxWidth: '450px',
-                padding: '24px',
+                padding: '16px',
                 maxHeight: '95vh',
                 overflowY: 'auto'
             }}>
@@ -249,10 +259,10 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                     </>
                 ) : (
                     <>
-                        <h2 style={{ marginBottom: '2px', textAlign: 'center', fontSize: '18px' }}>
+                        <h2 style={{ marginBottom: '1px', textAlign: 'center', fontSize: '17px' }}>
                             {isRegister ? 'Criar sua conta' : 'Bem-vindo de volta'}
                         </h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'center', marginBottom: '12px' }}>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', textAlign: 'center', marginBottom: '8px' }}>
                             {isRegister ? 'Cadastre-se para participar dos Jogos Unisanta' : 'Acesse para interagir nos Jogos Unisanta'}
                         </p>
 
@@ -260,10 +270,10 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                             <div style={{
                                 background: 'rgba(227, 6, 19, 0.1)',
                                 color: 'var(--accent-color)',
-                                padding: '12px',
+                                padding: '10px',
                                 borderRadius: 'var(--border-radius)',
-                                fontSize: '13px',
-                                marginBottom: '20px',
+                                fontSize: '12px',
+                                marginBottom: '12px',
                                 border: '1px solid var(--accent-color)'
                             }}>
                                 {error}
@@ -273,140 +283,178 @@ const Login: FC<{ onClose: () => void }> = ({ onClose }) => {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {isRegister && (
                                 <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Nome</label>
-                                        <input
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleChange}
-                                            placeholder="Nome"
-                                            style={inputStyle}
-                                            required
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Sobrenome</label>
-                                        <input
-                                            name="surname"
-                                            value={formData.surname}
-                                            onChange={handleChange}
-                                            placeholder="Sobrenome"
-                                            style={inputStyle}
-                                            required
-                                        />
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>Nome</label>
+                                            <input
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleChange}
+                                                placeholder="Nome"
+                                                style={{ ...inputStyle, padding: '7px 10px' }}
+                                                required
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>Sobrenome</label>
+                                            <input
+                                                name="surname"
+                                                value={formData.surname}
+                                                onChange={handleChange}
+                                                placeholder="Sobrenome"
+                                                style={{ ...inputStyle, padding: '7px 10px' }}
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                 </>
                             )}
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>E-mail</label>
+                                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>E-mail</label>
                                 <input
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
                                     placeholder="seu@email.com"
-                                    style={inputStyle}
-                                    required
-                                />
-                            </div>
-
-                            {isRegister && (
-                                <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Curso</label>
-                                        <select
-                                            name="preferredCourse"
-                                            value={formData.preferredCourse}
-                                            onChange={handleChange}
-                                            style={inputStyle}
-                                            required
-                                        >
-                                            <option value="" disabled>Selecione seu curso</option>
-                                            {AVAILABLE_COURSES.map(course => (
-                                                <option key={course} value={course}>{course}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Esporte de interesse</label>
-                                        <select
-                                            name="preferredSport"
-                                            value={formData.preferredSport}
-                                            onChange={handleChange}
-                                            style={inputStyle}
-                                            required
-                                        >
-                                            <option value="" disabled>Selecione seu esporte</option>
-                                            {AVAILABLE_SPORTS.map(sport => (
-                                                <option key={sport} value={sport}>{sport}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </>
-                            )}
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Senha</label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="••••••••"
-                                    style={inputStyle}
+                                    style={{ ...inputStyle, padding: '7px 10px' }}
                                     required
                                 />
                             </div>
 
                             {isRegister && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Confirmar Senha</label>
+                                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>Curso</label>
+                                    <select
+                                        name="preferredCourse"
+                                        value={formData.preferredCourse}
+                                        onChange={handleChange}
+                                        style={{ ...inputStyle, padding: '7px 10px' }}
+                                        required
+                                    >
+                                        <option value="" disabled>Selecione seu curso</option>
+                                        {AVAILABLE_COURSES.map(course => (
+                                            <option key={course} value={course}>{course}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>Senha</label>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    placeholder="••••••••"
+                                    style={{ ...inputStyle, padding: '7px 10px' }}
+                                    required
+                                />
+                            </div>
+
+                            {isRegister && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>Confirmar Senha</label>
                                     <input
                                         type="password"
                                         name="confirmPassword"
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
                                         placeholder="••••••••"
-                                        style={inputStyle}
+                                        style={{ ...inputStyle, padding: '7px 10px' }}
                                         required
                                     />
                                 </div>
                             )}
 
-                            <button type="submit" style={{
-                                background: 'var(--accent-color)',
-                                color: 'white',
-                                padding: '10px',
-                                borderRadius: 'var(--border-radius)',
-                                fontWeight: 'bold',
-                                marginTop: '4px',
-                                fontSize: '14px'
-                            }}>
+                            {isRegister && (
+                                <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center',
+                                    gap: '7px', 
+                                    marginTop: '2px'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        name="acceptTerms"
+                                        checked={formData.acceptTerms}
+                                        onChange={handleChange}
+                                        style={{
+                                            width: '14px',
+                                            height: '14px',
+                                            cursor: 'pointer',
+                                            accentColor: 'var(--accent-color)',
+                                            flexShrink: 0
+                                        }}
+                                        required
+                                    />
+                                    <label style={{ 
+                                        cursor: 'pointer',
+                                        fontSize: '11px',
+                                        lineHeight: '1.3',
+                                        color: 'var(--text-primary)'
+                                    }}>
+                                        Li e aceito os{' '}
+                                        <a 
+                                            href="/politica-de-privacidade" 
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ 
+                                                color: 'var(--accent-color)', 
+                                                textDecoration: 'underline',
+                                                fontWeight: 600
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            Termos de Uso e Política de Privacidade
+                                        </a>
+                                    </label>
+                                </div>
+                            )}
+
+                            <button 
+                                type="submit" 
+                                disabled={isRegister && !formData.acceptTerms}
+                                style={{
+                                    background: (isRegister && !formData.acceptTerms) ? 'var(--bg-hover)' : 'var(--accent-color)',
+                                    color: (isRegister && !formData.acceptTerms) ? 'var(--text-secondary)' : 'white',
+                                    padding: '9px',
+                                    borderRadius: 'var(--border-radius)',
+                                    fontWeight: 'bold',
+                                    marginTop: '4px',
+                                    fontSize: '14px',
+                                    cursor: (isRegister && !formData.acceptTerms) ? 'not-allowed' : 'pointer',
+                                    opacity: (isRegister && !formData.acceptTerms) ? 0.6 : 1,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
                                 {isRegister ? 'Finalizar Cadastro' : 'Entrar'}
                             </button>
 
                             {!isRegister && (
                                 <button
                                     type="button"
-                                    style={{ background: 'none', border: 'none', marginTop: 8 }}
+                                    style={{ background: 'none', border: 'none', marginTop: 6 }}
                                     onClick={() => setShowForgotPassword(true)}
                                 >
-                                    Esqueceu sua senha? <span style={{ color: 'var(--accent-color)', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline' }}>Clique aqui</span>
+                                    Esqueceu sua senha? <span style={{ color: 'var(--accent-color)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>Clique aqui</span>
                                 </button>
                             )}
 
                             <button
                                 type="button"
                                 onClick={() => setIsRegister(!isRegister)}
-                                style={{ color: 'var(--accent-color)', fontSize: '14px', fontWeight: 600 }}
+                                style={{ color: 'var(--accent-color)', fontSize: '13px', fontWeight: 600, marginTop: '0px' }}
                             >
                                 {isRegister ? 'Já tem uma conta? Faça Login' : 'Ainda não tem conta? Cadastre-se'}
                             </button>
 
                             <button type="button" onClick={onClose} style={{
                                 color: 'var(--text-secondary)',
-                                fontSize: '13px',
+                                fontSize: '12px',
+                                marginTop: '0px'
                             }}>
                                 Voltar para o site
                             </button>
@@ -425,7 +473,8 @@ const inputStyle = {
     borderRadius: 'var(--border-radius)',
     color: 'var(--text-primary)',
     outline: 'none',
-    width: '100%'
+    width: '100%',
+    fontSize: '13px'
 };
 
 export default Login;

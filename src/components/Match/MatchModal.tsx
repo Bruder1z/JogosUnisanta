@@ -629,7 +629,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   const TeamHeaderDisplay = ({ team }: { team: any }) => {
     const emblemUrl = getTeamEmblem(team);
     return (
-      <div style={{ flex: 1, textAlign: "center" }}>
+      <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
         <div
           style={{
             height: "80px",
@@ -665,10 +665,10 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             {team.logo}
           </div>
         </div>
-        <div style={{ fontSize: "18px", fontWeight: 800 }}>
+        <div style={{ fontSize: "18px", fontWeight: 800, wordWrap: "break-word", overflowWrap: "break-word" }}>
           {team.name.split(" - ")[0]}
         </div>
-        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+        <div style={{ fontSize: "12px", color: "var(--text-secondary)", wordWrap: "break-word", overflowWrap: "break-word" }}>
           {team.name.split(" - ")[1]}
         </div>
       </div>
@@ -786,8 +786,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
   };
 
   const getSafeEventDescription = (event: MatchEvent) => {
-    const baseLabel = event.description
-      ? event.description
+    const rawDescription = event.description
+      ? event.description.replace(/\|first=[AB]$/, '') // remove sufixo interno de pênaltis
+      : undefined;
+    const baseLabel = rawDescription
+      ? rawDescription
       : getEventLabel(event.type);
     const keepScoreTogether = (text: string) =>
       text.replace(/(\d+)\s*x\s*(\d+)/g, "$1\u00A0x\u00A0$2");
@@ -1436,6 +1439,7 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: "10px",
                 }}
               >
                 {isSwimming ? (
@@ -1485,15 +1489,17 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
                   <>
                     <TeamHeaderDisplay team={currentMatch.teamA} />
 
-                    <div style={{ padding: "0 20px", textAlign: "center" }}>
+                    <div style={{ padding: "0 20px", textAlign: "center", minWidth: "120px" }}>
                       <div
                         style={{
                           fontSize: "36px",
                           fontWeight: 900,
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "center",
                           gap: "15px",
                           color: "var(--text-primary)",
+                          flexWrap: "nowrap",
                         }}
                       >
                         <span className={scoreFlashTeam === 'A' ? 'score-flash-red' : ''}>
@@ -2759,6 +2765,11 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
             50% { color: #dc2626; text-shadow: 0 0 30px rgba(220, 38, 38, 1); }
         }
         
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
         .score-flash-red {
             animation: scoreFlashRed 0.5s ease-in-out 8;
         }
@@ -2775,6 +2786,27 @@ const MatchModal: FC<MatchModalProps> = ({ match: initialMatch, onClose }) => {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: var(--text-secondary);
+        }
+        
+        /* Responsividade para telas menores */
+        @media (max-width: 600px) {
+            .premium-card {
+                max-width: 100% !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .premium-card {
+                max-width: 100% !important;
+                padding: 15px !important;
+            }
+        }
+        
+        /* Garantir que o placar não quebre em nenhuma modalidade */
+        @media (max-width: 380px) {
+            .premium-card {
+                font-size: 14px;
+            }
         }
       `}</style>
     </div>

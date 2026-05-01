@@ -3154,7 +3154,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
         label = isJudo || isKarate ? "Início da luta" : "Início da partida";
         break;
       case "halftime":
-        label = event.description || "Intervalo";
+        label = (event.description || "Intervalo").replace(/\|first=[AB]$/, '');
         break;
       case "end":
         label =

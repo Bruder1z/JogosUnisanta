@@ -11,6 +11,7 @@ import Simulator from './pages/Simulator';
 import MatchControl from './pages/MatchControl';
 import Calendario from './pages/Calendario';
 import Torcida from './pages/Torcida';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './components/context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
@@ -73,6 +74,7 @@ const AppContent = () => {
         } />
         <Route path="/calendario" element={<Calendario />} />
         <Route path="/torcida" element={<Torcida />} />
+        <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
       </Routes>
       {isLoginModalOpen && <Login onClose={closeLoginModal} />}
       <BottomNav />
