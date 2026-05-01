@@ -258,6 +258,8 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
 
     const TeamDisplay = ({ team }: { team: any }) => {
         const emblemUrl = getTeamEmblem(team);
+        const [courseName, facultyFromName] = team.name.split(' - ');
+        const faculty = team.faculty || facultyFromName;
 
         return (
             <div style={{ flex: 1, textAlign: 'center' }}>
@@ -287,11 +289,10 @@ const MatchCard: FC<MatchCardProps> = ({ match, onClick }) => {
                         {team.logo}
                     </div>
                 </div>
-                <div className="match-team-name" style={{ fontSize: '14px', fontWeight: 600 }}>{team.name.split(' - ')[0]}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{team.name.split(' - ')[1]}</div>
-                {team.faculty && (
+                <div className="match-team-name" style={{ fontSize: '14px', fontWeight: 600 }}>{courseName}</div>
+                {faculty && (
                     <div style={{ fontSize: '11px', color: 'var(--accent-color)', fontWeight: 600, marginTop: '2px' }}>
-                        {team.faculty}
+                        {faculty}
                     </div>
                 )}
             </div>

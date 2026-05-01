@@ -212,6 +212,8 @@ button {
 
 .app-sidebar {
   transition: transform 0.3s ease;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 768px) {
@@ -219,6 +221,15 @@ button {
     transform: translateX(-100%);
     width: 260px !important;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.6) !important;
+    height: calc(100vh - var(--header-height)) !important;
+    max-height: calc(100vh - var(--header-height)) !important;
+    overflow-y: auto !important;
+    padding-bottom: 30px !important;
+  }
+  
+  /* Garantir que o conteúdo do sidebar seja scrollável */
+  .app-sidebar > * {
+    flex-shrink: 0;
   }
 
   .app-sidebar.sidebar-open {

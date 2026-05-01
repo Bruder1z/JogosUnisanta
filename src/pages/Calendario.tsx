@@ -46,7 +46,7 @@ const Calendario: FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }} className="calendar-page-head">
                             <div style={{ flex: 1 }}>
                                 <h1 style={{ margin: 0, fontSize: '34px', lineHeight: 1.1, fontWeight: 900 }}>
-                                    Calendario Oficial
+                                    Calendário Oficial
                                 </h1>
                                 <p style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '15px' }}>
                                     Jogos Unisanta 2026

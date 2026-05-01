@@ -134,7 +134,7 @@ const ModalDetalhes: FC<ModalDetalhesProps> = ({ isOpen, onClose, courseData }) 
                         </h2>
 
                         {/* Subtitle */}
-                        <div style={{
+                        <div className="participant-badge" style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '8px',
@@ -143,10 +143,18 @@ const ModalDetalhes: FC<ModalDetalhesProps> = ({ isOpen, onClose, courseData }) 
                             padding: '8px 16px',
                             borderRadius: '20px',
                             fontSize: '14px',
-                            fontWeight: 600
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            maxWidth: '100%'
                         }}>
-                            <Trophy size={16} />
-                            Participante dos Jogos Unisanta
+                            <Trophy size={16} style={{ flexShrink: 0 }} />
+                            <span style={{ 
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                Participante dos Jogos Unisanta
+                            </span>
                         </div>
                     </div>
 
@@ -171,10 +179,13 @@ const ModalDetalhes: FC<ModalDetalhesProps> = ({ isOpen, onClose, courseData }) 
                             </div>
                             <div>
                                 <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                    Unisanta
+                                    {courseData.university}
                                 </div>
                                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                    Santos - Brasil
+                                    {courseData.university.toLowerCase().includes('unaerp') || 
+                                     courseData.university.toLowerCase().includes('unoeste') 
+                                        ? 'Guarujá - Brasil' 
+                                        : 'Santos - Brasil'}
                                 </div>
                             </div>
                         </div>
@@ -223,6 +234,20 @@ const ModalDetalhes: FC<ModalDetalhesProps> = ({ isOpen, onClose, courseData }) 
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px) scale(0.95); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                
+                /* Mobile adjustments for participant badge */
+                @media (max-width: 480px) {
+                    .participant-badge {
+                        font-size: 12px !important;
+                        padding: 6px 12px !important;
+                        gap: 6px !important;
+                    }
+                    
+                    .participant-badge svg {
+                        width: 14px !important;
+                        height: 14px !important;
+                    }
                 }
             `}</style>
         </div>

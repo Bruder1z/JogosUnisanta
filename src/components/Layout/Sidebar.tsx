@@ -162,7 +162,7 @@ const Sidebar: FC<SidebarProps> = ({ onShowModalities, onSelectSport, onShowRank
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '30px' }}>
                     <button
                         onClick={() => {
                             close();

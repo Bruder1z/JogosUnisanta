@@ -4,7 +4,7 @@ import Sidebar from '../components/Layout/Sidebar';
 import RankingModal from '../components/Modals/RankingModal';
 import { useData } from '../components/context/DataContext';
 import { SPORT_ICONS } from '../data/mockData';
-import { Trophy, Star, Medal } from 'lucide-react';
+import { Trophy, Star } from 'lucide-react';
 
 // ─── Interface ─────────────────────────────────────────────────────────────────
 
@@ -59,11 +59,6 @@ const Avatar: FC<{ name: string; size?: number }> = ({ name, size = 48 }) => (
         {getInitials(name)}
     </div>
 );
-
-const SportEmoji: FC<{ modalidade: string }> = ({ modalidade }) => {
-    const emoji = SPORT_ICONS[modalidade] ?? '🏅';
-    return <span style={{ fontSize: '13px', lineHeight: 1 }}>{emoji}</span>;
-};
 
 // ─── Componente Principal ──────────────────────────────────────────────────────
 
@@ -213,13 +208,12 @@ const MelhoresAtletas: FC = () => {
                                     Ainda não há jogadores com MVP contabilizado.
                                 </div>
                             ) : (
-                                <div style={{ overflowX: 'auto' }}>
+                                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <thead>
                                             <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--border-color)' }}>
                                                 <th style={thStyle}>#</th>
                                                 <th style={thStyle}>Jogador</th>
-                                                <th style={thStyle}>Curso / Instituição</th>
                                                 <th style={thStyle}>Esporte</th>
                                                 <th style={{ ...thStyle, textAlign: 'right' }}>MVPs</th>
                                                 <th style={{ ...thStyle, textAlign: 'right' }}>Votos</th>
@@ -228,7 +222,6 @@ const MelhoresAtletas: FC = () => {
                                         <tbody>
                                             {mvpLeaders.map((athlete, index) => {
                                                 const isTop3 = index < 3;
-                                                const medalColors = ['#f59e0b', '#9ca3af', '#cd7c3a'];
                                                 return (
                                                     <tr
                                                         key={`${athlete.playerName}-${athlete.course}-${athlete.institution}`}
@@ -239,28 +232,40 @@ const MelhoresAtletas: FC = () => {
                                                         }}
                                                     >
                                                         <td style={{ ...tdStyle, width: '48px' }}>
-                                                            {isTop3 ? (
-                                                                <Medal size={16} color={medalColors[index]} fill={medalColors[index]} />
-                                                            ) : (
-                                                                <span style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>{index + 1}</span>
-                                                            )}
+                                                            <span style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>{index + 1}</span>
                                                         </td>
                                                         <td style={tdStyle}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                <Avatar name={athlete.playerName} size={38} />
-                                                                <div>
-                                                                    <div style={{ fontWeight: 700, fontSize: '14px' }}>{athlete.playerName}</div>
+                                                            <div style={{ minWidth: 0, flex: 1 }}>
+                                                                <div style={{ 
+                                                                    fontWeight: 700, 
+                                                                    fontSize: '14px',
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap'
+                                                                }}>
+                                                                    {athlete.playerName}
+                                                                </div>
+                                                                <div style={{ 
+                                                                    fontSize: '11px',
+                                                                    color: 'var(--text-secondary)',
+                                                                    marginTop: '2px',
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap'
+                                                                }}>
+                                                                    {athlete.course}
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                                            {athlete.course}
-                                                        </td>
-                                                        <td style={{ ...tdStyle, fontSize: '13px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                <SportEmoji modalidade={athlete.sportSample} />
-                                                                <span style={{ color: 'var(--text-secondary)' }}>{athlete.sportSample}</span>
-                                                            </div>
+                                                        <td style={{ 
+                                                            ...tdStyle, 
+                                                            fontSize: '13px',
+                                                            maxWidth: '120px',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            <span style={{ color: 'var(--text-secondary)' }}>{athlete.sportSample}</span>
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                             <span style={{
@@ -417,6 +422,43 @@ const MelhoresAtletas: FC = () => {
                     border-color: rgba(255,255,255,0.12);
                 }
                 tbody tr:hover { background: rgba(255,255,255,0.02) !important; }
+                
+                /* Mobile adjustments for MVP table */
+                @media (max-width: 768px) {
+                    table {
+                        font-size: 12px !important;
+                    }
+                    
+                    th, td {
+                        padding: 8px 4px !important;
+                    }
+                    
+                    /* Adjust column widths for mobile */
+                    th:nth-child(1),
+                    td:nth-child(1) {
+                        width: 30px !important;
+                        padding: 8px 2px !important;
+                    }
+                    
+                    th:nth-child(2),
+                    td:nth-child(2) {
+                        max-width: 130px !important;
+                    }
+                    
+                    th:nth-child(3),
+                    td:nth-child(3) {
+                        max-width: 90px !important;
+                        font-size: 11px !important;
+                    }
+                    
+                    th:nth-child(4),
+                    td:nth-child(4),
+                    th:nth-child(5),
+                    td:nth-child(5) {
+                        width: 50px !important;
+                        text-align: center !important;
+                    }
+                }
             `}</style>
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}

@@ -66,7 +66,8 @@ const ModalRegras: FC<ModalRegrasProps> = ({ aberto, setAberto }) => {
                         paddingRight: '32px',
                     }}
                 >
-                    Regras do Bolão
+                    Regras do Palpitômetro
+
                 </h2>
 
                 {/* Texto principal */}

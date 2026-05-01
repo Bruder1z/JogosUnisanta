@@ -4592,64 +4592,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
               </div>
             ) : (
               <>
-                <div style={styles.teamLeft}>
-                  {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) && (
-                    <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
-                      DESCLASSIFICADO (HANSOKU)
-                    </div>
-                  )}
-                  <h2
-                    style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
-                    className="match-timeline-team-name"
-                  >
-                    {selectedMatch.teamA.name}
-                    {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamA.id) && (
-                      <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
-                    )}
-                  </h2>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{
-                      ...styles.score,
-                      color: (flashTeam === "A" || flashTeam === "both") ? "var(--accent-color)" : "white",
-                      transition: "color 0.4s ease",
-                    }}>{selectedMatch.scoreA}</div>
-                    {isSetSport && (
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {(() => {
-                          const lastSetWinEvent = [
-                            ...(selectedMatch.events || []),
-                          ]
-                            .reverse()
-                            .find((e) => e.type === "set_win");
-                          const events = lastSetWinEvent
-                            ? selectedMatch.events?.slice(
-                              selectedMatch.events.indexOf(lastSetWinEvent) + 1,
-                            ) || []
-                            : selectedMatch.events || [];
-                          return events.filter(
-                            (e) =>
-                              e.type === "goal" &&
-                              e.teamId === selectedMatch.teamA.id,
-                          ).length;
-                        })()}{" "}
-                        pts
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+                {/* Informações do jogo (tempo, modalidade) */}
                 {!isNoTimerSport ? (
                   <div
                     style={styles.timeDisplay}
@@ -4670,7 +4613,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       {formatClock(currentMinute)}
                     </span>
                     {isRunning && (
-                      <span style={styles.liveBadge} className="pulse-animation">
+                      <span style={styles.liveBadge}>
                         AO VIVO
                       </span>
                     )}
@@ -4724,7 +4667,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       {selectedMatch.sport} {selectedMatch.category}
                     </span>
                     {selectedMatch.status === "live" && (
-                      <span style={styles.liveBadge} className="pulse-animation">
+                      <span style={styles.liveBadge}>
                         AO VIVO
                       </span>
                     )}
@@ -4793,62 +4736,138 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                     )}
                   </div>
                 )}
-
-                <div style={styles.teamRight}>
-                  {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) && (
-                    <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
-                      DESCLASSIFICADO (HANSOKU)
-                    </div>
-                  )}
-                  <h2
-                    style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
-                    className="match-timeline-team-name"
-                  >
-                    {selectedMatch.teamB.name}
-                    {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamB.id) && (
-                      <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
-                    )}
-                  </h2>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{
-                      ...styles.score,
-                      color: (flashTeam === "B" || flashTeam === "both") ? "var(--accent-color)" : "white",
-                      transition: "color 0.4s ease",
-                    }}>{selectedMatch.scoreB}</div>
-                    {isSetSport && (
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "var(--accent-color)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {(() => {
-                          const lastSetWinEvent = [
-                            ...(selectedMatch.events || []),
-                          ]
-                            .reverse()
-                            .find((e) => e.type === "set_win");
-                          const events = lastSetWinEvent
-                            ? selectedMatch.events?.slice(
-                              selectedMatch.events.indexOf(lastSetWinEvent) + 1,
-                            ) || []
-                            : selectedMatch.events || [];
-                          return events.filter(
-                            (e) =>
-                              e.type === "goal" &&
-                              e.teamId === selectedMatch.teamB.id,
-                          ).length;
-                        })()}{" "}
-                        pts
+                
+                {/* Container dos times e placar */}
+                <div className="match-timeline-teams-container" style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                  gap: "20px",
+                }}>
+                  <div style={styles.teamLeft} className="match-timeline-team-left">
+                    {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) && (
+                      <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                        DESCLASSIFICADO (HANSOKU)
                       </div>
                     )}
+                    <h2
+                      style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamA.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
+                      className="match-timeline-team-name"
+                    >
+                      {selectedMatch.teamA.name}
+                      {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamA.id) && (
+                        <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                      )}
+                    </h2>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{
+                        ...styles.score,
+                        color: (flashTeam === "A" || flashTeam === "both") ? "var(--accent-color)" : "white",
+                        transition: "color 0.4s ease",
+                      }}>{selectedMatch.scoreA}</div>
+                      {isSetSport && (
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            color: "var(--accent-color)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {(() => {
+                            const lastSetWinEvent = [
+                              ...(selectedMatch.events || []),
+                            ]
+                              .reverse()
+                              .find((e) => e.type === "set_win");
+                            const events = lastSetWinEvent
+                              ? selectedMatch.events?.slice(
+                                selectedMatch.events.indexOf(lastSetWinEvent) + 1,
+                              ) || []
+                              : selectedMatch.events || [];
+                            return events.filter(
+                              (e) =>
+                                e.type === "goal" &&
+                                e.teamId === selectedMatch.teamA.id,
+                            ).length;
+                          })()}{" "}
+                          pts
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    fontSize: "48px",
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    flexShrink: 0,
+                  }}>
+                    X
+                  </div>
+                
+                  <div style={styles.teamRight} className="match-timeline-team-right">
+                    {selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) && (
+                      <div style={{ color: 'white', backgroundColor: 'var(--danger-color, #ef4444)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>
+                        DESCLASSIFICADO (HANSOKU)
+                      </div>
+                    )}
+                    <h2
+                      style={{ ...styles.teamName, ...(selectedMatch.events?.some(e => e.type === "hansoku" && e.teamId === selectedMatch.teamB.id) ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}
+                      className="match-timeline-team-name"
+                    >
+                      {selectedMatch.teamB.name}
+                      {selectedMatch.events?.some(e => e.type === "senshu" && e.teamId === selectedMatch.teamB.id) && (
+                        <span title="Senshu (Primeiro Ponto)" style={{ marginLeft: '8px', color: '#fbbf24', fontSize: '1.2em' }}>⭐</span>
+                      )}
+                    </h2>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{
+                        ...styles.score,
+                        color: (flashTeam === "B" || flashTeam === "both") ? "var(--accent-color)" : "white",
+                        transition: "color 0.4s ease",
+                      }}>{selectedMatch.scoreB}</div>
+                      {isSetSport && (
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            color: "var(--accent-color)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {(() => {
+                            const lastSetWinEvent = [
+                              ...(selectedMatch.events || []),
+                            ]
+                              .reverse()
+                              .find((e) => e.type === "set_win");
+                            const events = lastSetWinEvent
+                              ? selectedMatch.events?.slice(
+                                selectedMatch.events.indexOf(lastSetWinEvent) + 1,
+                              ) || []
+                              : selectedMatch.events || [];
+                            return events.filter(
+                              (e) =>
+                                e.type === "goal" &&
+                                e.teamId === selectedMatch.teamB.id,
+                            ).length;
+                          })()}{" "}
+                          pts
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </>
@@ -6840,7 +6859,7 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                       : isTeamA
                         ? "flex-start"
                         : "flex-end";
-                    const cardWidth = isGeneral ? "46%" : "48%";
+                    const cardWidth = "100%"; // Sempre 100% para melhor layout mobile
                     const shortTeamName = isTeamA
                       ? selectedMatch.teamA.name.split(" - ")[0]
                       : isTeamB
@@ -6969,14 +6988,26 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             </div>
                           ) : (
                             <>
-                              {!isSetSport && !isNoTimerSport && !isSwimming && (
-                                <span style={styles.eventTimePill}>
-                                  {formatClock(event.minute)}
+                              <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                width: "100%",
+                              }}>
+                                {!isSetSport && !isNoTimerSport && !isSwimming && (
+                                  <span style={styles.eventTimePill}>
+                                    {formatClock(event.minute)}
+                                  </span>
+                                )}
+                                <span style={styles.eventIconBubble}>
+                                  {getEventIcon(event.type)}
                                 </span>
-                              )}
-                              <span style={styles.eventIconBubble}>
-                                {getEventIcon(event.type)}
-                              </span>
+                                {event.teamId && !isBasketball && (
+                                  <span style={styles.eventMetaTag}>
+                                    {shortTeamName}
+                                  </span>
+                                )}
+                              </div>
                               <div
                                 style={{
                                   ...styles.eventContentWrap,
@@ -6995,19 +7026,14 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                                     style={{
                                       fontSize: "12px",
                                       color: "var(--accent-color)",
-                                      marginLeft: "8px",
                                       fontWeight: 700,
                                       background: "rgba(227, 6, 19, 0.1)",
-                                      padding: "2px 6px",
+                                      padding: "4px 8px",
                                       borderRadius: "4px",
+                                      alignSelf: "flex-start",
                                     }}
                                   >
                                     {event.timelineScore}
-                                  </span>
-                                )}
-                                {event.teamId && !isBasketball && (
-                                  <span style={styles.eventMetaTag}>
-                                    {shortTeamName}
                                   </span>
                                 )}
                               </div>
@@ -7019,9 +7045,9 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                             <div style={{
                               display: "flex",
                               gap: "6px",
-                              marginLeft: isTeamB ? "0" : "auto",
-                              marginRight: isTeamB ? "auto" : "0",
-                              marginTop: "8px",
+                              flexWrap: "wrap",
+                              width: "100%",
+                              marginTop: "4px",
                             }}>
                               {editingEventId === event.id ? (
                                 <>
@@ -7298,7 +7324,69 @@ const MatchTimeline: FC<MatchTimelineProps> = ({ matchId }) => {
                         border-left: none !important;
                     }
 
-                    .timeline-neutral {
+                    /* Mobile adjustments for timeline */
+                    @media (max-width: 768px) {
+                        .timeline-row-beauty {
+                            justify-content: center !important;
+                        }
+                        
+                        .timeline-item-beauty {
+                            width: 100% !important;
+                            max-width: 100% !important;
+                        }
+                        
+                        .timeline-list-beauty::before {
+                            display: none;
+                        }
+                        
+                        /* Ajustes para botões de editar/deletar no mobile */
+                        .timeline-item-beauty button {
+                            font-size: 11px !important;
+                            padding: 6px 10px !important;
+                        }
+                        
+                        .timeline-item-beauty select {
+                            font-size: 12px !important;
+                            min-width: 150px !important;
+                        }
+                        
+                        /* Ajustes para o placar no mobile */
+                        .match-timeline-scoreboard {
+                            flex-direction: column !important;
+                            gap: 16px !important;
+                            padding: 20px 16px !important;
+                        }
+                        
+                        .match-timeline-team-name {
+                            font-size: 0.9rem !important;
+                            text-align: center !important;
+                        }
+                        
+                        .match-timeline-time-display {
+                            order: -1 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                        }
+                        
+                        /* Layout do placar: times lado a lado */
+                        .match-timeline-teams-container {
+                            flex-direction: row !important;
+                            justify-content: space-between !important;
+                            align-items: center !important;
+                            gap: 12px !important;
+                        }
+                        
+                        .match-timeline-team-left,
+                        .match-timeline-team-right {
+                            flex: 1 !important;
+                            min-width: 0 !important;
+                        }
+                        
+                        /* Remover animação de pulse */
+                        .pulse-animation {
+                            animation: none !important;
+                        }
+                    }                    .timeline-neutral {
                         border-left: none !important;
                     }
 
@@ -7768,11 +7856,19 @@ const styles: Record<string, React.CSSProperties> = {
   },
   teamLeft: {
     flex: 1,
-    textAlign: "left",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
   },
   teamRight: {
     flex: 1,
-    textAlign: "right",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
   },
   teamName: {
     fontSize: "1.4rem",
@@ -8036,9 +8132,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   timelineItem: {
     display: "flex",
-    alignItems: "flex-start",
+    flexDirection: "column",
+    alignItems: "stretch",
     gap: "8px",
-    padding: "8px 10px",
+    padding: "12px",
     backgroundColor: "var(--bg-main)",
     borderRadius: "var(--border-radius)",
     border: "1px solid var(--border-color)",
@@ -8054,6 +8151,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "999px",
     padding: "4px 8px",
     flexShrink: 0,
+    alignSelf: "flex-start",
   },
   eventIconBubble: {
     fontSize: "18px",
@@ -8066,21 +8164,22 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(255,255,255,0.06)",
     border: "1px solid var(--border-color)",
     flexShrink: 0,
+    alignSelf: "flex-start",
   },
   eventContentWrap: {
     flex: 1,
     minWidth: 0,
     display: "flex",
+    flexDirection: "column",
     alignItems: "flex-start",
-    flexWrap: "wrap",
-    gap: "6px",
+    gap: "8px",
   },
   eventText: {
-    flex: 1,
-    minWidth: 0,
+    width: "100%",
     fontSize: "14px",
-    lineHeight: 1.4,
+    lineHeight: 1.5,
     wordBreak: "break-word",
+    whiteSpace: "normal",
   },
   eventMetaTag: {
     fontSize: "11px",
